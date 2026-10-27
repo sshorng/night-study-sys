@@ -9,6 +9,10 @@
  *  或在 Apps Script「專案設定 → 指令碼屬性」新增 PASSWORD。程式裡不寫死任何密語。 */
 const PWD_KEY = 'password';
 
+/** 「設定」工作表裡這幾列是系統用的，其餘每一列都是可調參數（前端「設定與檢查」頁也會寫回這裡）。
+ *  參數以「項目／值」兩欄呈現，直接在試算表改完，前端按「從雲端重新載入」就生效。 */
+const CFG_SYS_KEYS = { password: 1, meta: 1, config: 1, conflicts: 1, updatedAt: 1 };
+
 /** 範本檔名（上傳到雲端硬碟後，用檔名尋找） */
 const TPL_NAMES = ['座位表-範本.docx', '違規單-範本.docx', '名單範本.xlsx'];
 
@@ -153,6 +157,12 @@ function loadState_() {
   ensureSheets_();
   const cfg = {};
   readRows_('config').forEach(function (r) { cfg[r[0]] = r[1]; });
+  const opts = {};
+  Object.keys(cfg).forEach(function (k) {
+    const key = String(k || '').trim();
+    if (!key || CFG_SYS_KEYS[key]) return;
+    opts[key] = cfg[k] === null || cfg[k] === undefined ? '' : String(cfg[k]);
+  });
 
   const students = readRows_('students').map(function (r) {
     return {
@@ -216,7 +226,8 @@ function loadState_() {
   });
 
   return {
-    meta: safeJson_(cfg.meta, { school: '建成國中', term: '' }),
+    meta: safeJson_(cfg.meta, { school: '', term: '' }),
+    opts: opts,
     config: safeJson_(cfg.config, { refDate: '', totals: {} }),
     students: students,
     enrollments: enrollments,
@@ -264,6 +275,13 @@ function saveState_(st) {
   cfgMap.config = JSON.stringify(st.config || {});
   cfgMap.conflicts = JSON.stringify(st.conflicts || []);
   cfgMap.updatedAt = new Date().toISOString();
+  /* 可調參數逐列寫回「設定」工作表，前端與試算表兩邊都能改 */
+  const optRows = st.opts || {};
+  Object.keys(optRows).forEach(function (k) {
+    const key = String(k || '').trim();
+    if (!key || CFG_SYS_KEYS[key]) return;
+    cfgMap[key] = optRows[k] === null || optRows[k] === undefined ? '' : String(optRows[k]);
+  });
   const configRows = Object.keys(cfgMap).map(function (k) { return [k, cfgMap[k]]; });
 
   writeRows_('students', students);
@@ -308,7 +326,10 @@ function 初次設定() {
     return n + '：' + (findTemplate_(n) ? '找到' : '尚未上傳');
   });
   SpreadsheetApp.getUi().alert('工作表已建立\n\n' + report.join('\n')
-    + '\n\n通關密語：' + (password_() ? '已設定' : '尚未設定，請在「設定」工作表新增一列（A 欄 password、B 欄你的密語）'));
+    + '\n\n通關密語：' + (password_() ? '已設定' : '尚未設定，請在「設定」工作表新增一列（A 欄 password、B 欄你的密語）')
+    + '\n\n可調參數：也在「設定」工作表，一項一列（A 欄項目、B 欄值）。'
+    + '\n學校名稱、學年度與學期、退班點數門檻、違規事由清單、請假事由清單、便當選項、匯出檔名前綴，'
+    + '\n改完存檔，回到網頁按「從雲端重新載入」就生效。');
 }
 
 /* ------------------------------------------------------------------ */

@@ -512,11 +512,9 @@ input[type=checkbox]{accent-color:var(--seal)}
     <section class="page" id="page-config">
       <div class="grid2">
         <div>
-          <p class="hint">顯示與列印</p>
-          <div class="field" style="margin-bottom:10px">
-            <label>學年度與學期（會印在座位表表頭）</label>
-            <input id="cfgTerm" placeholder="115學年度第1學期">
-          </div>
+          <p class="hint">可調參數（同時存在試算表「設定」工作表，一項一列，直接改試算表也有效）</p>
+          <div id="optFields"></div>
+          <p class="hint">連線設定</p>
           <p class="hint">連線設定</p>
           <div class="field" style="margin-bottom:10px">
             <label>Google Apps Script 網址</label>
@@ -575,11 +573,31 @@ const CONFIG = {
 };
 const TPL = { seat:null, violation:null, roster:null };
 
+/* 可調參數：全部存在試算表「設定」工作表（一項一列，A 欄項目、B 欄值），
+   程式只留預設值；載入時以試算表的值為準，儲存時把有效值寫回試算表 */
+const OPTS = [
+  { key:'school',       label:'學校名稱',         def:'',      type:'text',
+    hint:'印在左側標題、違規通知單表頭與 Excel 表頭' },
+  { key:'term',         label:'學年度與學期',     def:'',      type:'text',
+    hint:'例：115學年度第1學期，會印在座位表與 Excel 表頭' },
+  { key:'vioLimit',     label:'退班點數門檻',     def:'3',     type:'number', min:1, max:9,
+    hint:'累積達這個點數就標示「依規定退班」' },
+  { key:'vioReasons',   label:'違規事由常用清單', def:'滑手機、聊天喧譁、趴睡、未帶作業、離開座位', type:'text',
+    hint:'以頓號分隔，新增違規時可一鍵填入' },
+  { key:'leaveReasons', label:'請假事由常用清單', def:'事假、病假、家庭因素、公假、臨時就醫', type:'text',
+    hint:'以頓號分隔，新增請假時可從清單挑' },
+  { key:'lunchOptions', label:'便當選項',         def:'葷、素、不訂', type:'text',
+    hint:'以頓號分隔，編輯學生時可從清單挑' },
+  { key:'exportPrefix', label:'匯出檔名前綴',     def:'夜自習', type:'text',
+    hint:'下載的檔案會是「前綴_座位表_日期.docx」' }
+];
+
 /* =====================================================================
    2. STATE
    ===================================================================== */
 let state = {
-  meta:{ school:'建成國中', term:'' },
+  meta:{ school:'', term:'' },
+  opts:{},
   config:{ refDate:'', totals:{} },
   students:[], enrollments:[], calendar:[], leaves:[], violations:[], checkins:[],
   seats:{}, seatPair:{}, duty:[], conflicts:[]
@@ -594,6 +612,30 @@ let ui = { tab:'today', sel:null, vioSel:new Set(), weekRef:'', cls:'all',
 const E = {
   iso(d){ const p=n=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate()); },
   today(){ return E.iso(new Date()); },
+  /* 可調參數：以試算表「設定」工作表的值優先，缺項才用程式預設值 */
+  optsOf(st){
+    const raw = (st && st.opts) || {}, out = {};
+    const meta = (st && st.meta) || {};
+    OPTS.forEach(function(d){
+      const v = raw[d.key];
+      const empty = v===undefined || v===null || String(v).trim()==='';
+      let val = empty ? d.def : String(v).trim();
+      if(empty && (d.key==='school' || d.key==='term') && meta[d.key]) val = String(meta[d.key]).trim();
+      out[d.key] = val;
+    });
+    return out;
+  },
+  opt(st,key){ return E.optsOf(st)[key]; },
+  optNum(st,key){
+    const d = OPTS.find(function(o){ return o.key===key; });
+    const n = Number(E.opt(st,key));
+    if(isFinite(n) && n > 0) return n;
+    return Number(d ? d.def : 1) || 1;
+  },
+  optList(st,key){
+    return String(E.opt(st,key)||'').split(/[、,，;；]/)
+      .map(function(s){ return s.trim(); }).filter(Boolean);
+  },
   parse(iso){ const [y,m,d]=iso.split('-').map(Number); return new Date(y,m-1,d); },
   wd(iso){ return E.parse(iso).getDay(); },
   isMonToFri(iso){ const w=E.wd(iso); return w>=1 && w<=5; },
@@ -883,6 +925,11 @@ const API = {
    ===================================================================== */
 const $ = id => document.getElementById(id);
 const esc = s => String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+/* 可調參數裡的清單（便當、請假事由）用 datalist 呈現，直接挑不用打字 */
+function dlOptions(id, arr){
+  if(!arr || !arr.length) return '';
+  return '<datalist id="'+id+'">'+arr.map(function(v){ return '<option value="'+esc(v)+'"></option>'; }).join('')+'</datalist>';
+}
 const ref = () => state.config.refDate || E.today();
 
 function toast(msg, ms){
@@ -918,7 +965,8 @@ function renderShell(){
   const iso = ref();
   const board = E.board(state, iso);
   $('topMeta').textContent = iso + '（星期' + CONFIG.WEEKDAY[E.wd(iso)] + '）' + (E.calLabel(state,iso) ? '　'+E.calLabel(state,iso) : '');
-  $('railSub').textContent = (state.meta.school||'') + '　' + (state.meta.term||'');
+  const shellOpts = E.optsOf(state);
+  $('railSub').textContent = [shellOpts.school, shellOpts.term].filter(Boolean).join('　');
   $('topRight').innerHTML = '<span class="pill '+(API.isCloud()?'ok':'')+'">'+(API.isCloud()?'雲端模式':'本機模式')+'</span>';
   /* 尚未設定雲端或雲端沒有名冊時，在最上方提示 */
   const setupBar = $('setupBar');
@@ -1591,7 +1639,7 @@ function openLeaveNew(){
     + '<div class="field"><label>起日</label><input type="date" id="lvFrom" value="'+ref()+'"></div>'
     + '<div class="field"><label>迄日</label><input type="date" id="lvTo" value="'+ref()+'"></div>'
     + '</div>'
-    + '<div class="field"><label>事由</label><input id="lvWhy" placeholder="例如：家長請假、身體不適"></div>'
+    + '<div class="field"><label>事由</label><input id="lvWhy" list="lvWhyDL" placeholder="例如：家長請假、身體不適">'+dlOptions('lvWhyDL', E.optList(state,'leaveReasons'))+'</div>'
     + '<p class="hint">只在夜自習上課日建立紀錄，週末與放假自動略過；同一天已有紀錄會跳過；當天若已點「到」會一併取消。</p>';
   const m = modal('新增請假', body, '<button class="btn" data-close>取消</button><button class="btn primary" id="lvSave">建立</button>');
   m.querySelector('[data-close]').addEventListener('click', closeModal);
@@ -1667,8 +1715,9 @@ function renderVio(){
       + '</div></div>';
   }).join('') : '<p class="hint">尚無紀錄</p>';
   const tot = E.vioTotals(state);
-  const over = tot.filter(t=>t.p>=3).length;
-  $('vioSum').innerHTML = '<h3>學生累積點數'+(over ? '　（'+over+' 人已達 3 點，依規定退班）' : '')+'</h3>'
+  const lim = E.optNum(state,'vioLimit');
+  const over = tot.filter(t=>t.p>=lim).length;
+  $('vioSum').innerHTML = '<h3>學生累積點數'+(over ? '　（'+over+' 人已達 '+lim+' 點，依規定退班）' : '')+'</h3>'
     + (tot.length ? '<div class="tablewrap"><table class="data">'
         + '<thead><tr><th style="width:200px">學生</th><th style="width:68px">筆數</th>'
         + '<th style="width:100px">累積點數</th><th style="width:120px">最近一次</th><th style="width:150px">狀態</th>'
@@ -1677,10 +1726,10 @@ function renderVio(){
             const s = E.byKey(state, t.key);
             return '<tr><td>'+(s ? s.cls+'-'+s.seat+' '+esc(s.name) : esc(t.key))+'</td>'
               + '<td class="num">'+t.n+'</td>'
-              + '<td class="num'+(t.p>=3?' over':'')+'">'+t.p+'</td>'
+              + '<td class="num'+(t.p>=lim?' over':'')+'">'+t.p+'</td>'
               + '<td>'+t.last+'</td>'
-              + '<td>'+(t.p>=3 ? '<span class="pill seal">達 3 點，依規定退班</span>' : '<span class="pill">觀察中</span>')+'</td>'
-              + '<td><button class="btn small'+(t.p>=3?' seal':'')+'" data-exitnotice="'+t.key+'">退班通知</button></td></tr>';
+              + '<td>'+(t.p>=lim ? '<span class="pill seal">達 '+lim+' 點，依規定退班</span>' : '<span class="pill">觀察中</span>')+'</td>'
+              + '<td><button class="btn small'+(t.p>=lim?' seal':'')+'" data-exitnotice="'+t.key+'">退班通知</button></td></tr>';
           }).join('')
         + '</tbody></table></div>'
       : '<p class="hint">目前沒有違規紀錄。</p>');
@@ -1807,7 +1856,15 @@ function renderExport(){
 function renderConfig(){
   $('cfgGas').value = CONFIG.GAS_URL || '';
   $('cfgPwd').value = CONFIG.PASSWORD || '';
-  $('cfgTerm').value = state.meta.term || '';
+  const cur = E.optsOf(state);
+  $('optFields').innerHTML = OPTS.map(function(d){
+    const val = esc(cur[d.key] || '');
+    const input = d.type==='number'
+      ? '<input type="number" data-opt="'+d.key+'" min="'+(d.min||1)+'" max="'+(d.max||999)+'" step="1" value="'+val+'">'
+      : '<input data-opt="'+d.key+'" value="'+val+'">';
+    return '<div class="field" style="margin-bottom:10px"><label>'+esc(d.label)+'</label>'+input
+      + '<p class="hint" style="margin:2px 0 0">'+esc(d.hint)+'</p></div>';
+  }).join('');
 }
 
 function render(){
@@ -2188,7 +2245,7 @@ function openStudent(key){
     + '<div class="grid2">'
     + '<div class="field"><label>姓名</label><input id="sName" value="'+esc(s.name)+'"></div>'
     + '<div class="field"><label>電話</label><input id="sPhone" value="'+esc(s.phone||'')+'"></div>'
-    + '<div class="field"><label>便當</label><input id="sLunch" value="'+esc(s.lunch||'')+'"></div>'
+    + '<div class="field"><label>便當</label><input id="sLunch" list="sLunchDL" value="'+esc(s.lunch||'')+'">'+dlOptions('sLunchDL', E.optList(state,'lunchOptions'))+'</div>'
     + '</div>'
     + '<div class="field"><label>備註</label><textarea id="sNote" rows="2">'+esc(s.note||'')+'</textarea></div>'
     + '<div class="field"><label>目前每週參加</label><div class="days" id="sDays">'
@@ -2267,15 +2324,29 @@ function openVioForm(id, pre){
   const selKey = pickKey || (list[0] ? list[0].key : '');
   const opts = list.map(s=>'<option value="'+s.key+'"'+(s.key===selKey?' selected':'')+'>'+s.cls+'-'+s.seat+' '+esc(s.name)+'</option>').join('');
   const theDate = rec ? rec.date : (pre.date || ref());
+  const lim = E.optNum(state,'vioLimit');
+  const chips = E.optList(state,'vioReasons').map(function(v){
+    return '<button type="button" class="btn small" data-fill="'+esc(v)+'">'+esc(v)+'</button>';
+  }).join(' ');
   const body = '<div class="field"><label>學生</label><select id="vk">'+opts+'</select></div>'
     + '<div class="field"><label>日期</label><input type="date" id="vd" value="'+theDate+'"></div>'
-    + '<div class="field"><label>違規點數（滿 3 點依規定退班）</label><input type="number" id="vp" min="1" max="9" step="1" value="'+(rec ? (Number(rec.points)||1) : 1)+'"></div>'
-    + '<div class="field"><label>事由</label><textarea id="vr" rows="3" placeholder="例如：夜自習期間違規（打瞌睡，多次提醒）"></textarea></div>'
-    + '<p class="hint">列印與下載時會自動在事由後面加上「（記O點）」。</p>';
+    + '<div class="field"><label>違規點數（滿 '+lim+' 點依規定退班）</label><input type="number" id="vp" min="1" max="9" step="1" value="'+(rec ? (Number(rec.points)||1) : 1)+'"></div>'
+    + '<div class="field"><label>事由</label><textarea id="vr" rows="3" placeholder="例如：夜自習期間違規（打瞌睡，多次提醒）"></textarea>'
+    + (chips ? '<div class="tools" style="margin-top:6px;flex-wrap:wrap">'+chips+'</div>' : '')
+    + '</div>'
+    + '<p class="hint">點上面的常用事由可快速填入；列印與下載時會自動在事由後面加上「（記O點）」。</p>';
   const m = modal(rec ? '編輯違規紀錄' : '新增違規紀錄', body,
     '<button class="btn" data-close>取消</button><button class="btn primary" id="vSave">儲存</button>');
   m.querySelector('#vr').value = rec ? (rec.reason || '') : (pre.reason || '');
   m.querySelector('#vr').focus();
+  m.querySelectorAll('[data-fill]').forEach(function(b){
+    b.addEventListener('click', function(){
+      const t = m.querySelector('#vr');
+      const cur = t.value.trim();
+      t.value = cur ? (cur.replace(/[、，,；;]$/,'') + '、' + b.dataset.fill) : b.dataset.fill;
+      t.focus();
+    });
+  });
   m.querySelector('[data-close]').addEventListener('click', closeModal);
   m.querySelector('#vSave').addEventListener('click', ()=>{
     const reason = m.querySelector('#vr').value.trim();
@@ -2313,7 +2384,7 @@ function doPrint(html, size, margin){
 function noticeBlock(it, kind){
   const titles = ['第一聯 教學組留存','第二聯 導師留存','第三聯 家長留存'];
   const isExit = kind === 'exit';
-  const head = isExit ? '建成國中夜自習退班通知單' : '建成國中夜自習違規通知單';
+  const head = (E.opt(state,'school') || '') + (isExit ? '夜自習退班通知單' : '夜自習違規通知單');
   const label = isExit ? '退班事由' : '違規事由';
   return titles.map(function(t){
     return '<table class="wt vio"><colgroup>'
@@ -2357,9 +2428,10 @@ function printExitNotice(keys, why, date){
 /* 從累積點數區直接列印退班通知 */
 function openExitNotice(key){
   const s = E.byKey(state, key); if(!s) return;
+  const lim = E.optNum(state,'vioLimit');
   const tot = E.vioTotals(state).filter(function(t){ return t.key===key; })[0];
   const p = tot ? tot.p : 0;
-  const def = '累積違規點數 '+p+' 點'+(p >= 3 ? '，依規定退班' : '');
+  const def = '累積違規點數 '+p+' 點'+(p >= lim ? '，依規定退班' : '');
   const body = '<div class="hint">'+s.cls+'-'+s.seat+'　'+esc(s.name)+'　累積違規 '+p+' 點</div>'
     + '<div class="field"><label>退班事由</label><textarea id="xWhy" rows="3">'+esc(def)+'</textarea></div>'
     + '<p class="hint">格式與違規通知單相同，只把「違規」改成「退班」，A4 橫式、三聯。</p>';
@@ -2367,7 +2439,7 @@ function openExitNotice(key){
     '<button class="btn" data-close>取消</button><button class="btn seal" id="xPrint">列印</button>');
   m.querySelector('[data-close]').addEventListener('click', closeModal);
   m.querySelector('#xPrint').addEventListener('click', function(){
-    const why = m.querySelector('#xWhy').value.trim() || ('累積違規點數 '+p+' 點，依規定退班');
+    const why = m.querySelector('#xWhy').value.trim() || ('累積違規點數 '+p+' 點'+(p >= lim ? '，依規定退班' : ''));
     printExitNotice([key], why, ref());
   });
 }
@@ -2473,7 +2545,7 @@ async function exportSeat(){
     CONFIG.SEAT_SLOTS.forEach(slot=>{ data['s'+slot.i] = E.seatCell(state, slot.i); });
     doc.render(data);
     const bytes = doc.getZip().generate({ type:'uint8array', compression:'DEFLATE' });
-    download(new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}), '夜自習座位表_'+stamp()+'.docx');
+    download(new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}), (E.opt(state,'exportPrefix')||'夜自習')+'_座位表_'+stamp()+'.docx');
     toast('已下載座位表');
   }catch(err){ toast('匯出失敗：'+err.message, 5000); }
 }
@@ -2487,7 +2559,7 @@ async function exportVio(ids){
     const doc = new DocxT(zip, { paragraphLoop:true, linebreaks:true, nullGetter:()=>'' });
     doc.render(E.vioDoc(state, ids));
     const bytes = doc.getZip().generate({ type:'uint8array', compression:'DEFLATE' });
-    download(new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}), '夜自習違規通知單_'+stamp()+'.docx');
+    download(new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}), (E.opt(state,'exportPrefix')||'夜自習')+'_違規通知單_'+stamp()+'.docx');
     toast('已下載違規單（'+ids.length+' 位，每頁 2 張）');
   }catch(err){ toast('匯出失敗：'+err.message, 5000); }
 }
@@ -2556,16 +2628,23 @@ async function exportXlsx(){
 
     wb.calcProperties = { fullCalcOnLoad:true };
     const out = await wb.xlsx.writeBuffer();
-    download(new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}), '夜自習名單_'+stamp()+'.xlsx');
+    download(new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}), (E.opt(state,'exportPrefix')||'夜自習')+'_名單_'+stamp()+'.xlsx');
     toast('已下載 Excel');
   }catch(err){ toast('匯出失敗：'+err.message, 5000); }
 }
 
 /* ---------- 設定 ---------- */
 function saveCfg(){
-  const url = $('cfgGas').value.trim(), pwd = $('cfgPwd').value, term = $('cfgTerm').value.trim();
+  const url = $('cfgGas').value.trim(), pwd = $('cfgPwd').value;
   CONFIG.GAS_URL = url; CONFIG.PASSWORD = pwd;
-  state.meta.term = term;
+  state.opts = state.opts || {};
+  Array.prototype.forEach.call(document.querySelectorAll('[data-opt]'), function(el){
+    state.opts[el.dataset.opt] = String(el.value || '').trim();
+  });
+  /* meta 同步一份，讓舊資料、Excel 與座位表範本照樣拿得到 */
+  state.meta = state.meta || {};
+  state.meta.school = state.opts.school || '';
+  state.meta.term = state.opts.term || '';
   localStorage.setItem('nightstudy.gas', url);
   localStorage.setItem('nightstudy.pwd', pwd);
   API.save().then(()=>{ render(); toast('設定已儲存'); }).catch(err=>toast('雲端連線失敗：'+err.message,5000));
@@ -2594,6 +2673,16 @@ function selfTest(){
 
 /* ---------- 啟動 ---------- */
 function normalize(){
+  state.meta = state.meta || {};
+  state.opts = state.opts || {};
+  /* 舊資料只有 meta.school／meta.term，搬進 opts 當作唯一來源 */
+  if(!state.opts.school && state.meta.school) state.opts.school = state.meta.school;
+  if(!state.opts.term && state.meta.term) state.opts.term = state.meta.term;
+  /* 缺的參數就補上預設值，儲存時會一併寫回試算表「設定」工作表，方便直接在試算表調整 */
+  const eff = E.optsOf(state);
+  Object.keys(eff).forEach(function(k){ if(state.opts[k]===undefined) state.opts[k] = eff[k]; });
+  state.meta.school = state.opts.school || '';
+  state.meta.term = state.opts.term || '';
   state.config = state.config || {};
   if(!state.config.refDate) state.config.refDate = E.today();
   state.config.totals = state.config.totals || {};
@@ -2641,6 +2730,7 @@ function normalize(){
 function emptyState(){
   return {
     meta:{ school:'', term:'', source:'' },
+    opts:{},
     config:{ refDate:E.today(), totals:{} },
     students:[], enrollments:[], calendar:[], leaves:[], violations:[],
     checkins:[], seats:{}, seatPair:{}, duty:[], dutyNotes:[], conflicts:[]
@@ -2740,7 +2830,7 @@ window.__NS = { CONFIG, get state(){ return state; }, get ui(){ return ui; }, E,
   renderList, renderListBody, listRows, setActive, batchActive, batchDays, dropSeatOf,
   releaseSeat, printVio, vioPages, openVioForm, renderLeave, openLeaveNew, deleteLeave, leaveList,
   printSeat, autoSeat, seatPart, deskSlots, deskBotKey,
-  openExit, openExitBatch, renderLog,
+  openExit, openExitBatch, renderLog, OPTS, closeModal, renderConfig, optsOf(){ return E.optsOf(state); },
   setTemplate(n,b){ TPL[n]=b; }, setTab(t){ ui.tab=t; render(); } };
 boot();
 </script>
