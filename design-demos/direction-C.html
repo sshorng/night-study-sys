@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>方向 C・夜自習工作台</title>
+<style>
+:root{
+  --bg:#F6F6F3; --card:#FFFFFF; --line:#E4E2DB; --line-2:#EFEDE6;
+  --ink:#16181C; --ink-2:#4E5561; --ink-3:#616976;
+  --accent:#0F6F63; --accent-soft:#E4F0ED; --warn:#B4522F;
+  --sans:"Noto Sans TC","Microsoft JhengHei",sans-serif;
+  --mono:ui-monospace,"Cascadia Mono",Consolas,monospace;
+  --r:14px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.7}
+.app{display:grid;grid-template-columns:224px minmax(0,1fr);min-height:100vh}
+
+/* 左側導覽 */
+.side{background:var(--card);border-right:1px solid var(--line);padding:22px 16px;display:flex;flex-direction:column;gap:26px}
+.side .brand{font-size:15px;font-weight:700;letter-spacing:.02em}
+.side .brand small{display:block;font-size:12px;font-weight:400;color:var(--ink-3);letter-spacing:.1em;margin-top:2px}
+.side nav{display:flex;flex-direction:column;gap:2px}
+.side nav a{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border-radius:9px;
+  color:var(--ink-2);text-decoration:none;font-size:13px}
+.side nav a:hover{background:var(--bg)}
+.side nav a[aria-current="page"]{background:var(--accent-soft);color:var(--accent);font-weight:700}
+.side nav a .n{font-family:var(--mono);font-size:12px;color:var(--ink-3)}
+.side nav a[aria-current="page"] .n{color:var(--accent)}
+.side .foot{margin-top:auto;font-size:12px;color:var(--ink-3);line-height:1.8}
+
+/* 主區 */
+.main{padding:22px 26px 34px;min-width:0;display:flex;flex-direction:column;gap:18px}
+.top{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.top h1{margin:0;font-size:15px;font-weight:700;letter-spacing:.02em}
+.top .date{font-family:var(--mono);font-size:12px;color:var(--ink-3);letter-spacing:.04em}
+.top .pills{margin-left:auto;display:flex;gap:8px}
+.pill{display:inline-flex;align-items:center;gap:6px;background:var(--card);border:1px solid var(--line);
+  border-radius:999px;padding:5px 13px;font-size:12px;color:var(--ink-2)}
+.pill b{font-family:var(--mono);font-size:14px;color:var(--ink)}
+.pill.accent{border-color:#BFDAD4;background:var(--accent-soft)}
+.pill.accent b{color:var(--accent)}
+
+/* 首屏：數字＋本週矩陣 */
+.hero{display:grid;grid-template-columns:minmax(230px,300px) minmax(0,1fr);gap:18px}
+.figure{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:20px 22px}
+.figure .k{font-size:12px;color:var(--ink-3);letter-spacing:.08em}
+.figure .n{font-family:var(--mono);font-size:64px;line-height:1.05;font-weight:600;letter-spacing:-.02em}
+.figure .n span{font-family:var(--sans);font-size:14px;font-weight:400;color:var(--ink-3);margin-left:6px;letter-spacing:0}
+.figure .sub{display:flex;gap:16px;margin-top:10px;font-size:12px;color:var(--ink-2)}
+.figure .sub b{font-family:var(--mono);font-size:14px;color:var(--ink);margin-right:3px}
+.figure .sub .warn b{color:var(--warn)}
+
+.matrix{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:18px 20px;min-width:0}
+.matrix h2{margin:0 0 2px;font-size:13px;font-weight:700}
+.matrix p{margin:0 0 14px;font-size:12px;color:var(--ink-3)}
+.grid{display:grid;grid-template-columns:52px repeat(5,minmax(0,1fr));gap:5px;align-items:center}
+.grid .h{font-size:12px;color:var(--ink-3);text-align:center;padding-bottom:2px}
+.grid .h.now{color:var(--accent);font-weight:700}
+.grid .c{font-family:var(--mono);font-size:12px;color:var(--ink-2)}
+.cell{aspect-ratio:1.55;border-radius:7px;display:grid;place-items:center;font-family:var(--mono);font-size:13px;
+  color:var(--ink);background:#EFF3F1;animation:pop .3s ease-out both;animation-delay:calc(var(--d) * 11ms)}
+.cell.dark{color:#fff}
+.cell.zero{color:var(--ink-3);background:#F3F3F0}
+@keyframes pop{from{transform:scale(.94)}to{transform:none}}
+
+/* 名單 */
+.roster{background:var(--card);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.roster header{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--line-2)}
+.roster header h2{margin:0;font-size:13px;font-weight:700}
+.roster header .hint{font-size:12px;color:var(--ink-3)}
+.roster header .chips{margin-left:auto;display:flex;gap:6px}
+.chip{border:1px solid var(--line);background:#fff;border-radius:999px;padding:3px 11px;font-size:12px;color:var(--ink-2);cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#fff}
+.list{max-height:calc(100vh - 470px);min-height:210px;overflow:auto}
+.item{display:grid;grid-template-columns:54px 1fr auto 118px;align-items:center;gap:12px;padding:9px 18px;
+  border-bottom:1px solid var(--line-2)}
+.item:hover{background:#FBFBF9}
+.item .seat{font-family:var(--mono);font-size:12px;color:var(--ink-3)}
+.item .nm{font-size:14px}
+.item .cls{font-family:var(--mono);font-size:12px;color:var(--ink-3)}
+.days{display:flex;gap:5px}
+.days button{width:30px;height:28px;border-radius:7px;border:1px solid var(--line);background:#fff;
+  font-family:var(--sans);font-size:12px;color:var(--ink-3);cursor:pointer;transition:background .12s,border-color .12s}
+.days button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+.days button:hover{border-color:var(--ink-3)}
+.roster footer{padding:10px 18px;font-size:12px;color:var(--ink-3);border-top:1px solid var(--line-2)}
+
+@media (max-width:1100px){
+  .app{grid-template-columns:1fr}
+  .side{flex-direction:row;align-items:center;gap:14px;border-right:0;border-bottom:1px solid var(--line);padding:12px 16px;overflow:auto}
+  .side .foot{display:none}
+  .side nav{flex-direction:row;gap:4px}
+  .hero{grid-template-columns:1fr}
+  .list{max-height:none}
+}
+@media (max-width:620px){
+  .main{padding:16px 14px 26px}
+  .figure .n{font-size:48px}
+  .grid{grid-template-columns:44px repeat(5,minmax(0,1fr));gap:4px}
+  .cell{font-size:12px;border-radius:6px}
+  .item{grid-template-columns:40px 1fr;row-gap:8px;padding:10px 14px}
+  .item .days{grid-column:1 / -1}
+  .item .cls{grid-column:1 / -1}
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <aside class="side">
+    <div class="brand">夜自習工作台<small>建成國中　115 學年度第 1 學期</small></div>
+    <nav>
+      <a href="#" aria-current="page">指揮台<span class="n">32</span></a>
+      <a href="#">座位編排<span class="n">51</span></a>
+      <a href="#">違規紀錄<span class="n">7</span></a>
+      <a href="#">匯出表單</a>
+      <a href="#">輪值日誌</a>
+      <a href="#">設定與檢查</a>
+    </nav>
+    <p class="foot">資料同步：雲端模式<br>最後更新 2026.10.27 12:25</p>
+  </aside>
+
+  <main class="main">
+    <div class="top">
+      <h1>今日看板</h1>
+      <span class="date">2026.10.27　星期二</span>
+      <div class="pills">
+        <span class="pill accent">應到 <b>32</b></span>
+        <span class="pill">已到 <b>0</b></span>
+        <span class="pill">請假 <b>0</b></span>
+      </div>
+    </div>
+
+    <section class="hero">
+      <div class="figure">
+        <div class="k">今日應到</div>
+        <div class="n">32<span>人</span></div>
+        <div class="sub">
+          <span>本週最多 <b>32</b></span>
+          <span class="warn">未點名 <b>32</b></span>
+        </div>
+      </div>
+
+      <div class="matrix">
+        <h2>各班本週人數</h2>
+        <p>顏色越深代表人數越多，今日為星期二</p>
+        <div class="grid" id="grid"></div>
+      </div>
+    </section>
+
+    <section class="roster">
+      <header>
+        <h2>學生名單</h2>
+        <span class="hint">點方格可切換該日參加</span>
+        <div class="chips">
+          <button class="chip" aria-pressed="true">全部</button>
+        </div>
+      </header>
+      <div class="list" id="list"></div>
+      <footer>共 51 名在冊，其中 32 名今日應到</footer>
+    </section>
+  </main>
+</div>
+
+<script>
+const DATA = {"meta":{"school":"建成國中","term":"115學年度第1學期","refDate":"2026-10-27","weekday":"二"},"today":[{"key":"901-09","cls":901,"seat":"09","name":"劉智偉","days":[1,1,0,0,0]},{"key":"901-22","cls":901,"seat":"22","name":"蔡雯琪","days":[1,1,1,1,0]},{"key":"901-34","cls":901,"seat":"34","name":"林小美","days":[0,1,0,1,0]},{"key":"902-01","cls":902,"seat":"01","name":"黃家豪","days":[1,1,0,0,0]},{"key":"902-09","cls":902,"seat":"09","name":"陳書維","days":[1,1,0,0,0]},{"key":"902-26","cls":902,"seat":"26","name":"鄭彥廷","days":[1,1,1,1,1]},{"key":"902-29","cls":902,"seat":"29","name":"楊俊傑","days":[1,1,1,1,1]},{"key":"903-03","cls":903,"seat":"03","name":"王家瑜","days":[1,1,0,1,0]},{"key":"903-07","cls":903,"seat":"07","name":"鄭冠廷","days":[1,1,1,0,0]},{"key":"903-11","cls":903,"seat":"11","name":"陳小華","days":[1,1,1,1,0]},{"key":"903-12","cls":903,"seat":"12","name":"周心怡","days":[0,1,1,0,1]},{"key":"903-26","cls":903,"seat":"26","name":"廖俊宏","days":[1,1,0,1,0]},{"key":"903-35","cls":903,"seat":"35","name":"賴品妍","days":[1,1,1,1,1]},{"key":"904-05","cls":904,"seat":"05","name":"邱承恩","days":[1,1,1,1,0]},{"key":"904-13","cls":904,"seat":"13","name":"蔡威廷","days":[1,1,1,1,0]},{"key":"904-14","cls":904,"seat":"14","name":"許紹宇","days":[1,1,1,1,0]},{"key":"904-15","cls":904,"seat":"15","name":"許淑芬","days":[1,1,1,1,1]},{"key":"904-21","cls":904,"seat":"21","name":"廖子軒","days":[1,1,1,1,0]},{"key":"904-30","cls":904,"seat":"30","name":"劉建宏","days":[0,1,1,0,0]},{"key":"904-33","cls":904,"seat":"33","name":"張政宏","days":[0,1,0,1,0]},{"key":"904-34","cls":904,"seat":"34","name":"黃沛慈","days":[1,1,0,0,0]},{"key":"905-05","cls":905,"seat":"05","name":"吳宛玲","days":[0,1,0,1,0]},{"key":"905-12","cls":905,"seat":"12","name":"徐宥廷","days":[0,1,1,1,0]},{"key":"905-13","cls":905,"seat":"13","name":"張志豪","days":[0,1,1,1,0]},{"key":"905-21","cls":905,"seat":"21","name":"吳泓睿","days":[0,1,0,0,0]},{"key":"905-30","cls":905,"seat":"30","name":"洪郁婷","days":[0,1,1,0,1]},{"key":"906-11","cls":906,"seat":"11","name":"吳怡君","days":[1,1,1,0,1]},{"key":"906-25","cls":906,"seat":"25","name":"邱冠宇","days":[0,1,1,0,0]},{"key":"906-35","cls":906,"seat":"35","name":"徐柏翰","days":[0,1,0,0,1]},{"key":"906-36","cls":906,"seat":"36","name":"張宥蓁","days":[0,1,0,0,1]},{"key":"907-27","cls":907,"seat":"27","name":"曾雨柔","days":[1,1,1,1,1]},{"key":"908-03","cls":908,"seat":"03","name":"林若晴","days":[0,1,1,1,0]}],"classes":[{"cls":901,"per":[2,3,1,3,1],"total":29,"joined":4,"notJoined":25},{"cls":902,"per":[4,4,3,4,4],"total":30,"joined":6,"notJoined":24},{"cls":903,"per":[5,6,4,4,2],"total":32,"joined":6,"notJoined":26},{"cls":904,"per":[11,8,8,8,5],"total":30,"joined":15,"notJoined":15},{"cls":905,"per":[0,5,5,5,1],"total":31,"joined":7,"notJoined":24},{"cls":906,"per":[2,4,3,0,3],"total":30,"joined":5,"notJoined":25},{"cls":907,"per":[1,1,1,1,1],"total":29,"joined":1,"notJoined":28},{"cls":908,"per":[0,1,5,5,0],"total":8,"joined":5,"notJoined":3}],"students":[{"key":"901-09","cls":901,"seat":"09","name":"劉智偉","days":[1,1,0,0,0]},{"key":"901-13","cls":901,"seat":"13","name":"林瑋婷","days":[0,0,0,1,1]},{"key":"901-22","cls":901,"seat":"22","name":"蔡雯琪","days":[1,1,1,1,0]},{"key":"901-34","cls":901,"seat":"34","name":"林小美","days":[0,1,0,1,0]},{"key":"902-01","cls":902,"seat":"01","name":"黃家豪","days":[1,1,0,0,0]},{"key":"902-09","cls":902,"seat":"09","name":"陳書維","days":[1,1,0,0,0]},{"key":"902-21","cls":902,"seat":"21","name":"楊冠霖","days":[0,0,1,1,1]},{"key":"902-26","cls":902,"seat":"26","name":"鄭彥廷","days":[1,1,1,1,1]},{"key":"902-29","cls":902,"seat":"29","name":"楊俊傑","days":[1,1,1,1,1]},{"key":"902-32","cls":902,"seat":"32","name":"謝柏均","days":[0,0,0,1,1]},{"key":"903-03","cls":903,"seat":"03","name":"王家瑜","days":[1,1,0,1,0]},{"key":"903-07","cls":903,"seat":"07","name":"鄭冠廷","days":[1,1,1,0,0]},{"key":"903-11","cls":903,"seat":"11","name":"陳小華","days":[1,1,1,1,0]},{"key":"903-12","cls":903,"seat":"12","name":"周心怡","days":[0,1,1,0,1]},{"key":"903-26","cls":903,"seat":"26","name":"廖俊宏","days":[1,1,0,1,0]},{"key":"903-35","cls":903,"seat":"35","name":"賴品妍","days":[1,1,1,1,1]},{"key":"904-01","cls":904,"seat":"01","name":"李雅婷","days":[1,0,0,0,0]},{"key":"904-02","cls":904,"seat":"02","name":"蔡美玲","days":[1,0,0,0,0]},{"key":"904-05","cls":904,"seat":"05","name":"邱承恩","days":[1,1,1,1,0]},{"key":"904-06","cls":904,"seat":"06","name":"許柏睿","days":[0,0,0,0,0]},{"key":"904-10","cls":904,"seat":"10","name":"周采潔","days":[1,0,0,0,0]},{"key":"904-11","cls":904,"seat":"11","name":"陳孟宸","days":[1,0,1,0,1]},{"key":"904-13","cls":904,"seat":"13","name":"蔡威廷","days":[1,1,1,1,0]},{"key":"904-14","cls":904,"seat":"14","name":"許紹宇","days":[1,1,1,1,0]},{"key":"904-15","cls":904,"seat":"15","name":"許淑芬","days":[1,1,1,1,1]},{"key":"904-21","cls":904,"seat":"21","name":"廖子軒","days":[1,1,1,1,0]},{"key":"904-22","cls":904,"seat":"22","name":"曾慧敏","days":[0,0,0,1,1]},{"key":"904-23","cls":904,"seat":"23","name":"黃俊良","days":[0,0,0,1,1]},{"key":"904-30","cls":904,"seat":"30","name":"劉建宏","days":[0,1,1,0,0]},{"key":"904-32","cls":904,"seat":"32","name":"謝庭瑋","days":[1,0,1,0,1]},{"key":"904-33","cls":904,"seat":"33","name":"張政宏","days":[0,1,0,1,0]},{"key":"904-34","cls":904,"seat":"34","name":"黃沛慈","days":[1,1,0,0,0]},{"key":"905-04","cls":905,"seat":"04","name":"李宇恩","days":[0,0,1,1,0]},{"key":"905-05","cls":905,"seat":"05","name":"吳宛玲","days":[0,1,0,1,0]},{"key":"905-12","cls":905,"seat":"12","name":"徐宥廷","days":[0,1,1,1,0]},{"key":"905-13","cls":905,"seat":"13","name":"張志豪","days":[0,1,1,1,0]},{"key":"905-14","cls":905,"seat":"14","name":"王小明","days":[0,0,1,1,0]},{"key":"905-21","cls":905,"seat":"21","name":"吳泓睿","days":[0,1,0,0,0]},{"key":"905-26","cls":905,"seat":"26","name":"洪思妤","days":[0,0,0,0,0]},{"key":"905-30","cls":905,"seat":"30","name":"洪郁婷","days":[0,1,1,0,1]},{"key":"906-07","cls":906,"seat":"07","name":"賴佩妤","days":[1,0,1,0,0]},{"key":"906-11","cls":906,"seat":"11","name":"吳怡君","days":[1,1,1,0,1]},{"key":"906-25","cls":906,"seat":"25","name":"邱冠宇","days":[0,1,1,0,0]},{"key":"906-35","cls":906,"seat":"35","name":"徐柏翰","days":[0,1,0,0,1]},{"key":"906-36","cls":906,"seat":"36","name":"張宥蓁","days":[0,1,0,0,1]},{"key":"907-27","cls":907,"seat":"27","name":"曾雨柔","days":[1,1,1,1,1]},{"key":"908-03","cls":908,"seat":"03","name":"林若晴","days":[0,1,1,1,0]},{"key":"908-04","cls":908,"seat":"04","name":"劉詩涵","days":[0,0,1,1,0]},{"key":"908-06","cls":908,"seat":"06","name":"李立婷","days":[0,0,1,1,0]},{"key":"908-07","cls":908,"seat":"07","name":"楊映彤","days":[0,0,1,1,0]},{"key":"908-21","cls":908,"seat":"21","name":"王聖凱","days":[0,0,1,1,0]}]};
+const WD = ['一', '二', '三', '四', '五'];
+const maxPer = Math.max.apply(null, DATA.classes.map(c => Math.max.apply(null, c.per)));
+const NOW = WD.indexOf(DATA.meta.weekday);
+
+/* 矩陣 */
+const grid = document.getElementById('grid');
+grid.innerHTML = '<div></div>' + WD.map((w, i) =>
+  '<div class="h' + (i === NOW ? ' now' : '') + '">' + w + '</div>').join('');
+let d = 0;
+DATA.classes.forEach(c => {
+  grid.insertAdjacentHTML('beforeend', '<div class="c">' + c.cls + '</div>');
+  c.per.forEach(v => {
+    const ratio = v / maxPer;
+    const strong = ratio >= 0.6;
+    const alpha = strong ? 1 : 0.12 + ratio * 0.55;
+    /* 實色：小量用淡青、大量用深青實色，確保白字對比足夠且列印不偏色 */
+    const mix = c => Math.round(255 - (255 - c) * alpha);
+    const bg = v === 0 ? '' : (strong ? '#0F6F63' : 'rgb(' + mix(15) + ',' + mix(111) + ',' + mix(99) + ')');
+    grid.insertAdjacentHTML('beforeend',
+      '<div class="cell' + (strong ? ' dark' : '') + (v === 0 ? ' zero' : '') + '" style="--d:' + (d++) +
+      ';background:' + bg + '">' + v + '</div>');
+  });
+});
+
+/* 名單 */
+const list = document.getElementById('list');
+DATA.students.forEach(s => {
+  const btns = s.days.map((v, i) =>
+    '<button aria-pressed="' + (v ? 'true' : 'false') + '" title="星期' + WD[i] + '">' + WD[i] + '</button>').join('');
+  const row = document.createElement('div');
+  row.className = 'item';
+  row.innerHTML =
+    '<span class="seat">' + s.seat + '</span>' +
+    '<span class="nm">' + s.name + '</span>' +
+    '<span class="cls">' + s.cls + '</span>' +
+    '<div class="days">' + btns + '</div>';
+  row.querySelectorAll('.days button').forEach(b => {
+    b.onclick = () => b.setAttribute('aria-pressed', b.getAttribute('aria-pressed') === 'true' ? 'false' : 'true');
+  });
+  list.appendChild(row);
+});
+</script>
+</body>
+</html>

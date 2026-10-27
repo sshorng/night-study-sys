@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>方向 A・夜自習運轉板</title>
+<style>
+:root{
+  --bg:#0B0D10; --panel:#14181E; --panel-2:#101419; --line:#262D36; --line-soft:#1C222A;
+  --fg:#E8EAEE; --fg-2:#C2C9D4; --fg-3:#AEB6C2;
+  --lamp:#E5A13C; --lamp-dim:#7A5620; --alert:#C96A4F; --ok:#4E9E7A;
+  --mono:ui-monospace,"Cascadia Mono",Consolas,"Courier New",monospace;
+  --sans:"Noto Sans TC","Microsoft JhengHei",sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:14px;line-height:1.7}
+body{-webkit-font-smoothing:antialiased}
+.shell{min-height:100vh;display:flex;flex-direction:column}
+
+/* 頂列 */
+.bar{display:flex;align-items:baseline;gap:28px;padding:18px 28px;border-bottom:1px solid var(--line)}
+.brand{font-size:15px;letter-spacing:.02em;font-weight:700}
+.brand span{display:block;font-size:12px;font-weight:400;color:var(--fg-3);letter-spacing:.14em}
+.clock{font-family:var(--mono);font-size:13px;color:var(--fg-2);letter-spacing:.04em}
+.clock span{color:var(--fg-3);margin-left:8px}
+.counts{margin-left:auto;font-size:12px;color:var(--fg-3);letter-spacing:.08em}
+.counts b{font-family:var(--mono);font-size:20px;color:var(--fg);font-weight:600;margin:0 4px}
+.counts .live{color:var(--lamp)}
+.counts .live b{color:var(--lamp)}
+
+/* 版面 */
+main{flex:1;display:grid;grid-template-columns:92px minmax(0,1fr) 322px}
+
+/* 左：班級索引 */
+.platforms{border-right:1px solid var(--line);padding:14px 0;background:var(--panel-2)}
+.platforms .idx{display:block;width:100%;padding:9px 0;text-align:center;font-family:var(--mono);font-size:13px;
+  color:var(--fg-3);letter-spacing:.06em;background:transparent;border:0;
+  border-left:2px solid transparent;cursor:pointer;appearance:none}
+.platforms .idx em{display:block;font-family:var(--sans);font-size:12px;font-style:normal;color:#8E97A6;letter-spacing:0}
+.platforms .idx[aria-selected="true"]{color:var(--fg);border-left-color:var(--lamp);background:#171C23}
+.platforms .idx[aria-selected="true"] em{color:var(--lamp)}
+.platforms .all{padding:6px 0 12px;text-align:center;font-size:12px;color:#8E97A6;letter-spacing:.1em}
+
+/* 中：今日名單 */
+.board{display:flex;flex-direction:column;min-width:0}
+.board-head{display:flex;align-items:baseline;gap:14px;padding:20px 28px 14px}
+.board-head h1{margin:0;font-size:13px;font-weight:400;color:var(--fg-2);letter-spacing:.14em}
+.board-head .big{font-family:var(--mono);font-size:46px;line-height:1;color:var(--lamp);font-weight:600}
+.board-head .unit{font-size:12px;color:var(--fg-3)}
+.board-head .state{margin-left:auto;font-size:12px;color:var(--fg-3);letter-spacing:.06em}
+.board-head .state::before{content:"";display:inline-block;width:6px;height:6px;background:var(--ok);
+  border-radius:50%;margin-right:7px;vertical-align:middle}
+
+.roster{list-style:none;margin:0;padding:0 12px 28px;overflow:auto}
+.row{display:grid;grid-template-columns:52px 1fr 138px 62px;align-items:center;gap:8px;
+  padding:7px 16px;border-bottom:1px solid var(--line-soft);animation:rowIn .3s ease-out both;
+  animation-delay:calc(var(--i) * 14ms)}
+.row:first-child{border-top:1px solid var(--line)}
+.seat{font-family:var(--mono);font-size:13px;color:var(--fg-3);letter-spacing:.06em}
+.name{font-size:15px;letter-spacing:.04em}
+.days{font-family:var(--mono);font-size:15px;letter-spacing:.34em;color:var(--fg-3)}
+.days b{color:var(--lamp);font-weight:400}
+.cls{font-family:var(--mono);font-size:12px;color:var(--fg-3);text-align:right;letter-spacing:.04em}
+.row:hover{background:#171C23}
+
+/* 右：各班本週 */
+.departures{border-left:1px solid var(--line);padding:20px 20px 28px;background:var(--panel-2)}
+.departures h2{margin:0 0 4px;font-size:12px;font-weight:400;color:var(--fg-3);letter-spacing:.16em}
+.departures p.note{margin:0 0 18px;font-size:12px;color:#8E97A6}
+.dept{display:grid;grid-template-columns:44px 1fr 30px;align-items:center;gap:10px;padding:7px 0;
+  border-bottom:1px solid var(--line-soft)}
+.dept .c{font-family:var(--mono);font-size:12px;color:var(--fg-2);letter-spacing:.04em}
+.bars{display:grid;grid-template-columns:repeat(5,1fr);gap:3px}
+.bars i{display:block;height:7px;background:#232A33;border-radius:1px;position:relative}
+.bars i b{position:absolute;inset:0;background:var(--lamp);border-radius:1px;transform-origin:left;
+  animation:barIn .5s cubic-bezier(.2,.8,.2,1) forwards;animation-delay:calc(var(--d) * 40ms)}
+.dept .sum{font-family:var(--mono);font-size:12px;color:var(--fg-3);text-align:right}
+.axis{display:grid;grid-template-columns:44px 1fr 30px;gap:10px;margin-top:8px}
+  font-size:12px;color:#8E97A6;text-align:center;letter-spacing:0}
+
+@keyframes rowIn{from{transform:translateY(4px)}to{transform:none}}
+@keyframes barIn{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+
+/* 窄螢幕 */
+@media (max-width:1000px){
+  main{grid-template-columns:64px minmax(0,1fr)}
+  .departures{display:none}
+  .row{grid-template-columns:44px 1fr 118px}
+  .cls{display:none}
+  .board-head{padding:16px 18px 10px}
+  .board-head .big{font-size:36px}
+  .row{padding:9px 10px}
+}
+@media (max-width:520px){
+  .bar{flex-wrap:wrap;gap:10px;padding:14px 16px}
+  .counts{margin-left:0;width:100%}
+  main{grid-template-columns:minmax(0,1fr)}
+  .platforms{display:none}
+  .days{letter-spacing:.2em;font-size:14px}
+}
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <header class="bar">
+    <div class="brand">建成國中<span>夜自習運轉板</span></div>
+    <div class="clock">2026.10.27<span>星期二</span></div>
+    <div class="counts">應到 <b>32</b>　實到 <b>0</b>　請假 <b>0</b>　<span class="live">未點名 <b>32</b></span></div>
+  </header>
+
+  <main>
+    <nav class="platforms" aria-label="班級索引">
+      <div class="all">全部</div>
+    </nav>
+
+    <section class="board">
+      <div class="board-head">
+        <h1>今日應到</h1>
+        <div class="big">32</div>
+        <div class="unit">人</div>
+        <div class="state">點名尚未開始</div>
+      </div>
+      <ol class="roster" id="roster"></ol>
+    </section>
+
+    <aside class="departures">
+      <h2>各班本週</h2>
+      <p class="note">左至右為星期一至星期五，長條為當日人數</p>
+      <div id="deptList"></div>
+      <div class="axis"><div></div><div class="wd"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span></div><div></div></div>
+    </aside>
+  </main>
+</div>
+
+<script>
+const DATA = {"meta":{"school":"建成國中","term":"115學年度第1學期","refDate":"2026-10-27","weekday":"二"},"today":[{"key":"901-09","cls":901,"seat":"09","name":"劉智偉","days":[1,1,0,0,0]},{"key":"901-22","cls":901,"seat":"22","name":"蔡雯琪","days":[1,1,1,1,0]},{"key":"901-34","cls":901,"seat":"34","name":"林小美","days":[0,1,0,1,0]},{"key":"902-01","cls":902,"seat":"01","name":"黃家豪","days":[1,1,0,0,0]},{"key":"902-09","cls":902,"seat":"09","name":"陳書維","days":[1,1,0,0,0]},{"key":"902-26","cls":902,"seat":"26","name":"鄭彥廷","days":[1,1,1,1,1]},{"key":"902-29","cls":902,"seat":"29","name":"楊俊傑","days":[1,1,1,1,1]},{"key":"903-03","cls":903,"seat":"03","name":"王家瑜","days":[1,1,0,1,0]},{"key":"903-07","cls":903,"seat":"07","name":"鄭冠廷","days":[1,1,1,0,0]},{"key":"903-11","cls":903,"seat":"11","name":"陳小華","days":[1,1,1,1,0]},{"key":"903-12","cls":903,"seat":"12","name":"周心怡","days":[0,1,1,0,1]},{"key":"903-26","cls":903,"seat":"26","name":"廖俊宏","days":[1,1,0,1,0]},{"key":"903-35","cls":903,"seat":"35","name":"賴品妍","days":[1,1,1,1,1]},{"key":"904-05","cls":904,"seat":"05","name":"邱承恩","days":[1,1,1,1,0]},{"key":"904-13","cls":904,"seat":"13","name":"蔡威廷","days":[1,1,1,1,0]},{"key":"904-14","cls":904,"seat":"14","name":"許紹宇","days":[1,1,1,1,0]},{"key":"904-15","cls":904,"seat":"15","name":"許淑芬","days":[1,1,1,1,1]},{"key":"904-21","cls":904,"seat":"21","name":"廖子軒","days":[1,1,1,1,0]},{"key":"904-30","cls":904,"seat":"30","name":"劉建宏","days":[0,1,1,0,0]},{"key":"904-33","cls":904,"seat":"33","name":"張政宏","days":[0,1,0,1,0]},{"key":"904-34","cls":904,"seat":"34","name":"黃沛慈","days":[1,1,0,0,0]},{"key":"905-05","cls":905,"seat":"05","name":"吳宛玲","days":[0,1,0,1,0]},{"key":"905-12","cls":905,"seat":"12","name":"徐宥廷","days":[0,1,1,1,0]},{"key":"905-13","cls":905,"seat":"13","name":"張志豪","days":[0,1,1,1,0]},{"key":"905-21","cls":905,"seat":"21","name":"吳泓睿","days":[0,1,0,0,0]},{"key":"905-30","cls":905,"seat":"30","name":"洪郁婷","days":[0,1,1,0,1]},{"key":"906-11","cls":906,"seat":"11","name":"吳怡君","days":[1,1,1,0,1]},{"key":"906-25","cls":906,"seat":"25","name":"邱冠宇","days":[0,1,1,0,0]},{"key":"906-35","cls":906,"seat":"35","name":"徐柏翰","days":[0,1,0,0,1]},{"key":"906-36","cls":906,"seat":"36","name":"張宥蓁","days":[0,1,0,0,1]},{"key":"907-27","cls":907,"seat":"27","name":"曾雨柔","days":[1,1,1,1,1]},{"key":"908-03","cls":908,"seat":"03","name":"林若晴","days":[0,1,1,1,0]}],"classes":[{"cls":901,"per":[2,3,1,3,1],"total":29,"joined":4,"notJoined":25},{"cls":902,"per":[4,4,3,4,4],"total":30,"joined":6,"notJoined":24},{"cls":903,"per":[5,6,4,4,2],"total":32,"joined":6,"notJoined":26},{"cls":904,"per":[11,8,8,8,5],"total":30,"joined":15,"notJoined":15},{"cls":905,"per":[0,5,5,5,1],"total":31,"joined":7,"notJoined":24},{"cls":906,"per":[2,4,3,0,3],"total":30,"joined":5,"notJoined":25},{"cls":907,"per":[1,1,1,1,1],"total":29,"joined":1,"notJoined":28},{"cls":908,"per":[0,1,5,5,0],"total":8,"joined":5,"notJoined":3}],"students":[{"key":"901-09","cls":901,"seat":"09","name":"劉智偉","days":[1,1,0,0,0]},{"key":"901-13","cls":901,"seat":"13","name":"林瑋婷","days":[0,0,0,1,1]},{"key":"901-22","cls":901,"seat":"22","name":"蔡雯琪","days":[1,1,1,1,0]},{"key":"901-34","cls":901,"seat":"34","name":"林小美","days":[0,1,0,1,0]},{"key":"902-01","cls":902,"seat":"01","name":"黃家豪","days":[1,1,0,0,0]},{"key":"902-09","cls":902,"seat":"09","name":"陳書維","days":[1,1,0,0,0]},{"key":"902-21","cls":902,"seat":"21","name":"楊冠霖","days":[0,0,1,1,1]},{"key":"902-26","cls":902,"seat":"26","name":"鄭彥廷","days":[1,1,1,1,1]},{"key":"902-29","cls":902,"seat":"29","name":"楊俊傑","days":[1,1,1,1,1]},{"key":"902-32","cls":902,"seat":"32","name":"謝柏均","days":[0,0,0,1,1]},{"key":"903-03","cls":903,"seat":"03","name":"王家瑜","days":[1,1,0,1,0]},{"key":"903-07","cls":903,"seat":"07","name":"鄭冠廷","days":[1,1,1,0,0]},{"key":"903-11","cls":903,"seat":"11","name":"陳小華","days":[1,1,1,1,0]},{"key":"903-12","cls":903,"seat":"12","name":"周心怡","days":[0,1,1,0,1]},{"key":"903-26","cls":903,"seat":"26","name":"廖俊宏","days":[1,1,0,1,0]},{"key":"903-35","cls":903,"seat":"35","name":"賴品妍","days":[1,1,1,1,1]},{"key":"904-01","cls":904,"seat":"01","name":"李雅婷","days":[1,0,0,0,0]},{"key":"904-02","cls":904,"seat":"02","name":"蔡美玲","days":[1,0,0,0,0]},{"key":"904-05","cls":904,"seat":"05","name":"邱承恩","days":[1,1,1,1,0]},{"key":"904-06","cls":904,"seat":"06","name":"許柏睿","days":[0,0,0,0,0]},{"key":"904-10","cls":904,"seat":"10","name":"周采潔","days":[1,0,0,0,0]},{"key":"904-11","cls":904,"seat":"11","name":"陳孟宸","days":[1,0,1,0,1]},{"key":"904-13","cls":904,"seat":"13","name":"蔡威廷","days":[1,1,1,1,0]},{"key":"904-14","cls":904,"seat":"14","name":"許紹宇","days":[1,1,1,1,0]},{"key":"904-15","cls":904,"seat":"15","name":"許淑芬","days":[1,1,1,1,1]},{"key":"904-21","cls":904,"seat":"21","name":"廖子軒","days":[1,1,1,1,0]},{"key":"904-22","cls":904,"seat":"22","name":"曾慧敏","days":[0,0,0,1,1]},{"key":"904-23","cls":904,"seat":"23","name":"黃俊良","days":[0,0,0,1,1]},{"key":"904-30","cls":904,"seat":"30","name":"劉建宏","days":[0,1,1,0,0]},{"key":"904-32","cls":904,"seat":"32","name":"謝庭瑋","days":[1,0,1,0,1]},{"key":"904-33","cls":904,"seat":"33","name":"張政宏","days":[0,1,0,1,0]},{"key":"904-34","cls":904,"seat":"34","name":"黃沛慈","days":[1,1,0,0,0]},{"key":"905-04","cls":905,"seat":"04","name":"李宇恩","days":[0,0,1,1,0]},{"key":"905-05","cls":905,"seat":"05","name":"吳宛玲","days":[0,1,0,1,0]},{"key":"905-12","cls":905,"seat":"12","name":"徐宥廷","days":[0,1,1,1,0]},{"key":"905-13","cls":905,"seat":"13","name":"張志豪","days":[0,1,1,1,0]},{"key":"905-14","cls":905,"seat":"14","name":"王小明","days":[0,0,1,1,0]},{"key":"905-21","cls":905,"seat":"21","name":"吳泓睿","days":[0,1,0,0,0]},{"key":"905-26","cls":905,"seat":"26","name":"洪思妤","days":[0,0,0,0,0]},{"key":"905-30","cls":905,"seat":"30","name":"洪郁婷","days":[0,1,1,0,1]},{"key":"906-07","cls":906,"seat":"07","name":"賴佩妤","days":[1,0,1,0,0]},{"key":"906-11","cls":906,"seat":"11","name":"吳怡君","days":[1,1,1,0,1]},{"key":"906-25","cls":906,"seat":"25","name":"邱冠宇","days":[0,1,1,0,0]},{"key":"906-35","cls":906,"seat":"35","name":"徐柏翰","days":[0,1,0,0,1]},{"key":"906-36","cls":906,"seat":"36","name":"張宥蓁","days":[0,1,0,0,1]},{"key":"907-27","cls":907,"seat":"27","name":"曾雨柔","days":[1,1,1,1,1]},{"key":"908-03","cls":908,"seat":"03","name":"林若晴","days":[0,1,1,1,0]},{"key":"908-04","cls":908,"seat":"04","name":"劉詩涵","days":[0,0,1,1,0]},{"key":"908-06","cls":908,"seat":"06","name":"李立婷","days":[0,0,1,1,0]},{"key":"908-07","cls":908,"seat":"07","name":"楊映彤","days":[0,0,1,1,0]},{"key":"908-21","cls":908,"seat":"21","name":"王聖凱","days":[0,0,1,1,0]}]};
+
+/* 今日名單 */
+const roster = document.getElementById('roster');
+DATA.today.forEach((s, i) => {
+  const marks = s.days.map(v => v ? '<b>■</b>' : '<span>□</span>').join('');
+  const li = document.createElement('li');
+  li.className = 'row';
+  li.style.setProperty('--i', i);
+  li.innerHTML =
+    '<span class="seat">' + s.seat + '</span>' +
+    '<span class="name">' + s.name + '</span>' +
+    '<span class="days">' + marks + '</span>' +
+    '<span class="cls">' + s.cls + '</span>';
+  roster.appendChild(li);
+});
+if (!DATA.today.length) {
+  roster.innerHTML = '<li class="row" style="opacity:1;--i:0"><span class="name">今日無應到學生</span></li>';
+}
+
+/* 班級索引 */
+const nav = document.querySelector('.platforms');
+DATA.classes.forEach(c => {
+  const b = document.createElement('button');
+  b.className = 'idx';
+  b.setAttribute('aria-selected', c.cls === 901 ? 'true' : 'false');
+  b.innerHTML = c.cls + '<em>' + c.joined + ' 人</em>';
+  b.onclick = () => {
+    document.querySelectorAll('.idx').forEach(x => x.setAttribute('aria-selected', 'false'));
+    b.setAttribute('aria-selected', 'true');
+  };
+  nav.appendChild(b);
+});
+
+/* 各班本週 */
+const maxPer = Math.max.apply(null, DATA.classes.map(c => Math.max.apply(null, c.per)));
+const dept = document.getElementById('deptList');
+DATA.classes.forEach((c, ci) => {
+  const bars = c.per.map((v, di) =>
+    '<i><b style="--d:' + (ci * 5 + di) + ';width:' + Math.round(v / maxPer * 100) + '%"></b></i>').join('');
+  const sum = c.per.reduce((a, b) => a + b, 0);
+  const row = document.createElement('div');
+  row.className = 'dept';
+  row.innerHTML = '<span class="c">' + c.cls + '</span><div class="bars">' + bars + '</div><span class="sum">' + sum + '</span>';
+  dept.appendChild(row);
+});
+</script>
+</body>
+</html>

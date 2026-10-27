@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>夜自習管理系統　介面方向初稿</title>
+<style>
+:root{
+  --bg:#F4F4F1; --card:#fff; --line:#E2E0DA; --ink:#17191D; --ink-2:#545B67; --ink-3:#6E7580;
+  --sans:"Noto Sans TC","Microsoft JhengHei",sans-serif;
+  --mono:ui-monospace,"Cascadia Mono",Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.75}
+.wrap{max-width:1320px;margin:0 auto;padding:36px 26px 60px}
+header h1{margin:0 0 6px;font-size:24px;letter-spacing:.02em}
+header p{margin:0;color:var(--ink-2);font-size:14px}
+.meta{margin-top:14px;display:flex;gap:18px;flex-wrap:wrap;font-size:13px;color:var(--ink-2)}
+.meta b{color:var(--ink-2);font-family:var(--mono)}
+
+.dirs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;margin-top:26px}
+.dir{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column}
+.dir .shot{display:block;position:relative;background:#EEE;aspect-ratio:16/10;overflow:hidden;border-bottom:1px solid var(--line)}
+.dir .shot img{width:100%;height:100%;object-fit:cover;object-position:top left;display:block;transition:transform .5s ease}
+.dir .shot:hover img{transform:scale(1.02)}
+.dir .body{padding:16px 18px 18px}
+.dir h2{margin:0 0 2px;font-size:16px;letter-spacing:.02em}
+.dir .tagline{margin:0 0 10px;font-size:14px;color:var(--ink-2)}
+.dir dl{margin:0;display:grid;grid-template-columns:64px 1fr;gap:2px 10px;font-size:14px;color:var(--ink-2)}
+.dir dt{color:var(--ink-3)}
+.dir dd{margin:0}
+.dir .links{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap}
+.dir a.btn{border:1px solid var(--line);border-radius:8px;padding:5px 12px;font-size:13px;color:var(--ink);text-decoration:none;background:#fff}
+.dir a.btn:hover{background:var(--bg)}
+
+.note{margin-top:28px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px}
+.note h2{margin:0 0 8px;font-size:14px}
+.note ul{margin:0;padding-left:1.2em;font-size:14px;color:var(--ink-2)}
+.note li{margin-bottom:4px}
+.note code{font-family:var(--mono);font-size:13px;background:#F1F0EC;padding:1px 5px;border-radius:4px}
+
+@media (max-width:1080px){ .dirs{grid-template-columns:1fr 1fr} }
+@media (max-width:720px){ .dirs{grid-template-columns:1fr} .wrap{padding:22px 16px 40px} header h1{font-size:20px} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>夜自習管理系統　介面方向初稿</h1>
+    <p>三個方向都用你的真實資料（51 人、8 班、2026.10.27 星期二）製作，不是假畫面。選一個，我照那個方向重做正式版。</p>
+    <div class="meta">
+      <span>今日應到 <b>32</b></span>
+      <span>各班本週 <b>8×5</b> 矩陣</span>
+      <span>三版皆通過對比度與字級下限</span>
+    </div>
+  </header>
+
+  <div class="dirs">
+    <article class="dir">
+      <a class="shot" href="direction-A.html"><img src="shots/A-first.png" alt="方向 A 首屏"></a>
+      <div class="body">
+        <h2>方向 A：運轉板</h2>
+        <p class="tagline">把 62 個晚上想成一班班的運轉，名單排成時刻表。</p>
+        <dl>
+          <dt>氣質</dt><dd>深夜、值班室、儀表</dd>
+          <dt>版面</dt><dd>班級軌道索引／時刻表名單／各班條圖</dd>
+          <dt>字型</dt><dd>數字等寬，中文黑體</dd>
+          <dt>色彩</dt><dd>近黑底＋琥珀單一強調</dd>
+        </dl>
+        <div class="links">
+          <a class="btn" href="direction-A.html">開啟完整版</a>
+          <a class="btn" href="shots/A-full.png">整頁截圖</a>
+        </div>
+      </div>
+    </article>
+
+    <article class="dir">
+      <a class="shot" href="direction-B.html"><img src="shots/B-first.png" alt="方向 B 首屏"></a>
+      <div class="body">
+        <h2>方向 B：點名簿</h2>
+        <p class="tagline">做成一本要蓋章的點名簿，直書題簽、界欄格線。</p>
+        <dl>
+          <dt>氣質</dt><dd>紙本、莊重、可歸檔</dd>
+          <dt>版面</dt><dd>右側直排書名／中央帳冊／左側今夜要點</dd>
+          <dt>字型</dt><dd>標題襯線（Noto Serif TC），內文黑體</dd>
+          <dt>色彩</dt><dd>宣紙暖黃＋墨＋朱紅印章</dd>
+        </dl>
+        <div class="links">
+          <a class="btn" href="direction-B.html">開啟完整版</a>
+          <a class="btn" href="shots/B-full.png">整頁截圖</a>
+        </div>
+      </div>
+    </article>
+
+    <article class="dir">
+      <a class="shot" href="direction-C.html"><img src="shots/C-first.png" alt="方向 C 首屏"></a>
+      <div class="body">
+        <h2>方向 C：工作台</h2>
+        <p class="tagline">當代資料工具，本週人數用熱度矩陣一眼看完。</p>
+        <dl>
+          <dt>氣質</dt><dd>清爽、現代、辦公日常</dd>
+          <dt>版面</dt><dd>左側導覽／首屏數字＋矩陣／名單卡片</dd>
+          <dt>字型</dt><dd>全黑體，標題加重</dd>
+          <dt>色彩</dt><dd>近白底＋深青單一強調</dd>
+        </dl>
+        <div class="links">
+          <a class="btn" href="direction-C.html">開啟完整版</a>
+          <a class="btn" href="shots/C-full.png">整頁截圖</a>
+        </div>
+      </div>
+    </article>
+  </div>
+
+  <div class="note">
+    <h2>三個方向的差別在哪</h2>
+    <ul>
+      <li><b>投影機與列印</b>：A 版深底在教室投影很清楚，但列印較耗墨；B、C 兩版列印都省墨。</li>
+      <li><b>第一眼看什麼</b>：A 先看到「今天誰該來」的名單；B 先看到「這是一本簿子」的莊重感；C 先看到「哪一天最忙」的分布。</li>
+      <li><b>與你既有習慣的距離</b>：B 最接近你現在的紙本與 Word 表單；C 最接近一般網站；A 兩者都不像，適合想要「一眼掃完」的值班情境。</li>
+      <li><b>手機使用</b>：三版都做過 375 寬檢查，B 會把直書標題收成橫式。</li>
+    </ul>
+  </div>
+</div>
+</body>
+</html>

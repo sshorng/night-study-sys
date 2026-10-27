@@ -1,0 +1,2748 @@
+﻿<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>夜自習點名簿</title>
+<style>
+:root{
+  --paper:#E8DDC4; --sheet:#F3EBD9; --sheet-2:#EEE4CE; --card:#FAF4E6;
+  --ink:#1F1B15; --ink-2:#4A4237; --ink-3:#6C6251;
+  --rule:#C3B394; --rule-soft:#D6C9AC;
+  --seal:#9E2B18; --seal-soft:#F0DAD2;
+  --ok:#3F6B4F; --ok-soft:#E2EBDD;
+  --serif:"Noto Serif TC","標楷體","DFKai-SB",serif;
+  --sans:"Noto Sans TC","Microsoft JhengHei",sans-serif;
+  --mono:ui-monospace,"Cascadia Mono",Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.75}
+body{
+  background-image:
+    repeating-linear-gradient(90deg, rgba(120,100,70,.045) 0 1px, transparent 1px 4px),
+    repeating-linear-gradient(0deg, rgba(120,100,70,.03) 0 1px, transparent 1px 5px);
+  min-height:100vh;
+}
+button{font-family:inherit;font-size:14px;color:inherit}
+input,select,textarea{font-family:inherit;font-size:14px}
+
+.sheet{
+  min-height:100vh;display:grid;grid-template-columns:186px minmax(0,1fr);
+  background:var(--sheet);border-left:1px solid var(--rule);border-right:1px solid var(--rule);
+}
+
+/* ---------- 左：今夜要點 ---------- */
+.stats{border-right:1px solid var(--rule);padding:22px 18px;display:flex;flex-direction:column;gap:16px;
+  position:sticky;top:0;align-self:start;height:100vh;overflow:auto}
+.stats h2{margin:0;font-family:var(--serif);font-size:14px;font-weight:600;letter-spacing:.22em;color:var(--ink-2)}
+.stat{display:flex;align-items:baseline;gap:8px;border-bottom:1px solid var(--rule-soft);padding-bottom:6px}
+.stat .n{font-family:var(--serif);font-size:30px;line-height:1.1;font-weight:600}
+.stat .k{font-size:12px;color:var(--ink-3);letter-spacing:.16em}
+.stat.warn .n{color:var(--seal)}
+.stats .quote{margin-top:auto;font-size:12px;color:var(--ink-3);line-height:1.9}
+.stats .quote b{display:block;font-family:var(--serif);font-size:13px;color:var(--ink-2);letter-spacing:.1em}
+
+/* ---------- 中：主區 ---------- */
+.main{min-width:0;display:flex;flex-direction:column}
+.topbar{padding:18px 26px 0}
+.topline{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.topline h1{margin:0;font-family:var(--serif);font-size:19px;font-weight:600;letter-spacing:.12em}
+.topline .meta{font-size:12px;color:var(--ink-3);letter-spacing:.08em}
+.topline .right{margin-left:auto;display:flex;gap:8px;align-items:center}
+
+.tabs{display:flex;gap:2px;margin-top:14px;border-bottom:2px solid var(--ink);flex-wrap:wrap}
+.tabs button{
+  border:0;background:transparent;padding:9px 15px;min-height:44px;font-size:13px;color:var(--ink-3);
+  border-bottom:3px solid transparent;margin-bottom:-2px;cursor:pointer;letter-spacing:.06em;
+}
+.tabs button:hover{color:var(--ink)}
+.tabs button[aria-selected="true"]{color:var(--ink);font-weight:700;border-bottom-color:var(--seal)}
+.setupbar{margin:12px 0 0;padding:10px 14px;border:1px solid #DCB6AA;border-radius:6px;
+  background:var(--seal-soft);color:#7E2415;font-size:13px;line-height:1.7}
+.setupbar[hidden]{display:none}
+
+.page{display:none;padding:16px 26px 34px}
+.page.on{display:block}
+
+/* ---------- 控制列 ---------- */
+.tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+.tools>*{flex:0 0 auto}
+.tools>span.hint{flex:1 1 220px;min-width:0;white-space:normal}
+.daynav{display:flex;align-items:center;gap:4px}
+.btn.nav{font-family:var(--serif);font-size:18px;line-height:1;padding:0 14px;min-width:44px;justify-content:center}
+.btn{
+  white-space:nowrap;
+  border:1px solid var(--rule);background:var(--card);border-radius:6px;padding:6px 14px;
+  min-height:44px;cursor:pointer;color:var(--ink);
+}
+.btn:hover{background:#FFF9EA}
+.btn.primary{background:var(--ink);border-color:var(--ink);color:#FBF5E7}
+.btn.primary:hover{background:#332C22}
+.btn.seal{background:var(--seal);border-color:var(--seal);color:#FBF1EC;white-space:nowrap}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.small{padding:6px 10px;min-height:36px;font-size:12px}
+.hint{font-size:12px;color:var(--ink-3)}
+
+/* ---------- 名冊 ---------- */
+.ledger{width:100%;border-collapse:collapse;background:var(--sheet)}
+.ledger th{
+  font-family:var(--serif);font-weight:600;font-size:12px;letter-spacing:.16em;color:var(--ink-2);
+  text-align:left;padding:8px 6px;border-bottom:1px solid var(--rule);white-space:nowrap;
+}
+.ledger th.d,.ledger td.d{text-align:center;width:52px;padding-left:2px;padding-right:2px}
+.ledger th.wk-hot{background:var(--seal);color:#FBF1EC;font-weight:700;border-bottom-color:var(--seal)}
+.ledger th.wk-hot span{display:block;font-size:9px;letter-spacing:0;color:#FBF1EC;opacity:.85}
+/* 今日那一欄：紙色壓深一階，不另起色相；表頭用朱印色塊標示 */
+.ledger td.wk-hot{background:#EBE0C6}
+.ledger td{padding:7px 6px;border-bottom:1px solid var(--rule-soft);vertical-align:middle}
+.ledger tr.band td{background:var(--sheet-2);font-family:var(--serif);font-size:13px;letter-spacing:.2em;color:var(--ink-2)}
+.ledger tbody tr.person{cursor:pointer}
+.ledger tbody tr.person:hover{background:#F8F1DE}
+.ledger .c{font-family:var(--serif);font-size:13px;color:var(--ink-2)}
+.ledger .s{font-family:var(--serif);font-size:13px;color:var(--ink-3)}
+.ledger .nm{font-family:var(--serif);font-size:16px;letter-spacing:.08em}
+.ledger .note{font-size:12px;color:var(--ink-3);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mk{font-family:var(--serif);font-size:15px;color:var(--ink)}
+.mk .off{color:#B4A68B}
+.mkbtn{
+  display:block;margin:0 auto;width:44px;height:44px;border-radius:6px;border:1px solid transparent;background:transparent;
+  font-family:var(--serif);font-size:15px;color:var(--ink);cursor:pointer;line-height:1;
+}
+.mkbtn:hover{border-color:var(--rule);background:#FFF9EA}
+.mkbtn.on{color:var(--ink)}
+.mkbtn.off{color:#B4A68B}
+/* 之後才生效的異動：名字旁的小標記，滑鼠移上去看異動內容 */
+.chg{display:inline-block;margin-left:6px;padding:0 4px;font-size:10px;letter-spacing:0;
+  color:var(--seal);background:var(--seal-soft);border:1px solid #DCB6AA;border-radius:3px;
+  cursor:help;vertical-align:middle}
+.ledger .wkmk{display:none}
+.pill{display:inline-block;font-size:11px;padding:1px 8px;border-radius:999px;border:1px solid var(--rule);color:var(--ink-3);background:var(--card)}
+.pill.seal{background:var(--seal-soft);border-color:#DCB6AA;color:#7E2415}
+.pill.ok{background:var(--ok-soft);border-color:#B9CDB4;color:#2F5340}
+
+/* ---------- 座位 ---------- */
+.band{margin-bottom:16px}
+.band .band-h{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--ink-3);margin-bottom:5px;letter-spacing:.1em}
+#seatWrap{overflow-x:auto;padding-bottom:6px}
+.seatgrid{display:grid;grid-template-columns:repeat(14,minmax(44px,1fr));gap:4px;min-width:0}
+#seatWrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.seat{
+  border:1px solid var(--rule);border-radius:5px;background:var(--card);padding:16px 4px 4px;min-height:46px;
+  display:flex;flex-direction:column;justify-content:center;align-items:center;gap:1px;text-align:center;cursor:pointer;position:relative;
+}
+.seat.tall{min-height:98px}
+.seat.empty{border-style:dashed;color:var(--ink-3)}
+/* 同一張桌子（同組的 A 與 C）同色；單數排一色、雙數排另一色 */
+.seat.g-odd{background:var(--card)}
+.seat.g-even{background:#EEE2C8}
+.seat.sel{outline:2px solid var(--seal);outline-offset:1px}
+.seat.over{background:#FFF3D8}
+.seat .no{position:absolute;top:2px;left:5px;font-size:10px;letter-spacing:.06em;color:#8D7C5F;font-family:var(--serif)}
+.seat .no i{font-style:normal;font-size:9px;margin-left:1px;color:#A2937A}
+.actbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:10px 0 2px}
+.seat .nm{font-family:var(--serif);font-size:13px;letter-spacing:.06em}
+.seat .mn{font-family:var(--serif);font-size:11px;color:var(--ink-2);letter-spacing:1px}
+.seat .sub{font-size:10px;color:var(--ink-3)}
+.seat.pair{padding-top:4px;justify-content:flex-start;gap:0}
+.seat .part{display:flex;flex-direction:column;align-items:center;gap:1px;padding:12px 0 2px;width:100%;position:relative}
+.seat .plab{position:absolute;top:0;left:4px;font-family:var(--serif);font-size:9.5px;color:#8D7C5F;letter-spacing:.04em}
+.seat .plab i{font-style:normal;margin-left:3px;font-size:9px;color:var(--seal);border:1px solid var(--seal-soft);border-radius:3px;padding:0 2px}
+.seat .nm{white-space:nowrap}
+.chip.un{flex-direction:column;align-items:flex-start;line-height:1.3;padding:5px 12px;border-radius:14px;gap:1px}
+.chip.un .un-days{font-family:var(--mono);font-size:10px;letter-spacing:1.5px;color:var(--ink-3)}
+.chip.un.sel .un-days{color:#FBF1EC}
+#printArea .sm+.sm{border-top:.5pt dashed #000;margin-top:1mm;padding-top:1mm}
+#printArea .sg{font-size:7pt;line-height:1.2}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1px solid var(--rule);background:var(--card);border-radius:999px;padding:4px 12px;min-height:44px;display:inline-flex;align-items:center;font-size:12px;cursor:pointer}
+.chip.sel{background:var(--seal);border-color:var(--seal);color:#FBF1EC}
+
+/* ---------- 異動日誌 ---------- */
+.log{list-style:none;margin:0;padding:0}
+.log li{border-left:2px solid var(--rule);padding:0 0 16px 16px;position:relative}
+.log li::before{content:"";position:absolute;left:-5px;top:7px;width:8px;height:8px;border-radius:50%;background:var(--sheet);border:2px solid var(--seal)}
+.log .date{font-family:var(--serif);font-size:13px;color:var(--ink-2);letter-spacing:.1em}
+.log .who{font-family:var(--serif);font-size:16px;letter-spacing:.06em;margin:0 8px}
+.log .chg{font-family:var(--mono);font-size:13px;color:var(--ink-2)}
+.log .why{font-size:12px;color:var(--ink-3);margin-top:2px}
+.log .lhead{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.log .acts{margin-left:auto;display:flex;gap:6px}
+
+/* ---------- 表格（違規、彙整） ---------- */
+table.data{width:100%;border-collapse:collapse;font-size:13px}
+table.data th,table.data td{border-bottom:1px solid var(--rule-soft);padding:7px 8px;text-align:left}
+table.data th{font-family:var(--serif);font-size:12px;letter-spacing:.14em;color:var(--ink-2);border-bottom:1px solid var(--rule)}
+table.roster td.tel{font-family:var(--mono);font-size:12px;color:var(--ink)}
+table.roster tr.off{opacity:.75}
+table.roster th.pick,table.roster td.pick{width:52px;padding:0;text-align:center}
+table.roster .cbox{display:grid;place-items:center;width:44px;height:44px;margin:0 auto;cursor:pointer}
+table.roster .cbox input{width:20px;height:20px;cursor:pointer}
+table.roster th.d5h,table.roster td.d5{text-align:center}
+/* 表頭字與下方方塊共用同一組等寬格位，確保一一對齊 */
+table.roster .d5g{display:inline-grid;grid-template-columns:repeat(5,15px);justify-items:center;align-items:center;letter-spacing:0}
+table.roster .d5g i{display:block;width:15px;font-style:normal;text-align:center;line-height:1;letter-spacing:0}
+table.roster th.d5h .d5g i{font-family:var(--serif);font-size:12px;color:var(--ink-2)}
+table.roster td.d5 .d5g i{font-family:var(--mono);font-size:12px;color:#B4A68B}
+table.roster td.d5 .d5g i.on{color:var(--ink)}
+.tablewrap{overflow-x:auto}
+/* 欄寬以百分比分配，隨容器等比例縮放；最窄 892px 可橫向捲動，最寬 1040px 不再拉長 */
+table.roster{width:100%;min-width:892px;max-width:1040px;table-layout:fixed}
+/* 請假次數與違規點數：數字可移入查看逐筆日期與原因 */
+table.data th.cnt,table.data td.cnt{width:64px;text-align:center}
+table.data td.cnt b{font-family:var(--serif);font-size:14px;font-weight:600;border-bottom:1px dotted var(--rule);cursor:help;padding:0 3px}
+table.data td.cnt b.hot{color:var(--seal);border-bottom-color:var(--seal)}
+table.data td.cnt .nul{color:var(--ink-3)}
+table.data td.num{font-family:var(--serif);font-size:14px;text-align:center}
+.vio-sum{margin-top:20px}
+.vio-sum h3{margin:0 0 8px;font-family:var(--serif);font-size:14px;font-weight:600;letter-spacing:.12em;color:var(--ink-2)}
+.vio-sum .over{color:var(--seal);font-weight:700}
+/* 紙本繳回勾選欄 */
+table.data th.paper,table.data td.paper{width:88px;text-align:center}
+table.data .pbox{display:grid;place-items:center;width:44px;height:44px;margin:0 auto;cursor:pointer}
+table.data .pbox input{width:20px;height:20px;cursor:pointer}
+input[type=checkbox]{accent-color:var(--seal)}
+#leaveTable th:nth-child(1),#leaveTable td:nth-child(1){width:170px;white-space:nowrap}
+#leaveTable th:nth-child(2),#leaveTable td:nth-child(2),
+#leaveTable th:nth-child(3),#leaveTable td:nth-child(3){width:72px}
+#leaveTable th:nth-child(6),#leaveTable td:nth-child(6){width:96px}
+#listTools .chips{flex:1 1 240px;min-width:0}
+.btn.tiny{min-height:44px;padding:2px 12px;font-size:12px}
+
+/* ---------- 輪值日誌：直式，每日一區塊 ---------- */
+.week{display:flex;flex-direction:column;gap:12px}
+/* 每天一張：第一列放日期與人數，下面整塊都是紀錄區 */
+.dayv{border:1px solid var(--rule);border-radius:6px;background:var(--card);padding:14px 16px;
+  display:flex;flex-direction:column;gap:12px}
+.dayv.today{outline:2px solid var(--seal);outline-offset:-1px;background:var(--sheet)}
+.dayv.off{background:var(--sheet-2)}
+.dv-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  padding-bottom:10px;border-bottom:1px solid var(--rule-soft)}
+.dv-wd{font-family:var(--serif);font-size:15px;letter-spacing:.14em;color:var(--ink)}
+.dv-dt{font-family:var(--mono);font-size:12px;color:var(--ink-3)}
+.dv-teach{font-family:var(--serif);font-size:17px;letter-spacing:.06em}
+.dv-nums{display:flex;flex-wrap:wrap;gap:2px 12px;font-size:12px;color:var(--ink-2)}
+.dv-nums b{font-family:var(--mono);font-size:13px;color:var(--ink)}
+.dv-act{margin-left:auto;display:flex;gap:8px}
+.dv-body{display:flex;flex-direction:column;gap:10px}
+.nt{border:1px solid var(--rule-soft);border-radius:6px;background:var(--sheet);padding:8px 10px;
+  display:grid;grid-template-columns:132px minmax(0,1fr) 124px;gap:10px;align-items:start;
+  grid-template-areas:"time main acts"}
+.nt-edit{background:var(--card)}
+.nt-ro{grid-template-columns:132px minmax(0,1fr);grid-template-areas:"time main"}
+.nt-edit .nt-text{min-height:130px}
+.nt-time{grid-area:time}
+.nt-main{grid-area:main;min-width:0;display:flex;flex-direction:column;gap:6px}
+.nt-acts{grid-area:acts;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.nt-hint{font-size:11px;color:var(--ink-3)}
+.nt-time-v{grid-area:time;font-family:var(--mono);font-size:13px;color:var(--ink-2);line-height:1.8}
+.nt-text-v{grid-area:main;font-size:14px;line-height:1.85;color:var(--ink);white-space:pre-wrap;word-break:break-word}
+/* 記事內容：可直接編輯，學生以內文標記呈現 */
+.nt-text{min-height:60px;border:1px solid var(--rule-soft);border-radius:4px;background:#FFFDF6;
+  padding:6px 8px;font-size:13px;line-height:1.7;white-space:pre-wrap;word-break:break-word}
+.nt-text:focus{outline:2px solid var(--seal);outline-offset:1px}
+.nt-text:empty:before{content:attr(data-ph);color:var(--ink-3)}
+.nt input[type=time]{width:124px;min-height:38px;border:1px solid var(--rule-soft);border-radius:4px;
+  background:#FFFDF6;padding:4px 6px;font-size:13px}
+.nt .nt-empty{font-size:12px;color:var(--ink-3);padding:4px 2px}
+.stu-tag{background:var(--seal-soft);border:1px solid #DCB6AA;border-radius:4px;
+  padding:0 5px;color:#7E2415;font-family:var(--serif);cursor:pointer;white-space:nowrap}
+.stu-tag:hover{background:#F2C9BE}
+/* 圖示按鈕：儲存打勾、編輯鉛筆、刪除叉叉 */
+.icobtn{width:44px;height:44px;display:inline-flex;align-items:center;justify-content:center;
+  border:1px solid var(--rule);border-radius:6px;background:var(--card);color:var(--ink-2);
+  cursor:pointer;padding:0}
+.icobtn:hover{background:#FFF9EA;color:var(--ink)}
+.icobtn.seal{background:var(--seal);border-color:var(--seal);color:#FBF1EC}
+.icobtn.seal:hover{background:#8C2415}
+.icobtn svg{width:18px;height:18px;display:block;stroke:currentColor;fill:none;
+  stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+/* 學生選單（輸入 90 開頭時浮出） */
+.stu-pop{position:absolute;z-index:80;display:flex;flex-direction:column;min-width:210px;max-width:280px;
+  background:var(--card);border:1px solid var(--rule);border-radius:6px;padding:4px;
+  box-shadow:0 10px 26px rgba(40,30,15,.22)}
+.stu-pop button{border:0;background:transparent;text-align:left;padding:8px 10px;font-size:13px;
+  font-family:var(--serif);letter-spacing:.04em;cursor:pointer;border-radius:4px;min-height:44px}
+.stu-pop button:hover,.stu-pop button:focus{background:var(--seal-soft);color:#7E2415}
+.icobtn:focus-visible{outline:2px solid var(--seal);outline-offset:2px}
+.nt-acts .icobtn{flex:0 0 auto}
+.ckbtn{display:inline-flex;align-items:center;justify-content:center;gap:2px;min-width:48px;min-height:44px;
+  background:transparent;border:0;padding:0 2px;cursor:pointer;border-radius:8px}
+.ckbtn i{font-style:normal;font-size:12px;color:var(--ink-3);margin-left:1px}
+.ckbtn:hover .pill{border-color:var(--ink-3);color:var(--ink)}
+.ckbtn:hover i{color:var(--ink)}
+.ckbtn:focus-visible{outline:2px solid var(--seal);outline-offset:2px}
+
+/* ---------- 對話框 ---------- */
+.overlay{position:fixed;inset:0;background:rgba(31,27,21,.5);display:flex;align-items:center;justify-content:center;z-index:70;padding:16px}
+.modal{background:var(--sheet);border:1px solid var(--rule);border-radius:10px;box-shadow:0 20px 50px rgba(40,30,15,.35);
+  width:min(560px,100%);max-height:92vh;overflow:auto}
+.modal.wide{width:min(900px,100%)}
+.modal h3{margin:0;padding:14px 18px;border-bottom:1px solid var(--rule);font-family:var(--serif);font-size:15px;letter-spacing:.1em}
+.modal .body{padding:16px 18px;display:flex;flex-direction:column;gap:12px}
+.modal .foot{padding:12px 18px;border-top:1px solid var(--rule);display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+.field{display:flex;flex-direction:column;gap:4px}
+.field label{font-size:12px;color:var(--ink-3);letter-spacing:.06em}
+.field input,.field select,.field textarea{border:1px solid var(--rule);border-radius:5px;padding:7px 10px;background:#FFFDF6;color:var(--ink)}
+.chk{display:flex;align-items:center;gap:10px;min-height:44px;font-size:13px;cursor:pointer;color:var(--ink)}
+.chk input{width:20px;height:20px;cursor:pointer}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.days{display:flex;gap:6px}
+.days button{flex:1;border:1px solid var(--rule);background:#FFFDF6;border-radius:5px;padding:9px 0;min-height:40px;cursor:pointer}
+.days button.on{background:var(--ink);border-color:var(--ink);color:#FBF5E7}
+
+/* ---------- 題簽：頁首標題區 ---------- */
+.titleblock{display:flex;flex-direction:column;gap:2px}
+.titleblock h1{margin:0;font-family:var(--serif);font-size:20px;font-weight:600;letter-spacing:.14em}
+.titleblock .meta{margin:0;font-size:11px;color:var(--ink-3);letter-spacing:.2em}
+.when{display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}
+.crest{width:38px;height:38px;flex:none;align-self:center;border:2px solid var(--seal);border-radius:3px;color:var(--seal);display:grid;
+  grid-template-columns:1fr 1fr;place-items:center;font-family:var(--serif);font-size:13px;font-weight:700;line-height:1;transform:rotate(-2.4deg)}
+
+.brief{border:1px solid var(--rule);background:var(--card);border-radius:6px;padding:10px 14px;margin:0 0 12px}
+.brief .row1{display:flex;gap:18px;flex-wrap:wrap;align-items:baseline;font-size:13px;color:var(--ink-2)}
+.brief b{font-family:var(--serif);font-size:15px;color:var(--ink);margin:0 2px}
+.brief .lv{margin-top:8px;padding-top:8px;border-top:1px dashed var(--rule);display:flex;gap:14px;flex-wrap:wrap;
+  align-items:baseline;font-size:13px}
+.brief .lv i{font-style:normal;font-size:12px;color:var(--ink-3);letter-spacing:.08em}
+.brief .lv .none{color:var(--ink-3);font-size:12px}
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);display:flex;flex-direction:column;gap:6px;z-index:90}
+.toast div{background:var(--ink);color:#FBF5E7;padding:8px 18px;border-radius:999px;font-size:13px;box-shadow:0 6px 18px rgba(0,0,0,.25)}
+.testlist{font-family:var(--mono);font-size:12px;display:flex;flex-direction:column;gap:2px}
+.testlist .ok{color:var(--ok)}
+.testlist .ng{color:var(--seal)}
+
+/* ---------- 窄螢幕 ---------- */
+/* 學生清單卡片：只在窄螢幕出現 */
+.cards{display:none}
+.card{border:1px solid var(--rule);border-radius:8px;background:var(--card);padding:10px 12px;
+  display:flex;flex-direction:column;gap:8px}
+.card.off{opacity:.72}
+.card-h{display:flex;align-items:center;gap:8px}
+.card .cbox{display:grid;place-items:center;width:44px;height:44px;flex:0 0 44px;margin-left:-10px;cursor:pointer}
+.card .cbox input{width:20px;height:20px;cursor:pointer}
+.card-who{flex:1 1 auto;font-family:var(--serif);font-size:17px;letter-spacing:.04em;cursor:pointer}
+.card-who b{font-family:var(--mono);font-size:12px;color:var(--ink-3);font-weight:400;margin-right:8px}
+.card-row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.card .d5g{display:inline-grid;grid-template-columns:repeat(5,16px);justify-items:center;align-items:center;letter-spacing:0}
+.card .d5g i{display:block;width:16px;font-style:normal;text-align:center;line-height:1;font-family:var(--mono);font-size:13px;color:#B4A68B}
+.card .d5g i.on{color:var(--ink)}
+.card-nums{display:flex;gap:14px;font-size:12px;color:var(--ink-2)}
+.card-nums b{font-family:var(--serif);font-size:14px;color:var(--ink)}
+.card-foot{display:flex;align-items:center;gap:12px;font-size:12px;color:var(--ink-3)}
+.card-foot .btn{margin-left:auto}
+.card-reason{font-size:13px;line-height:1.75;color:var(--ink)}
+.card-btns{display:flex;gap:8px;margin-left:auto}
+.chk-inline{display:inline-flex;align-items:center;gap:8px;min-height:44px;font-size:12px;color:var(--ink-2);cursor:pointer}
+.chk-inline input{width:20px;height:20px;cursor:pointer}
+#vioSum table{min-width:680px}
+@media (max-width:1100px){
+  .sheet{grid-template-columns:minmax(0,1fr)}
+  .stats{display:none}
+}
+@media (max-width:860px){
+  .sheet{grid-template-columns:minmax(0,1fr);border:0}
+  .crest{width:36px;height:36px;font-size:12px;line-height:.92}
+  .topline{gap:10px}
+  .topline h1{font-size:17px}
+  .titleblock h1{font-size:17px;letter-spacing:.06em}
+  .topline .meta,.titleblock .meta{font-size:11px;letter-spacing:.06em}
+  .topbar{padding:14px 14px 0}
+  .tabs{overflow-x:auto;flex-wrap:nowrap}
+  .tabs button{padding:9px 12px;white-space:nowrap}
+  .page{padding:14px 14px 30px}
+  /* 學生清單：窄螢幕改卡片，表格收起來 */
+  #listTableWrap,#leaveTableWrap,#vioTableWrap{display:none}
+  #listCards,#leaveCards,#vioCards{display:flex;flex-direction:column;gap:10px}
+  /* 手機版點名列：座號姓名一行、五個方塊加今夜一行、備註一行 */
+  .ledger thead{display:none}
+  .ledger tbody tr.person{display:grid;
+    grid-template-columns:repeat(5,44px) 58px minmax(0,1fr);
+    gap:6px 4px;align-items:center;padding:12px 0;border-bottom:1px solid var(--rule-soft)}
+  .ledger tbody tr.person td{border:0;padding:0}
+  .ledger .c{display:none}
+  .ledger .s{grid-row:1;grid-column:1;font-size:12px;color:var(--ink-3)}
+  .ledger .nm{grid-row:1;grid-column:2 / -1;font-size:17px;letter-spacing:.04em}
+  .ledger td.d{grid-row:2;position:relative;display:flex;justify-content:center;align-items:flex-start;
+    padding-bottom:14px;background:transparent}
+  .ledger td.d:nth-of-type(4){grid-column:1}
+  .ledger td.d:nth-of-type(5){grid-column:2}
+  .ledger td.d:nth-of-type(6){grid-column:3}
+  .ledger td.d:nth-of-type(7){grid-column:4}
+  .ledger td.d:nth-of-type(8){grid-column:5}
+  .ledger td.d:nth-of-type(9){grid-column:6}
+  .ledger td.wk-hot{background:transparent}
+  .ledger td.note{grid-row:3;grid-column:1 / -1;font-size:12px;max-width:none;color:var(--ink-3)}
+  .ledger tr.band td{display:block;padding:8px 0;font-size:12px}
+  .mkbtn{width:44px;height:44px;border:1px solid var(--rule);border-radius:6px;font-size:17px}
+  .ledger td.d .wkmk{position:absolute;left:0;right:0;bottom:0;display:block;text-align:center;
+    font-size:10px;line-height:1;color:var(--seal);letter-spacing:0;font-style:normal}
+  .seatgrid{grid-template-columns:repeat(14,minmax(58px,1fr))}
+  .seat{padding:14px 2px 3px}
+  .seat .nm{font-size:12px;letter-spacing:0;white-space:nowrap}
+  .seat .no{font-size:9px;left:3px}
+  .seat .nm{font-size:11px;letter-spacing:0}
+  .seat .sub,.seat .mn{font-size:9px;letter-spacing:0}
+  .seat.tall{min-height:64px}
+  .dayv{padding:12px 14px}
+  .dv-head{gap:8px}
+  .dv-act{margin-left:0;width:100%}
+  .nt-edit .nt-text{min-height:110px}
+  .nt{grid-template-columns:minmax(0,1fr) 48px;grid-template-areas:"time del" "main main"}
+  .nt input[type=time]{width:100%;max-width:200px}
+  .grid2{grid-template-columns:1fr}
+}
+/* 列印：只印 #printArea 裡的內容 */
+#printArea{display:none}
+#printArea .cut{border-top:.5pt solid #000;margin:3mm 0 0;height:8mm}
+#printArea .tit{font-family:var(--serif);font-size:12pt;text-align:center;margin:0 0 4mm;letter-spacing:.12em}
+#printArea table{border-collapse:collapse;width:100%}
+#printArea th,#printArea td{border:1px solid #333;padding:2px 3px;text-align:center;font-size:9pt;
+  font-family:var(--serif);line-height:1.4;vertical-align:middle}
+#printArea th{background:#EDEDED;font-weight:700}
+#printArea .printpage{margin-bottom:0}
+#printArea .lian{border:1.2px solid #333;margin-bottom:4mm}
+#printArea .lian .t{background:#EDEDED}
+/* 套 Word 範本尺寸的列印表格 */
+#printArea .wt{border-collapse:collapse;table-layout:fixed;width:100%;font-family:"標楷體","DFKai-SB",serif}
+#printArea .wt td{border:.5pt solid #000;padding:.4mm 1mm;text-align:center;vertical-align:middle;
+  font-size:9.5pt;line-height:1.2;font-family:"標楷體","DFKai-SB",serif}
+#printArea .wt .vt{font-size:12pt;font-weight:700}
+#printArea .wt .vl{text-align:left}
+#printArea .wt .vh td{font-weight:700;background:#EDEDED}
+#printArea .vio{margin:0;width:5.21in}
+#printArea .duo{display:grid;grid-template-columns:5.22in 5.22in;column-gap:.24in;justify-content:center;align-items:start}
+#printArea .duo .side{min-width:0}
+#printArea .seatmap td{font-size:12pt;line-height:1.15;padding:0}
+#printArea .seatmap .lbl{font-size:16pt;font-weight:700}
+@media print{
+  .sheet,#modalRoot,.toast,#tplPicker{display:none!important}
+  body{background:#fff;background-image:none}
+  #printArea{display:block!important}
+  #printArea .pagebreak{break-after:page;page-break-after:always}
+  #printArea .pagebreak:last-child{break-after:auto;page-break-after:auto}
+}
+</style>
+</head>
+<body>
+<div class="sheet">
+
+  <aside class="stats" id="stats"></aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div class="topline">
+        <span class="crest" aria-label="建成國中印"><span>建</span><span>成</span><span>國</span><span>中</span></span>
+        <div class="titleblock">
+          <h1>夜自習點名簿</h1>
+          <p class="meta" id="railSub">建成國中　115 學年度第 1 學期</p>
+        </div>
+        <div class="when">
+          <span class="meta" id="topMeta"></span>
+        </div>
+        <span class="right" id="topRight"></span>
+      </div>
+      <nav class="tabs" id="tabs" role="tablist"></nav>
+      <div class="setupbar" id="setupBar" hidden></div>
+    </div>
+
+    <section class="page on" id="page-today">
+      <div class="tools" id="todayTools"></div>
+      <div class="brief" id="todayBrief"></div>
+      <table class="ledger" id="roster"></table>
+    </section>
+
+    <section class="page" id="page-list">
+      <div class="tools" id="listTools"></div>
+      <div class="hint" id="listStat" style="margin-bottom:6px"></div>
+      <div class="tools" id="listBatch"></div>
+      <div class="tablewrap" id="listTableWrap"><table class="data roster" id="listTable"></table></div>
+      <div class="cards" id="listCards"></div>
+    </section>
+    <section class="page" id="page-seat">
+      <div class="tools" id="seatTools"></div>
+      <div class="actbar" id="seatAct"></div>
+      <div id="seatWrap"></div>
+      <div class="tools" style="margin-top:14px"><span class="hint">尚未入座</span></div>
+      <div class="chips" id="unseated"></div>
+    </section>
+
+    <section class="page" id="page-log">
+      <div class="tools" id="logTools"></div>
+      <ol class="log" id="logList"></ol>
+    </section>
+    <section class="page" id="page-leave">
+      <div class="tools" id="leaveTools"></div>
+      <div class="hint" id="leaveStat" style="margin-bottom:6px"></div>
+      <div class="tablewrap" id="leaveTableWrap"><table class="data" id="leaveTable"></table></div>
+      <div class="cards" id="leaveCards"></div>
+    </section>
+
+
+    <section class="page" id="page-vio">
+      <div class="tools" id="vioTools"></div>
+      <div class="tablewrap" id="vioTableWrap"><table class="data" id="vioList"></table></div>
+      <div class="cards" id="vioCards"></div>
+      <div class="vio-sum" id="vioSum"></div>
+    </section>
+
+    <section class="page" id="page-duty">
+      <div class="tools" id="dutyTools"></div>
+      <div class="week" id="week"></div>
+    </section>
+    <section class="page" id="page-export">
+      <div class="tools" id="expTools"></div>
+      <div class="grid2">
+        <div>
+          <p class="hint">一鍵匯出（以原檔為範本填入）</p>
+          <div class="tools" style="flex-direction:column;align-items:stretch">
+            <button class="btn primary" id="expXlsx">下載名單總表（.xlsx）</button>
+            <button class="btn primary" id="expSeat">下載座位表（.docx）</button>
+            <button class="btn" id="expVio">下載違規通知單（.docx）</button>
+            <button class="btn" id="expPrintList">列印名單（A4）</button>
+            <button class="btn" id="expBackup">備份全部資料（.json）</button>
+          </div>
+        </div>
+        <div>
+          <p class="hint">匯入時的資料落差</p>
+          <div id="conflictBox"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="page" id="page-config">
+      <div class="grid2">
+        <div>
+          <p class="hint">顯示與列印</p>
+          <div class="field" style="margin-bottom:10px">
+            <label>學年度與學期（會印在座位表表頭）</label>
+            <input id="cfgTerm" placeholder="115學年度第1學期">
+          </div>
+          <p class="hint">連線設定</p>
+          <div class="field" style="margin-bottom:10px">
+            <label>Google Apps Script 網址</label>
+            <input id="cfgGas" placeholder="https://script.google.com/macros/s/..../exec">
+          </div>
+          <div class="field" style="margin-bottom:10px">
+            <label>通關密語</label>
+            <input id="cfgPwd" type="password">
+          </div>
+          <p class="hint" id="cfgClsTotal" style="margin-bottom:10px"></p>
+          <div class="tools">
+            <button class="btn primary" id="btnSaveCfg">儲存設定</button>
+            <button class="btn" id="btnReload">從雲端重新載入</button>
+          </div>
+        </div>
+        <div>
+          <p class="hint">資料檢查</p>
+          <div class="tools"><button class="btn primary" id="btnTest">執行自我檢查</button></div>
+          <div class="testlist" id="testOut"></div>
+          <div class="tools" style="margin-top:12px">
+            <button class="btn" id="btnImport">匯入備份檔</button>
+            <input type="file" id="backupPicker" accept=".json" style="display:none">
+          </div>
+          <p class="hint">回復會覆蓋目前所有異動，執行前請先備份。</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+</div>
+
+<div id="printArea"></div>
+<div id="modalRoot"></div>
+<div class="toast" id="toast"></div>
+<input type="file" id="tplPicker" multiple accept=".docx,.xlsx" style="display:none">
+
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pizzip@3.1.7/dist/pizzip.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/docxtemplater@3.60.1/build/docxtemplater.js"></script>
+<script>/* 資料一律從雲端試算表載入；本檔不含任何名冊或個資（window.SEED 保留給測試與匯入覆寫） */window.SEED = window.SEED || null;</script>
+<script>
+/* =====================================================================
+   1. CONFIG
+   ===================================================================== */
+const CONFIG = {
+  VERSION: '2.0.0',
+  GAS_URL: '',
+  PASSWORD: '',
+  DAY_LABELS: ['一','二','三','四','五'],
+  WEEKDAY: ['日','一','二','三','四','五','六'],
+  /* 原檔座位欄標籤：一A、一C…七C（A 上列、C 下列，段號接在後面） */
+  SEAT_GROUPS: ['一A','一C','二A','二C','三A','三C','四A','四C','五A','五C','六A','六C','七A','七C'],
+  STORE_KEY: 'nightstudy.state.v2',
+  TPL_NAMES: { seat:'座位表-範本.docx', violation:'違規單-範本.docx', roster:'名單範本.xlsx' },
+  SEAT_SLOTS: [{"i":1,"band":1,"col":1,"row":0,"span":1},{"i":2,"band":1,"col":1,"row":1,"span":1},{"i":3,"band":1,"col":2,"row":0,"span":2},{"i":4,"band":1,"col":3,"row":0,"span":2},{"i":5,"band":1,"col":4,"row":0,"span":1},{"i":6,"band":1,"col":4,"row":1,"span":1},{"i":7,"band":1,"col":5,"row":0,"span":2},{"i":8,"band":1,"col":6,"row":0,"span":2},{"i":9,"band":1,"col":7,"row":0,"span":1},{"i":10,"band":1,"col":7,"row":1,"span":1},{"i":11,"band":1,"col":8,"row":0,"span":2},{"i":12,"band":1,"col":9,"row":0,"span":2},{"i":13,"band":1,"col":10,"row":0,"span":2},{"i":14,"band":1,"col":11,"row":0,"span":1},{"i":15,"band":1,"col":11,"row":1,"span":1},{"i":16,"band":1,"col":12,"row":0,"span":2},{"i":17,"band":1,"col":13,"row":0,"span":2},{"i":18,"band":1,"col":14,"row":0,"span":2},{"i":19,"band":2,"col":1,"row":0,"span":2},{"i":20,"band":2,"col":2,"row":0,"span":2},{"i":21,"band":2,"col":3,"row":0,"span":1},{"i":22,"band":2,"col":3,"row":1,"span":1},{"i":23,"band":2,"col":4,"row":0,"span":2},{"i":24,"band":2,"col":5,"row":0,"span":2},{"i":25,"band":2,"col":6,"row":0,"span":2},{"i":26,"band":2,"col":7,"row":0,"span":2},{"i":27,"band":2,"col":8,"row":0,"span":1},{"i":28,"band":2,"col":8,"row":1,"span":1},{"i":29,"band":2,"col":9,"row":0,"span":2},{"i":30,"band":2,"col":10,"row":0,"span":2},{"i":31,"band":2,"col":11,"row":0,"span":2},{"i":32,"band":2,"col":12,"row":0,"span":2},{"i":33,"band":2,"col":13,"row":0,"span":2},{"i":34,"band":2,"col":14,"row":0,"span":2},{"i":35,"band":3,"col":1,"row":0,"span":2},{"i":36,"band":3,"col":2,"row":0,"span":2},{"i":37,"band":3,"col":3,"row":0,"span":2},{"i":38,"band":3,"col":4,"row":0,"span":1},{"i":39,"band":3,"col":4,"row":1,"span":1},{"i":40,"band":3,"col":5,"row":0,"span":2},{"i":41,"band":3,"col":6,"row":0,"span":2},{"i":42,"band":3,"col":7,"row":0,"span":1},{"i":43,"band":3,"col":7,"row":1,"span":1},{"i":44,"band":3,"col":8,"row":0,"span":2},{"i":45,"band":3,"col":9,"row":0,"span":2},{"i":46,"band":3,"col":10,"row":0,"span":1},{"i":47,"band":3,"col":10,"row":1,"span":1},{"i":48,"band":3,"col":11,"row":0,"span":2},{"i":49,"band":3,"col":12,"row":0,"span":2},{"i":50,"band":3,"col":13,"row":0,"span":2},{"i":51,"band":3,"col":14,"row":0,"span":2}]
+};
+const TPL = { seat:null, violation:null, roster:null };
+
+/* =====================================================================
+   2. STATE
+   ===================================================================== */
+let state = {
+  meta:{ school:'建成國中', term:'' },
+  config:{ refDate:'', totals:{} },
+  students:[], enrollments:[], calendar:[], leaves:[], violations:[], checkins:[],
+  seats:{}, seatPair:{}, duty:[], conflicts:[]
+};
+let dirty = false;
+let ui = { tab:'today', sel:null, vioSel:new Set(), weekRef:'', cls:'all',
+  rcls:0, q:'', show:'in', pick:new Set(), lvFilter:'all', editNote:null, noteDraft:null, dutyEdit:null };
+
+/* =====================================================================
+   3. PURE ENGINE
+   ===================================================================== */
+const E = {
+  iso(d){ const p=n=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate()); },
+  today(){ return E.iso(new Date()); },
+  parse(iso){ const [y,m,d]=iso.split('-').map(Number); return new Date(y,m-1,d); },
+  wd(iso){ return E.parse(iso).getDay(); },
+  isMonToFri(iso){ const w=E.wd(iso); return w>=1 && w<=5; },
+  clsOf(key){ return Number(String(key).split('-')[0]); },
+  seatOf(key){ return String(key).split('-')[1]; },
+  byKey(st,key){ return st.students.find(s=>s.key===key) || null; },
+  active(st){ return st.students.filter(s=>s.active!==false); },
+  classes(st){ return [...new Set(st.students.map(s=>s.cls))].sort((a,b)=>a-b); },
+  seatLabel(i){
+    const slot = CONFIG.SEAT_SLOTS.find(s=>s.i===Number(i));
+    if(!slot) return '';
+    return (CONFIG.SEAT_GROUPS[slot.col-1] || '') + slot.band;
+  },
+  seatSide(st, i){
+    const slot = CONFIG.SEAT_SLOTS.find(s=>s.i===Number(i));
+    if(!slot) return '';
+    const twins = CONFIG.SEAT_SLOTS.filter(s=>s.band===slot.band && s.col===slot.col);
+    if(twins.length < 2) return '';
+    const taken = twins.filter(s=>!!((st.seats||{})[String(s.i)])).length;
+    return taken >= 2 ? (slot.row===0 ? '上' : '下') : '';
+  },
+  label(days){ return days.map((v,i)=>v?CONFIG.DAY_LABELS[i]:'').join('') || '不参加'; },
+
+  daysAt(st,key,iso){
+    const base = E.byKey(st,key);
+    if(!base) return [0,0,0,0,0];
+    const hits = (st.enrollments||[]).filter(e=>e.key===key && e.date<=iso)
+      .sort((a,b)=> a.date<b.date?-1:(a.date>b.date?1:0));
+    return hits.length ? hits[hits.length-1].days.slice() : base.days.slice();
+  },
+  daysNow(st,key){
+    const base = E.byKey(st,key);
+    if(!base) return [0,0,0,0,0];
+    const hits = (st.enrollments||[]).filter(e=>e.key===key)
+      .sort((a,b)=> a.date<b.date?-1:(a.date>b.date?1:0));
+    return hits.length ? hits[hits.length-1].days.slice() : base.days.slice();
+  },
+  /* 這個日期之後才生效的異動，用來標示「之後已改」，不會動到當天 */
+  changesAfter(st,key,iso){
+    return (st.enrollments||[]).filter(e=>e.key===key && e.date>iso)
+      .sort((a,b)=> a.date<b.date?-1:(a.date>b.date?1:0));
+  },
+  isSchoolDay(st,iso){
+    const c = (st.calendar||[]).find(x=>x.date===iso);
+    if(c) return c.status==='上課' || c.status==='段考';
+    return E.isMonToFri(iso);
+  },
+  calLabel(st,iso){ const c=(st.calendar||[]).find(x=>x.date===iso); return c?c.label:''; },
+  present(st,key,iso){
+    const w = E.wd(iso);
+    if(w<1||w>5) return false;
+    if(!E.isSchoolDay(st,iso)) return false;
+    return E.daysAt(st,key,iso)[w-1]===1;
+  },
+  onLeave(st,key,iso){ return (st.leaves||[]).some(l=>l.key===key&&l.date===iso); },
+  checkin(st,key,iso){ const c=(st.checkins||[]).find(x=>x.key===key&&x.date===iso); return c?c.status:''; },
+  board(st,iso){
+    const out={should:[],leave:[],in:[],absent:[]};
+    for(const s of E.active(st)){
+      if(!E.present(st,s.key,iso)) continue;
+      out.should.push(s);
+      if(E.onLeave(st,s.key,iso)){ out.leave.push(s); continue; }
+      if(E.checkin(st,s.key,iso)==='到') out.in.push(s); else out.absent.push(s);
+    }
+    return out;
+  },
+  matrix(st,iso){
+    const rows = E.classes(st).map(cls=>{
+      const list = E.active(st).filter(s=>s.cls===cls);
+      const per=[0,0,0,0,0];
+      list.forEach(s=>{ const d=E.daysAt(st,s.key,iso); for(let i=0;i<5;i++) if(d[i]) per[i]++; });
+      const total = st.students.filter(s=>s.cls===cls).length || Number((st.config.totals||{})[cls]) || list.length;
+      const joined = list.filter(s=>E.daysNow(st,s.key).some(v=>v===1)).length;
+      return { cls, per, total, joined, notJoined: Math.max(total-joined,0) };
+    });
+    return { rows, total: rows.reduce((a,b)=>a+b.total,0), joined: rows.reduce((a,b)=>a+b.joined,0),
+             notJoined: rows.reduce((a,b)=>a+b.notJoined,0) };
+  },
+  historyOf(st,key){
+    return (st.enrollments||[]).filter(e=>e.key===key)
+      .sort((a,b)=> a.date<b.date?-1:(a.date>b.date?1:0))
+      .map((e,i,arr)=>{
+        const prev = i>0 ? arr[i-1].days : (e.from || E.byKey(st,key).days);
+        return { ...e, before: prev, after: e.days };
+      });
+  },
+  recentLog(st,limit){
+    const all = [];
+    (st.enrollments||[]).forEach((e, i)=>{
+      const key = e.key;
+      const list = E.historyOf(st,key);
+      const idx = list.findIndex(x=>x.id===e.id);
+      const before = e.from || (idx>0 ? list[idx-1].after : (E.byKey(st,key)||{days:[0,0,0,0,0]}).days);
+      all.push({ ...e, before, after: e.days, order: i });
+    });
+    all.sort((a,b)=> b.date.localeCompare(a.date) || (b.order - a.order));
+    return limit ? all.slice(0,limit) : all;
+  },
+  weekOf(iso){
+    const d = E.parse(iso);
+    const w = d.getDay();
+    const back = (w===0?6:w-1);
+    const mon = new Date(d.getFullYear(), d.getMonth(), d.getDate()-back);
+    const out=[];
+    for(let i=0;i<5;i++){
+      const x = new Date(mon.getFullYear(), mon.getMonth(), mon.getDate()+i);
+      out.push(E.iso(x));
+    }
+    return out;
+  },
+  weekRows(st,iso){
+    return E.weekOf(iso).map((date,i)=>{
+      const b = E.board(st,date);
+      const vio = (st.violations||[]).filter(v=>v.date===date);
+      const rec = (st.duty||[]).find(d=>d.date===date) || {};
+      return { date, wd:CONFIG.DAY_LABELS[i], teacher:rec.teacher||'', note:rec.note||'',
+               should:b.should.length, leave:b.leave.length, in:b.in.length,
+               absent:b.absent.length, vio:vio.length, school:E.isSchoolDay(st,date),
+               label:E.calLabel(st,date) };
+    });
+  },
+  seatRows(st){
+    return E.active(st).map(s=>({ cls:s.cls, seat:s.seat, name:s.name, days:E.daysNow(st,s.key), key:s.key }))
+      .sort((a,b)=> a.cls-b.cls || a.seat.localeCompare(b.seat));
+  },
+  seatCard(st,key){
+    if(!key) return '';
+    const s = E.byKey(st,key);
+    if(!s) return '';
+    const d = E.daysNow(st,key);
+    return '一二三四五\n' + d.map(v=>v?'■':'□').join('') + s.cls + s.seat + '\n' + s.name;
+  },
+  /* 一格可容納兩位（上下），下位存在 st.seatPair */
+  seatKeys(st,i){
+    const a = (st.seats||{})[String(i)] || '';
+    const b = (st.seatPair||{})[String(i)] || '';
+    return [a, b].filter(Boolean);
+  },
+  daysOverlap(st, a, b){
+    if(!a || !b) return false;
+    const x = E.daysNow(st,a), y = E.daysNow(st,b);
+    for(let i=0;i<5;i++) if(x[i] && y[i]) return true;
+    return false;
+  },
+  /* 匯出用：同一格若有上下兩位，兩份座位卡中間加一條分隔 */
+  seatCell(st,i){
+    const keys = E.seatKeys(st,i);
+    if(!keys.length) return '';
+    if(keys.length === 1) return E.seatCard(st, keys[0]);
+    return '─── 上 ───\n' + E.seatCard(st, keys[0]) + '\n─── 下 ───\n' + E.seatCard(st, keys[1]);
+  },
+  seatIssue(st){
+    const used={}, dup=[];
+    const mark = k=>{ if(!k) return; if(used[k]) dup.push(k); else used[k]=true; };
+    Object.values(st.seats||{}).forEach(mark);
+    Object.values(st.seatPair||{}).forEach(mark);
+    const unseated = E.active(st).filter(s=>!used[s.key]).map(s=>s.key);
+    return { dup, unseated };
+  },
+  rocDate(iso){
+    const d = E.parse(iso), roc = d.getFullYear()-1911;
+    return '民國    '+roc+'   年   '+(d.getMonth()+1)+'   月    '+d.getDate()+'  日 星期   '+CONFIG.WEEKDAY[d.getDay()]+'   ';
+  },
+  studentLine(st,key){
+    const cls = E.clsOf(key), grade = Math.floor(cls/100), room = cls%100;
+    const s = E.byKey(st,key), seat = E.seatOf(key);
+    const pad = seat.length>=2 ? seat : ' '+seat;
+    return '   '+grade+'  年  '+room+'   班 座號   '+pad+'   姓名       '+(s?s.name:'')+'      ';
+  },
+  /* 違規事由後面自動附上記點數，避免重複附加 */
+  vioReason(v){
+    const raw = String((v && v.reason) || '').replace(/[（(]\s*記\s*\d+\s*點\s*[）)]\s*$/, '').trim();
+    if(/記\s*\d+\s*點/.test(raw)) return raw;
+    return raw + '（記' + ((v && Number(v.points)) || 1) + '點）';
+  },
+  /* 各生累積違規點數，依點數由多到少 */
+  vioTotals(st){
+    const m = {};
+    (st.violations || []).forEach(function(v){
+      const p = Number(v.points) || 1;
+      const cur = m[v.key] || (m[v.key] = { key: v.key, n: 0, p: 0, last: '' });
+      cur.n += 1;
+      cur.p += p;
+      if (v.date > cur.last) cur.last = v.date;
+    });
+    return Object.keys(m).map(function(k){ return m[k]; })
+      .sort(function(a, b){ return b.p - a.p || a.key.localeCompare(b.key); });
+  },
+  vioItems(st,ids){
+    const list = (st.violations||[]).filter(v=>ids.includes(v.id))
+      .sort((a,b)=> a.date.localeCompare(b.date) || a.key.localeCompare(b.key));
+    return list.map((v,i)=>({
+      dateLine: E.rocDate(v.date),
+      studentLine: E.studentLine(st,v.key),
+      reason: v.reason,
+      reason: E.vioReason(v),
+    }));
+  },
+  vioPages(st,ids){
+    const items = E.vioItems(st,ids);
+    const pairs = [], tail = [];
+    let i = 0;
+    for(; i+1 < items.length; i += 2) pairs.push({ left: items[i], right: items[i+1] });
+    if(i < items.length) tail.push({ left: items[i] });
+    return { pairs: pairs, tail: tail };
+  },
+  /* 給 Word 範本用的攤平資料：左右各一組欄位，最後一位落單時放進 tail */
+  vioDoc(st,ids){
+    const b = E.vioPages(st,ids);
+    const pages = b.pairs.map(function(p, idx){
+      return {
+        L_dateLine:p.left.dateLine, L_studentLine:p.left.studentLine, L_reason:p.left.reason,
+        R_dateLine:p.right.dateLine, R_studentLine:p.right.studentLine, R_reason:p.right.reason,
+        brk: idx < b.pairs.length-1 || b.tail.length > 0
+      };
+    });
+    const tail = b.tail.map(function(t){
+      return { L_dateLine:t.left.dateLine, L_studentLine:t.left.studentLine, L_reason:t.left.reason };
+    });
+    return { pages: pages, tail: tail };
+  },
+};
+
+/* =====================================================================
+   4. API
+   ===================================================================== */
+const API = {
+  isCloud(){ return !!CONFIG.GAS_URL; },
+  async call(payload){
+    const res = await fetch(CONFIG.GAS_URL, {
+      method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body: JSON.stringify({ ...payload, password: CONFIG.PASSWORD })
+    });
+    const json = await res.json();
+    if(!json.ok) throw new Error(json.error || '雲端回應錯誤');
+    return json;
+  },
+  async load(){
+    if(!API.isCloud()){ return { ok:false }; }
+    const json = await API.call({ action:'loadAll' });
+    return { ok:true, state: json.state };
+  },
+  async save(){
+    localStorage.setItem(CONFIG.STORE_KEY, JSON.stringify(state));
+    if(!API.isCloud()) return;
+    await API.call({ action:'saveAll', state });
+  },
+  /* 範本優先讀專案內的 templates/ 相對路徑，讀不到才退回雲端範本 */
+  async template(name){
+    if(TPL[name]) return TPL[name];
+    const fname = CONFIG.TPL_NAMES[name];
+    try{
+      const res = await fetch('templates/'+encodeURIComponent(fname), { cache:'no-store' });
+      if(res.ok){
+        TPL[name] = await res.arrayBuffer();
+        return TPL[name];
+      }
+    }catch(err){ /* 用 file:// 直接開檔案時會失敗，改走下面的備援 */ }
+    if(API.isCloud()){
+      try{
+        const json = await API.call({ action:'getTemplate', name });
+        const bin = atob(json.base64), buf = new Uint8Array(bin.length);
+        for(let i=0;i<bin.length;i++) buf[i]=bin.charCodeAt(i);
+        TPL[name]=buf.buffer;
+        return TPL[name];
+      }catch(err){ /* 雲端也沒有，往下給統一說明 */ }
+    }
+    throw new Error('讀不到範本 '+fname+'（目前用 '+location.protocol+' 開啟）。'
+      + '請確認 templates 資料夾的檔案有一起推上 GitHub，並用 GitHub Pages 或本機伺服器開這個網頁；'
+      + '直接開 index.html 檔案時瀏覽器不准讀本機檔案，請按「選擇範本檔」手動載入');
+  },
+  /* 開頁後在背景先把三個範本讀進記憶體，第一次匯出就不用等 */
+  async warmTemplates(){
+    for(const n of ['seat','violation','roster']){
+      if(TPL[n]) continue;
+      try{
+        const res = await fetch('templates/'+encodeURIComponent(CONFIG.TPL_NAMES[n]), { cache:'no-store' });
+        if(res.ok) TPL[n] = await res.arrayBuffer();
+      }catch(err){ /* 讀不到就算了，匯出時會再試一次並給提示 */ }
+    }
+    return Object.keys(TPL).filter(function(k){ return TPL[k]; });
+  }
+};
+
+/* =====================================================================
+   5. UI
+   ===================================================================== */
+const $ = id => document.getElementById(id);
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const ref = () => state.config.refDate || E.today();
+
+function toast(msg, ms){
+  const el = document.createElement('div');
+  el.textContent = msg;
+  $('toast').appendChild(el);
+  setTimeout(()=>el.remove(), ms||2600);
+}
+function commit(){
+  dirty = true;
+  render();
+  API.save().catch(function(err){ toast('儲存失敗：'+err.message, 4200); });
+}
+function modal(title, bodyHTML, footHTML, wide){
+  $('modalRoot').innerHTML = '<div class="overlay"><div class="modal'+(wide?' wide':'')+'"><h3>'+title+'</h3>'
+    +'<div class="body">'+bodyHTML+'</div><div class="foot">'+footHTML+'</div></div></div>';
+  return $('modalRoot').firstElementChild;
+}
+function closeModal(){ $('modalRoot').innerHTML=''; }
+
+const TABS = [
+  ['today','今夜點名'], ['list','學生清單'], ['seat','座位編排'], ['log','異動日誌'],
+  ['leave','請假紀錄'], ['vio','違規紀錄'], ['duty','輪值日誌'], ['export','匯出表單'], ['config','設定與檢查']
+];
+
+function renderTabs(){
+  $('tabs').innerHTML = TABS.map(([id,label])=>
+    '<button role="tab" data-tab="'+id+'" aria-selected="'+(ui.tab===id)+'">'+label+'</button>').join('');
+  document.querySelectorAll('.page').forEach(p=>p.classList.toggle('on', p.id==='page-'+ui.tab));
+}
+
+function renderShell(){
+  const iso = ref();
+  const board = E.board(state, iso);
+  $('topMeta').textContent = iso + '（星期' + CONFIG.WEEKDAY[E.wd(iso)] + '）' + (E.calLabel(state,iso) ? '　'+E.calLabel(state,iso) : '');
+  $('railSub').textContent = (state.meta.school||'') + '　' + (state.meta.term||'');
+  $('topRight').innerHTML = '<span class="pill '+(API.isCloud()?'ok':'')+'">'+(API.isCloud()?'雲端模式':'本機模式')+'</span>';
+  /* 尚未設定雲端或雲端沒有名冊時，在最上方提示 */
+  const setupBar = $('setupBar');
+  if(setupBar){
+    let msg = '';
+    if(!API.isCloud()) msg = '尚未設定雲端：請到「設定與檢查」填入 Apps Script 網址與通關密語，所有資料都從試算表讀取。';
+    else if(!CONFIG.PASSWORD) msg = '已有網址但沒有通關密語：請到「設定與檢查」輸入密語後按「儲存設定」。';
+    else if(!state.students.length) msg = '試算表目前沒有名冊資料：請先在「名單」工作表建立，或到「設定與檢查」按「從雲端重新載入」。';
+    setupBar.hidden = !msg;
+    setupBar.textContent = msg;
+  }
+  $('stats').innerHTML = ''
+    + '<h2>今夜要點</h2>'
+    + '<div class="stat"><span class="n">'+board.should.length+'</span><span class="k">應到</span></div>'
+    + '<div class="stat ok"><span class="n">'+board.in.length+'</span><span class="k">實到</span></div>'
+    + '<div class="stat"><span class="n">'+board.leave.length+'</span><span class="k">請假</span></div>'
+    + '<div class="stat warn"><span class="n">'+board.absent.length+'</span><span class="k">未點</span></div>'
+    + '<div class="quote"><b>五天人數</b>'+E.matrix(state,iso).rows.map(r=>r.cls+'　'+r.per.join('／')).join('<br>')+'</div>';
+}
+
+/* ---------- 今夜點名 ---------- */
+function renderToday(){
+  const iso = ref();
+  const board = E.board(state, iso);
+  const wdIdx = (function(){ const w = E.wd(iso); return (w>=1 && w<=5) ? w-1 : -1; })();
+  $('todayTools').innerHTML = ''
+    + '<div class="daynav">'
+    + '<button class="btn nav" id="dayPrev" title="前一天" aria-label="前一天">‹</button>'
+    + '<input type="date" id="refDate" class="btn" value="'+iso+'" style="min-height:44px">'
+    + '<button class="btn nav" id="dayNext" title="後一天" aria-label="後一天">›</button>'
+    + '</div>'
+    + '<button class="btn seal" id="btnAllIn">今夜全到</button>'
+    + '<button class="btn" id="btnAllClear">清除點名</button>'
+    + '<span class="hint">點方格改該日參加；點「今夜」的未／到／假可循環切換；點姓名開個人資料。方塊與名單都依上方日期當天生效的設定</span>';
+  const dutyRec = (state.duty||[]).find(function(d){ return d.date===iso; }) || { teacher:'' };
+  const leaveList = board.should.filter(function(s){ return E.onLeave(state, s.key, iso); });
+  $('todayBrief').innerHTML = '<div class="row1">'
+    + '<span>輪值人員：<b>'+(dutyRec.teacher ? esc(dutyRec.teacher) : '（未排）')+'</b></span>'
+    + '<span>應到：<b>'+board.should.length+'</b> 人</span>'
+    + '<span>實到：<b>'+board.in.length+'</b> 人</span>'
+    + '<span>未到：<b>'+board.absent.length+'</b> 人</span>'
+    + '<span>請假：<b>'+leaveList.length+'</b> 人</span>'
+    + '</div>'
+    + '<div class="lv"><i>請假名單（'+leaveList.length+' 人）</i>'
+    + (leaveList.length
+        ? leaveList.map(function(s){ return '<span>'+s.cls+s.seat+'　'+esc(s.name)+'</span>'; }).join('')
+        : '<span class="none">今日無人請假</span>')
+    + '</div>'
+    + '<div class="lv"><i>本頁規則</i><span class="none">依 '+iso+' 當天生效的設定；之後才生效的異動不回寫這一天，也不會動到已記錄的點名。</span></div>';
+
+  const rows = [];
+  const changed = [];
+  E.classes(state).forEach(cls=>{
+    const list = E.active(state).filter(s=>s.cls===cls).sort((a,b)=>a.seat.localeCompare(b.seat));
+    if(!list.length) return;
+    const per=[0,0,0,0,0];
+    list.forEach(s=>E.daysAt(state,s.key,iso).forEach((v,i)=>{ if(v) per[i]++; }));
+    rows.push('<tbody><tr class="band"><td colspan="10">'+cls+' 班　'+list.length+' 人　五天人數 '
+      + per.map(function(n,i){ return CONFIG.DAY_LABELS[i]+n; }).join('／') +'</td></tr></tbody>');
+    list.forEach(s=>{
+      const d = E.daysAt(state, s.key, iso);
+      const later = E.changesAfter(state, s.key, iso);
+      let chgTip = '';
+      if(later.length){
+        changed.push({ s:s, last:later[later.length-1] });
+        chgTip = '　（'+later.map(function(e){ return e.date+' 起 '+E.label(e.days); }).join('、')+'）';
+      }
+      const marks = d.map((v,i)=>'<td class="d'+(i===wdIdx?' wk-hot':'')+'"><button class="mkbtn '+(v?'on':'off')+'" data-day="'+i+'" data-key="'+s.key+'" title="'+iso+' 當天：'+(v?'參加':'不參加')+' 星期'+CONFIG.DAY_LABELS[i]+chgTip+'">'
+        + (v?'■':'□')+'</button>'+(i===wdIdx?'<i class="wkmk">今</i>':'')+'</td>').join('');
+      const leave = E.onLeave(state,s.key,iso);
+      const arrived = E.checkin(state,s.key,iso)==='到';
+      rows.push('<tr class="person" data-stu="'+s.key+'">'
+        + '<td class="c">'+s.cls+'</td><td class="s">'+s.seat+'</td>'
+        + '<td class="nm">'+esc(s.name)+(later.length ? '<span class="chg" title="'+esc(later.map(function(e){ return e.date+' 起：'+E.label(e.from)+'→'+E.label(e.days); }).join('；'))+'">異動</span>' : '')+'</td>'
+        + marks
+        + '<td class="d">'+(E.present(state,s.key,iso)
+            ? '<button class="ckbtn" data-ck="'+s.key+'" title="'+(leave ? '目前為假，點一下取消請假' : (arrived ? '目前為到，點一下改為請假' : '目前為未，點一下標記到班'))+'">'
+              + (leave ? '<span class="pill seal">假</span>' : (arrived ? '<span class="pill ok">到</span>' : '<span class="pill">未</span>'))
+              + '<i aria-hidden="true">›</i>'
+              + '</button>'
+            : '')+'</td>'
+        + '<td class="note">'+esc(s.note||'')+(s.phone?'　'+esc(s.phone):'')+'</td>'
+        + '</tr>');
+    });
+  });
+  if(changed.length){
+    $('todayBrief').insertAdjacentHTML('beforeend',
+      '<div class="lv"><i>之後有異動（'+changed.length+' 人，不影響 '+iso+' 這一天）</i>'
+      + changed.map(function(c){
+          return '<span>'+c.s.cls+c.s.seat+'　'+esc(c.s.name)+'　'+c.last.date+' 起 '+E.label(c.last.days)+'</span>';
+        }).join('')
+      + '</div>');
+  }
+  $('roster').innerHTML = '<thead><tr><th>班級</th><th>座號</th><th>姓名</th>'
+    + CONFIG.DAY_LABELS.map((l,i)=>'<th class="d'+(i===wdIdx?' wk-hot':'')+'">'+l+(i===wdIdx?'<span>'+iso.slice(5).replace('-','/')+'</span>':'')+'</th>').join('')
+    + '<th class="d">今夜</th><th>備註</th></tr></thead>' + rows.join('');
+}
+
+/* ---------- 學生清單 ---------- */
+function listRows(){
+  const q = (ui.q||'').trim().toLowerCase();
+  return state.students.filter(function(s){
+    if(ui.rcls && s.cls!==ui.rcls) return false;
+    if(ui.show==='in' && s.active===false) return false;
+    if(ui.show==='out' && s.active!==false) return false;
+    if(!q) return true;
+    return listHit(s, q);
+  }).sort((a,b)=> a.cls-b.cls || a.seat.localeCompare(b.seat));
+}
+
+/* 搜尋：姓名、學號、座號、班級，或「班級＋座號」連寫（90129 就找 901 班 29 號） */
+function listHit(s, q){
+  const name = String(s.name||'').toLowerCase();
+  if(name.indexOf(q) >= 0) return true;
+  const cls = String(s.cls);
+  const seat = String(s.seat||'').padStart(2,'0');
+  const full = cls + seat;
+  const sid = String(s.sid||'');
+  if(full === q) return true;
+  if(q.length >= 3 && cls.indexOf(q) === 0) return true;
+  if(q.length >= 4 && full.indexOf(q) === 0) return true;
+  if(seat === q) return true;
+  if(sid && q.length >= 5 && sid.indexOf(q) >= 0) return true;
+  return false;
+}
+
+function renderListBatch(){
+  const rows = listRows();
+  const allOn = rows.length && rows.every(function(s){ return ui.pick.has(s.key); });
+  $('listBatch').innerHTML = (ui.pick.size
+    ? '<span class="hint">已選 <b>'+ui.pick.size+'</b> 人</span>'
+      + '<button class="btn seal" data-batch="in">設為參加</button>'
+      + '<button class="btn" data-batch="out">設為不參加</button>'
+      + '<button class="btn" data-batch="days">設定參加日</button>'
+      + '<button class="btn" data-batch="clear">取消選取</button>'
+    : '<span class="hint">勾選方格可批次設定參加與否，點名字可改電話等基本資料</span>')
+    + '<button class="btn tiny" data-pickall="'+(allOn?'0':'1')+'">'+(allOn?'取消全選':'全選目前顯示')+'</button>';
+}
+
+function renderListBody(){
+  const rows = listRows();
+  const all = state.students;
+  const on = all.filter(s=>s.active!==false);
+  const pending = on.filter(s=>!E.daysNow(state,s.key).some(Boolean)).length;
+  $('listStat').innerHTML = '九年級 '+all.length+' 人　參加 <b>'+on.length+'</b> 人　不參加 '+(all.length-on.length)+' 人'
+    + (pending ? '　<b style="color:var(--seal)">其中 '+pending+' 人尚未設定參加日</b>' : '')
+    + '　目前顯示 '+rows.length+' 筆';
+  renderListBatch();
+  /* 請假與違規明細，供清單上的數字懸停查看 */
+  const lvMap = {}, viMap = {};
+  (state.leaves||[]).forEach(l=>{ (lvMap[l.key] = lvMap[l.key] || []).push(l); });
+  (state.violations||[]).forEach(v=>{ (viMap[v.key] = viMap[v.key] || []).push(v); });
+  const att = t => String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/\n/g,'&#10;');
+  const mmdd = d => String(d).slice(5).replace('-','/');
+  function cntCell(recs, isLeave){
+    if(!recs || !recs.length) return '<td class="cnt"><span class="nul">—</span></td>';
+    const arr = recs.slice().sort((a,b)=> String(b.date).localeCompare(String(a.date)));
+    const n = isLeave ? arr.length : arr.reduce((x,v)=>x+(Number(v.points)||1),0);
+    const lines = arr.map(v=> mmdd(v.date)+'　'+(isLeave ? (v.reason||'請假') : (Number(v.points)||1)+' 點　'+(v.reason||'違規')));
+    const head = isLeave ? ('請假 '+n+' 次') : ('違規 '+n+' 點');
+    return '<td class="cnt"><b'+(isLeave ? '' : ' class="hot"')+' title="'+att(head+'\n'+lines.join('\n'))+'">'+n+'</b></td>';
+  }
+  /* 欄寬以百分比分配：勾選 5.8、班級 7.1、座號 7.1、姓名 10.7、一二三四五 11.6、電話 14.7、
+     便當 8.5、請假 6.7、違規 6.7、狀態 9.8、操作 11.2（合計 100） */
+  $('listTable').innerHTML = '<colgroup>'
+    + '<col style="width:5.8%"><col style="width:7.1%"><col style="width:7.1%"><col style="width:10.7%">'
+    + '<col style="width:11.6%"><col style="width:14.7%"><col style="width:8.5%">'
+    + '<col style="width:6.7%"><col style="width:6.7%"><col style="width:9.8%"><col style="width:11.2%">'
+    + '</colgroup>'
+    + '<thead><tr>'
+    + '<th class="pick"><label class="cbox"><input type="checkbox" id="pickAll" aria-label="全選目前顯示的學生"'+(rows.length && rows.every(s=>ui.pick.has(s.key)) ? ' checked' : '')+'></label></th>'
+    + '<th>班級</th><th>座號</th><th>姓名</th><th class="d5h"><span class="d5g">'+CONFIG.DAY_LABELS.map(l=>'<i>'+l+'</i>').join('')+'</span></th><th>電話</th><th>便當</th>'
+    + '<th class="cnt">請假</th><th class="cnt">違規</th><th>狀態</th><th>操作</th></tr></thead><tbody>'
+    + rows.map(s=>{
+        const joined = s.active!==false;
+        const d = E.daysNow(state,s.key);
+        const noDay = joined && !d.some(Boolean);
+        return '<tr class="person'+(joined?'':' off')+'" data-stu="'+s.key+'">'
+          + '<td class="pick"><label class="cbox"><input type="checkbox" data-pick="'+s.key+'" aria-label="選取 '+esc(s.name)+'"'+(ui.pick.has(s.key)?' checked':'')+'></label></td>'
+          + '<td>'+s.cls+'</td><td>'+s.seat+'</td>'
+          + '<td class="nm">'+esc(s.name)+'</td>'
+          + '<td class="d5"><span class="d5g">'+d.map(v=>'<i class="'+(v?'on':'off')+'">'+(v?'■':'□')+'</i>').join('')+'</span></td>'
+          + '<td class="tel">'+esc(s.phone||'')+'</td>'
+          + '<td>'+esc(s.lunch||'')+'</td>'
+          + cntCell(lvMap[s.key], true)
+          + cntCell(viMap[s.key], false)
+          + '<td>'+(joined ? (noDay?'<span class="pill seal">待設日</span>':'<span class="pill ok">參加</span>') : '<span class="pill">不參加</span>')+'</td>'
+          + '<td><button class="btn tiny" data-toggle="'+s.key+'">'+(joined?'退出':'加入')+'</button></td>'
+          + '</tr>';
+      }).join('')
+    + '</tbody>';
+  /* 手機版：同一份資料改用卡片，表格在窄螢幕隱藏 */
+  $('listCards').innerHTML = rows.map(function(s){
+    const joined = s.active!==false;
+    const d = E.daysNow(state, s.key);
+    const noDay = joined && !d.some(Boolean);
+    const lv = (lvMap[s.key]||[]).length;
+    const vp = (viMap[s.key]||[]).reduce(function(x,v){ return x + (Number(v.points)||1); }, 0);
+    return '<div class="card'+(joined?'':' off')+'">'
+      + '<div class="card-h">'
+      +   '<label class="cbox"><input type="checkbox" data-pick="'+s.key+'" aria-label="選取 '+esc(s.name)+'"'+(ui.pick.has(s.key)?' checked':'')+'></label>'
+      +   '<span class="card-who" data-stu="'+s.key+'"><b>'+s.cls+'-'+s.seat+'</b>'+esc(s.name)+'</span>'
+      +   (joined ? (noDay?'<span class="pill seal">待設日</span>':'<span class="pill ok">參加</span>') : '<span class="pill">不參加</span>')
+      + '</div>'
+      + '<div class="card-row"><span class="d5g">'
+      +   d.map(function(v){ return '<i class="'+(v?'on':'off')+'">'+(v?'■':'□')+'</i>'; }).join('')
+      + '</span>'
+      + '<span class="card-nums"><span>請假 <b>'+(lv||'—')+'</b></span><span>違規 <b>'+(vp||'—')+'</b></span></span></div>'
+      + '<div class="card-foot">'
+      +   '<span>'+esc(s.phone||'—')+'</span>'
+      +   '<span>便當 '+esc(s.lunch||'—')+'</span>'
+      +   '<button class="btn tiny" data-toggle="'+s.key+'">'+(joined?'退出':'加入')+'</button>'
+      + '</div></div>';
+  }).join('');
+}
+
+function renderList(){
+  const all = state.students;
+  const on = all.filter(s=>s.active!==false);
+  const cls = [...new Set(all.map(s=>s.cls))].sort((a,b)=>a-b);
+  $('listTools').innerHTML = '<div class="chips">'
+    + '<button class="chip'+(ui.rcls?'':' sel')+'" data-rcls="0">全部　'+on.length+'／'+all.length+'</button>'
+    + cls.map(c=>{
+        const t = all.filter(s=>s.cls===c), a = t.filter(s=>s.active!==false).length;
+        return '<button class="chip'+(ui.rcls===c?' sel':'')+'" data-rcls="'+c+'">'+c+'　'+a+'／'+t.length+'</button>';
+      }).join('')
+    + '</div>'
+    + '<input class="btn" id="rosterQ" style="min-width:260px" placeholder="搜尋姓名、座號或 90129" value="'+esc(ui.q||'')+'">'
+    + [['all','全部'],['in','參加'],['out','不參加']].map(([k,l])=>
+        '<button class="chip'+(ui.show===k?' sel':'')+'" data-show="'+k+'">'+l+'</button>').join('')
+    + '</div>';
+  renderListBody();
+}
+
+function dropSeatOf(key){
+  Object.keys(state.seats).forEach(sl=>{ if(state.seats[sl]===key) delete state.seats[sl]; });
+  Object.keys(state.seatPair||{}).forEach(sl=>{ if(state.seatPair[sl]===key) delete state.seatPair[sl]; });
+}
+
+function setActive(key, on){
+  const s = E.byKey(state,key); if(!s) return;
+  if(!on){ openExit(key); return; }
+  const date = ref();
+  const before = E.daysAt(state,key,date).slice();
+  s.active = true;
+  ui.pick.delete(key);
+  if(!before.some(Boolean) && s.days.some(Boolean)){
+    state.enrollments.push({ id:newId('e'), key:key, date:date, days:s.days.slice(), from:before,
+      reason:'加入夜自習', kind:'join', createdAt:new Date().toISOString() });
+  }
+  commit();
+  toast('已將 '+s.name+' 設為參加，記得設定參加日', 3600);
+}
+
+function batchActive(on){
+  const keys = [...ui.pick]; if(!keys.length) return;
+  if(!on){ openExitBatch(keys); return; }
+  const date = ref();
+  keys.forEach(function(k){
+    const s = E.byKey(state,k); if(!s) return;
+    const before = E.daysAt(state,k,date).slice();
+    s.active = true;
+    if(!before.some(Boolean) && s.days.some(Boolean)){
+      state.enrollments.push({ id:newId('e'), key:k, date:date, days:s.days.slice(), from:before,
+        reason:'加入夜自習', kind:'join', createdAt:new Date().toISOString() });
+    }
+  });
+  ui.pick.clear();
+  commit();
+  toast('已設為參加 '+keys.length+' 人', 3000);
+}
+
+/* 退出夜自習：一定要填原因，並寫入異動日誌 */
+function openExit(key){
+  const s = E.byKey(state,key); if(!s) return;
+  const cur = E.daysAt(state,key,ref());
+  const body = '<div class="hint">'+s.cls+'-'+s.seat+'　'+esc(s.name)+'　目前參加：'+E.label(cur)+'</div>'
+    + '<div class="field"><label>生效日</label><input type="date" id="oDate" value="'+ref()+'"></div>'
+    + '<div class="field"><label>退出原因（必填）</label><input id="oWhy" placeholder="例如：家長來電改為不參加、轉學"></div>'
+    + '<label class="chk"><input type="checkbox" id="oPrint"> 同時列印退班通知（格式同違規通知單，A4 橫式三聯）</label>'
+    + '<p class="hint">退出後座位會釋出，並在異動日誌留下一筆紀錄；生效日之前的統計不受影響。</p>';
+  const m = modal('退出夜自習', body, '<button class="btn" data-close>取消</button><button class="btn seal" id="oSave">確定退出</button>');
+  m.querySelector('[data-close]').addEventListener('click', closeModal);
+  m.querySelector('#oSave').addEventListener('click', function(){
+    const why = m.querySelector('#oWhy').value.trim();
+    if(!why){ toast('請填寫退出原因'); m.querySelector('#oWhy').focus(); return; }
+    const date = m.querySelector('#oDate').value || ref();
+    const before = E.daysAt(state,key,date).slice();
+    s.active = false;
+    dropSeatOf(key);
+    ui.pick.delete(key);
+    state.enrollments.push({ id:newId('e'), key:key, date:date, days:[0,0,0,0,0], from:before,
+      reason:why, kind:'exit', createdAt:new Date().toISOString() });
+    const doPrintExit = m.querySelector('#oPrint').checked;
+    closeModal(); commit();
+    if(doPrintExit) printExitNotice([key], why, date);
+    toast('已退出夜自習，並寫入異動日誌', 3200);
+  });
+}
+
+function openExitBatch(keys){
+  keys = (keys && keys.length) ? keys : [...ui.pick];
+  if(!keys.length) return;
+  const who = keys.map(function(k){
+    const s = E.byKey(state,k);
+    return s ? s.cls+'-'+s.seat+esc(s.name) : k;
+  }).join('、');
+  const body = '<div class="hint">一次退出 '+keys.length+' 人：'+who+'</div>'
+    + '<div class="field"><label>生效日</label><input type="date" id="oDate" value="'+ref()+'"></div>'
+    + '<div class="field"><label>退出原因（必填，套用到每個人）</label><input id="oWhy" placeholder="例如：本學期結束不再參加"></div>'
+    + '<label class="chk"><input type="checkbox" id="oPrint"> 同時列印退班通知（每人一張，格式同違規通知單）</label>'
+    + '<p class="hint">每個人都會在異動日誌留下一筆紀錄，座位一併釋出。</p>';
+  const m = modal('批次退出夜自習', body, '<button class="btn" data-close>取消</button><button class="btn seal" id="oSave">確定退出</button>');
+  m.querySelector('[data-close]').addEventListener('click', closeModal);
+  m.querySelector('#oSave').addEventListener('click', function(){
+    const why = m.querySelector('#oWhy').value.trim();
+    if(!why){ toast('請填寫退出原因'); m.querySelector('#oWhy').focus(); return; }
+    const date = m.querySelector('#oDate').value || ref();
+    let n = 0;
+    keys.forEach(function(k){
+      const s = E.byKey(state,k); if(!s || s.active===false) return;
+      const before = E.daysAt(state,k,date).slice();
+      s.active = false;
+      dropSeatOf(k);
+      state.enrollments.push({ id:newId('e'), key:k, date:date, days:[0,0,0,0,0], from:before,
+        reason:why, kind:'exit', createdAt:new Date().toISOString() });
+      n++;
+    });
+    const doPrintExit = m.querySelector('#oPrint').checked;
+    ui.pick.clear();
+    closeModal(); commit();
+    if(doPrintExit) printExitNotice(keys, why, date);
+    toast('已退出 '+n+' 人，並寫入異動日誌', 3200);
+  });
+}
+
+function batchDays(){
+  const keys = [...ui.pick]; if(!keys.length) return;
+  const body = '<div class="hint">套用到已選的 '+keys.length+' 人，會逐筆寫入異動日誌，套用後自動設為參加。</div>'
+    + '<div class="field"><label>每週參加日</label><div class="days" id="bDays">'
+    + CONFIG.DAY_LABELS.map((l,i)=>'<button type="button" data-d="'+i+'">'+l+'</button>').join('')
+    + '</div></div>'
+    + '<div class="field"><label>從哪一天開始生效</label><input type="date" id="bDate" value="'+ref()+'"></div>'
+    + '<div class="field"><label>異動原因</label><input id="bWhy" value="批次設定"></div>';
+  const m = modal('批次設定參加日', body, '<button class="btn" data-close>取消</button><button class="btn primary" id="bSave">套用</button>');
+  const days = [0,0,0,0,0];
+  m.querySelector('#bDays').addEventListener('click', ev=>{
+    const b = ev.target.closest('[data-d]'); if(!b) return;
+    const i = Number(b.dataset.d); days[i] = days[i]?0:1; b.classList.toggle('on', !!days[i]);
+  });
+  m.querySelector('[data-close]').addEventListener('click', closeModal);
+  m.querySelector('#bSave').addEventListener('click', ()=>{
+    const date = m.querySelector('#bDate').value || ref();
+    const why = m.querySelector('#bWhy').value.trim() || '批次設定';
+    let n = 0;
+    keys.forEach(k=>{
+      const before = E.daysAt(state,k,date).slice();
+      if(before.join('')===days.join('')) return;
+      state.enrollments.push({ id:'e'+Date.now()+Math.random().toString(36).slice(2,5), key:k, date,
+        days:days.slice(), from:before, reason:why, createdAt:new Date().toISOString() });
+      const s = E.byKey(state,k);
+      if(s && days.some(Boolean)) s.active = true;
+      n++;
+      });
+    ui.pick.clear(); closeModal(); commit();
+  });
+}
+/* ---------- 座位 ---------- */
+function renderSeat(){
+  const iso = ref();
+  const issue = E.seatIssue(state);
+  const dup = new Set(issue.dup);
+  $('seatTools').innerHTML = ''
+    + '<button class="btn primary" id="btnAutoSeat">依班級座號自動排</button>'
+    + '<button class="btn" id="btnClearSeat">清空座位</button>'
+    + '<button class="btn seal" id="btnPrintSeat">列印座位表（A3）</button>'
+    + (E.active(state).length > CONFIG.SEAT_SLOTS.length
+        ? '<span class="hint" style="color:var(--seal)">參加 '+E.active(state).length+' 人，超過座位表 '+CONFIG.SEAT_SLOTS.length+' 格，匯出前請先調整</span>'
+        : '')
+
+  /* 以「桌子」為單位：每張桌子固定佔兩列，可坐 1 人或 2 人 */
+  const desks = {};
+  CONFIG.SEAT_SLOTS.forEach(function(s){
+    const k = s.band + '-' + s.col;
+    (desks[k] = desks[k] || { band:s.band, col:s.col, slots:[] }).slots.push(s);
+  });
+  let html = '';
+  [1,2,3].forEach(function(b){
+    html += '<div class="band"><div class="band-h">第 '+b+' 段</div><div class="seatgrid">';
+    for(let col = 1; col <= 14; col++){
+      const d = desks[b + '-' + col];
+      if(!d) continue;
+      d.slots.sort(function(x,y){ return x.row - y.row; });
+      const primary = d.slots[0].i;
+      const topKey = state.seats[String(primary)] || '';
+      const botKey = deskBotKey(primary);
+      const people = [topKey, botKey].filter(Boolean);
+      const sel = ui.sel && ui.sel.kind === 'slot' && ui.sel.slot === primary;
+      const grp = Math.ceil(col / 2);
+      const names = people.map(function(k){ const s = E.byKey(state,k); return s ? s.name : ''; }).join('、');
+      html += '<div class="seat tall '+(grp % 2 ? 'g-odd' : 'g-even')+(people.length > 1 ? ' pair':'')+(people.length ? '':' empty')+(sel ? ' sel':'')+'"'
+        + ' style="grid-column:'+col+';grid-row:1 / span 2"'
+        + ' data-slot="'+primary+'"'
+        + (d.slots[1] ? ' data-second="'+d.slots[1].i+'"' : '')
+        + ' draggable="'+(people.length ? 'true' : 'false')+'"'
+        + ' title="'+E.seatLabel(primary)+'　第 '+primary+' 格'+(names ? '　'+names : '')+'">'
+        + (people.length > 1 ? '' : '<span class="no">'+E.seatLabel(primary)+'</span>')
+        + (people.length
+            ? (people.length > 1
+                ? seatPart(topKey, '上', dup, E.seatLabel(primary)) + '<div class="split"></div>' + seatPart(botKey, '下', dup, E.seatLabel(primary))
+                : seatPart(people[0], '', dup))
+            : '<div class="sub">空位</div>')
+        + '</div>';
+    }
+    html += '</div></div>';
+  });
+  $('seatWrap').innerHTML = html;
+
+  const selSlot = ui.sel && ui.sel.kind === 'slot' ? ui.sel.slot : 0;
+  const selTop = selSlot ? (state.seats[String(selSlot)] || '') : '';
+  const selBot = selSlot ? deskBotKey(selSlot) : '';
+  const who = function(k){
+    const s = k ? E.byKey(state,k) : null;
+    return s ? esc(s.name) + '（' + s.cls + '-' + s.seat + '）' : '';
+  };
+  const selCount = (selTop ? 1 : 0) + (selBot ? 1 : 0);
+  $('seatAct').innerHTML = selSlot
+    ? '<span class="hint">已選 <b>'+E.seatLabel(selSlot)+'</b>'
+        + (selCount
+            ? '　' + (selCount > 1 ? '上：' + who(selTop) + '　下：' + who(selBot) : who(selTop || selBot))
+            : '　空位')
+        + '</span>'
+      + (selTop ? '<button class="btn seal" id="btnSeatOut">移出座位</button>' : '')
+      + (selBot ? '<button class="btn" id="btnSeatOutBot">移出下方</button>' : '')
+      + '<button class="btn" id="btnSeatCancel">取消選取</button>'
+    : '<span class="hint">點「尚未入座」的學生再點桌子即可入座；同一張桌子可坐兩人，前提是兩人不會同一天到；拖曳或點兩張桌子可交換</span>';
+
+  const un = E.active(state).filter(function(s){ return issue.unseated.includes(s.key); });
+  $('unseated').innerHTML = un.length
+    ? un.map(function(s){
+        const d = E.daysNow(state, s.key).map(function(v){ return v?'■':'□'; }).join('');
+        return '<button class="chip un'+(ui.sel&&ui.sel.kind==='stu'&&ui.sel.key===s.key?' sel':'')+'" data-un="'+s.key+'">'
+          + '<span class="un-nm">'+s.cls+'-'+s.seat+' '+esc(s.name)+'</span>'
+          + '<span class="un-days">'+d+'</span>'
+          + '</button>';
+      }).join('')
+    : '<span class="hint">全部已入座</span>';
+}
+
+/* 同一張桌子的所有格：原本就拆兩格的桌子有兩個，其餘一個 */
+function deskSlots(slot){
+  const def = CONFIG.SEAT_SLOTS.find(function(s){ return s.i === Number(slot); });
+  if(!def) return [];
+  return CONFIG.SEAT_SLOTS.filter(function(s){ return s.band === def.band && s.col === def.col; })
+    .sort(function(a,b){ return a.row - b.row; })
+    .map(function(s){ return s.i; });
+}
+function deskBotKey(slot){
+  const slots = deskSlots(slot);
+  if(slots.length > 1) return state.seats[String(slots[1])] || '';
+  return (state.seatPair || {})[String(slot)] || '';
+}
+function setDeskBot(slot, key){
+  const slots = deskSlots(slot);
+  if(slots.length > 1){
+    if(key) state.seats[String(slots[1])] = key; else delete state.seats[String(slots[1])];
+  }else{
+    if(key) state.seatPair[String(slot)] = key; else delete state.seatPair[String(slot)];
+  }
+}
+
+/* 座位上／下其中一位的內容 */
+function seatPart(key, tag, dup, label){
+  const s = key ? E.byKey(state,key) : null;
+  if(!s) return '';
+  return '<div class="part">'
+    + (label ? '<span class="plab">'+label+(tag ? '<i>'+tag+'</i>' : '')+'</span>' : '')
+    + '<div class="nm">'+esc(s.name)+(dup && dup.has(key) ? ' <span class="sub">重複</span>' : '')+'</div>'
+    + '<div class="sub">'+s.cls+s.seat+'</div>'
+    + '<div class="mn">'+E.daysNow(state,key).map(v=>v?'■':'□').join('')+'</div>'
+    + '</div>';
+}
+
+function placeSeat(slot){
+  const i = Number(slot);
+  const idx = String(i);
+  const top = state.seats[idx] || '';
+  const bot = deskBotKey(i);
+  if(!ui.sel){ if(top || bot) ui.sel = { kind:'slot', slot:i }; renderSeat(); return; }
+
+  if(ui.sel.kind === 'slot'){
+    const src = Number(ui.sel.slot);
+    if(src === i){ ui.sel = null; renderSeat(); return; }
+    const sTop = state.seats[String(src)] || '';
+    const sBot = deskBotKey(src);
+    if(sTop) state.seats[idx] = sTop; else delete state.seats[idx];
+    setDeskBot(i, sBot);
+    if(top) state.seats[String(src)] = top; else delete state.seats[String(src)];
+    setDeskBot(src, bot);
+    ui.sel = null; commit(); return;
+  }
+
+  const key = ui.sel.key;
+  if(top === key || bot === key){ ui.sel = null; renderSeat(); return; }
+
+  if(!top){
+    state.seats[idx] = key;
+  } else if(E.daysOverlap(state, top, key)){
+    toast('這兩位同一天都要來，同一張桌子不能排在一起，請先調整其中一人的參加日', 5600);
+    return;
+  } else if(!bot){
+    setDeskBot(i, key);
+  } else if(E.daysOverlap(state, bot, key)){
+    toast('這兩位同一天都要來，同一張桌子不能排在一起，請先調整其中一人的參加日', 5600);
+    return;
+  } else {
+    setDeskBot(i, key);
+  }
+  ui.sel = null; commit();
+}
+
+function releaseSeat(slot, which){
+  const i = Number(slot);
+  const idx = String(i);
+  const isBot = which === 'bottom';
+  const top = state.seats[idx] || '';
+  const bot = deskBotKey(i);
+  const key = isBot ? bot : top;
+  if(!key) return;
+  const s = E.byKey(state,key);
+  if(isBot){
+    setDeskBot(i, '');
+  }else{
+    delete state.seats[idx];
+    if(bot){ state.seats[idx] = bot; setDeskBot(i, ''); }
+  }
+  ui.sel = null;
+  commit();
+  toast((s ? s.name : '學生') + ' 已移出座位，回到尚未入座', 3200);
+}
+
+/* ---------- 異動日誌 ---------- */
+function renderLog(){
+  const list = E.recentLog(state);
+  $('logTools').innerHTML = '<button class="btn primary" id="btnNewEnroll">新增異動</button>'
+    + '<span class="hint">共 '+list.length+' 筆，記錄生效日之前的狀態不受影響</span>';
+  $('logList').innerHTML = list.length ? list.map(e=>{
+    const s = E.byKey(state,e.key) || { name:'（已刪除）', cls:'' };
+    return '<li><div class="lhead"><span class="date">'+e.date+'</span>'
+      + '<span class="who">'+(s.cls?s.cls+'-'+E.seatOf(e.key)+' ':'')+esc(s.name)+'</span>'
+      + '<span class="chg">'+(e.kind==='exit' ? '<span class="pill seal">退出</span> ' : (e.kind==='join' ? '<span class="pill ok">加入</span> ' : ''))
+      + E.label(e.before)+' → '+E.label(e.after)+'</span>'
+      + '<span class="acts">'
+      + '<button class="btn small" data-edit="'+e.id+'">編輯</button>'
+      + '<button class="btn small" data-del="'+e.id+'">刪除</button>'
+      + '</span></div>'
+      + '<div class="why">'+esc(e.reason||'')+'</div></li>';
+  }).join('') : '<li><div class="hint">尚無異動紀錄</div></li>';
+}
+
+function openEditEnroll(id){
+  const e0 = (state.enrollments||[]).find(function(x){ return x.id===id; });
+  if(!e0) return;
+  const s = E.byKey(state,e0.key) || { name:'（已刪除）' };
+  let days = e0.days.slice();
+  const body = '<div class="hint">'+esc(s.name)+'　目前設定 '+E.label(e0.days)+'</div>'
+    + '<div class="field"><label>生效日</label><input type="date" id="xDate" value="'+e0.date+'"></div>'
+    + '<div class="field"><label>每週參加日</label><div class="days" id="xDays">'
+    + CONFIG.DAY_LABELS.map(function(l,i){ return '<button type="button" data-d="'+i+'" class="'+(days[i]?'on':'')+'">'+l+'</button>'; }).join('')
+    + '</div></div>'
+    + '<div class="field"><label>原因</label><input id="xWhy" value="'+esc(e0.reason||'')+'"></div>'
+    + '<p class="hint">修改後，這個生效日之後的出席與統計會跟著重算。</p>';
+  const m = modal('編輯異動', body, '<button class="btn" data-close>取消</button><button class="btn primary" id="xSave">儲存</button>');
+  m.querySelector('#xDays').addEventListener('click', function(ev){
+    const b = ev.target.closest('[data-d]'); if(!b) return;
+    const i = Number(b.dataset.d); days[i] = days[i]?0:1; b.classList.toggle('on', !!days[i]);
+  });
+  m.querySelector('[data-close]').addEventListener('click', closeModal);
+  m.querySelector('#xSave').addEventListener('click', function(){
+    e0.date = m.querySelector('#xDate').value || e0.date;
+    e0.days = days.slice();
+    const why = m.querySelector('#xWhy').value.trim();
+    if(why) e0.reason = why;
+    if(e0.days.some(Boolean)){ if(e0.kind==='exit') delete e0.kind; } else { e0.kind = 'exit'; }
+    closeModal(); commit(); toast('已更新異動紀錄');
+  });
+}
+
+function deleteEnroll(id){
+  const e0 = (state.enrollments||[]).find(function(x){ return x.id===id; });
+  if(!e0) return;
+  const s = E.byKey(state,e0.key);
+  const who = s ? (s.cls+'-'+E.seatOf(e0.key)+' '+s.name) : e0.key;
+  if(!confirm('刪除這筆異動？\n\n'+e0.date+'　'+who+'　'+E.label(e0.days)+'\n刪除後，該生會回到上一筆設定的狀態。')) return;
+  state.enrollments = state.enrollments.filter(function(x){ return x.id!==id; });
+  commit(); toast('已刪除異動紀錄');
+}
+
+/* ---------- 違規 ---------- */
+/* ---------- 請假紀錄 ---------- */
+function weekRange(iso){
+  const d = E.parse(iso);
+  const monday = new Date(d.getFullYear(), d.getMonth(), d.getDate() - ((d.getDay()+6)%7));
+  const sunday = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate()+6);
+  return [E.iso(monday), E.iso(sunday)];
+}
+
+function leaveList(){
+  const iso = ref();
+  const [mon, sun] = weekRange(iso);
+  return (state.leaves||[]).slice()
+    .sort((a,b)=> b.date.localeCompare(a.date) || a.key.localeCompare(b.key))
+    .filter(function(l){
+      if(ui.lvFilter==='today') return l.date===iso;
+      if(ui.lvFilter==='week') return l.date>=mon && l.date<=sun;
+      if(ui.lvFilter==='future') return l.date>=iso;
+      return true;
+    });
+}
+
+function renderLeave(){
+  const list = leaveList();
+  const all = state.leaves||[];
+  const people = new Set(all.map(function(l){ return l.key; }));
+  $('leaveTools').innerHTML = '<button class="btn primary" id="btnAddLeave">新增請假</button>'
+    + '<div class="chips">'
+    + [['all','全部'],['today','今天'],['week','本週'],['future','今天以後']]
+        .map(function(p){ return '<button class="chip'+(ui.lvFilter===p[0]?' sel':'')+'" data-lvf="'+p[0]+'">'+p[1]+'</button>'; }).join('')
+    + '</div>'
+    + '<span class="hint">請假只影響當日點名與統計，不動每週參加設定</span>';
+  $('leaveStat').innerHTML = '共 <b>'+all.length+'</b> 筆　涉及 '+people.size+' 人　已繳紙本 <b>'+(all.filter(function(l){ return l.paper; }).length)+'</b> 筆　目前顯示 '+list.length+' 筆'
+    + (all.length ? '' : '　還沒有任何請假紀錄，按「新增請假」開始');
+  $('leaveTable').innerHTML = '<thead><tr><th>日期</th><th>班級</th><th>座號</th><th>姓名</th><th>事由</th><th class="paper">已繳紙本</th><th>操作</th></tr></thead><tbody>'
+    + (list.length ? list.map(function(l){
+        const s = E.byKey(state, l.key) || { cls:'', seat:'', name:l.key };
+        return '<tr data-lv="'+l.id+'"><td>'+l.date+'（'+CONFIG.WEEKDAY[E.wd(l.date)]+'）</td>'
+          + '<td>'+s.cls+'</td><td>'+s.seat+'</td><td>'+esc(s.name)+'</td>'
+          + '<td>'+esc(l.reason||'')+'</td>'
+          + '<td class="paper"><label class="pbox"><input type="checkbox" data-lvpaper="'+l.id+'" aria-label="已繳回紙本"'+(l.paper?' checked':'')+'></label></td>'
+          + '<td><button class="btn tiny" data-leavedel="'+l.id+'">刪除</button></td></tr>';
+      }).join('') : '<tr><td colspan="7" class="hint">目前沒有符合條件的請假紀錄</td></tr>')
+    + '</tbody>';
+  /* 手機版：請假紀錄用卡片 */
+  $('leaveCards').innerHTML = list.length ? list.map(function(l){
+    const s = E.byKey(state, l.key) || { cls:'', seat:'', name:l.key };
+    return '<div class="card">'
+      + '<div class="card-h">'
+      +   '<span class="card-who"><b>'+l.date+'（'+CONFIG.WEEKDAY[E.wd(l.date)]+'）</b>'
+      +     (s.cls ? s.cls+'-'+s.seat+' ' : '')+esc(s.name)+'</span>'
+      + '</div>'
+      + '<div class="card-reason">'+esc(l.reason||'')+'</div>'
+      + '<div class="card-foot">'
+      +   '<label class="chk-inline"><input type="checkbox" data-lvpaper="'+l.id+'"'+(l.paper?' checked':'')+'> 已繳紙本</label>'
+      +   '<span class="card-btns"><button class="btn tiny" data-leavedel="'+l.id+'">刪除</button></span>'
+      + '</div></div>';
+  }).join('') : '<p class="hint">目前沒有符合條件的請假紀錄</p>';
+}
+
+let IDSEQ = 0;
+function newId(prefix){
+  IDSEQ++;
+  return (prefix||'') + Date.now().toString(36) + IDSEQ.toString(36) + Math.random().toString(36).slice(2,5);
+}
+
+function openLeaveNew(){
+  const opts = E.active(state).sort((a,b)=> a.cls-b.cls || a.seat.localeCompare(b.seat))
+    .map(function(s){ return '<option value="'+s.key+'">'+s.cls+'-'+s.seat+' '+esc(s.name)+'</option>'; }).join('');
+  const body = '<div class="field"><label>學生</label><select id="lvKey">'+opts+'</select></div>'
+    + '<div class="grid2">'
+    + '<div class="field"><label>起日</label><input type="date" id="lvFrom" value="'+ref()+'"></div>'
+    + '<div class="field"><label>迄日</label><input type="date" id="lvTo" value="'+ref()+'"></div>'
+    + '</div>'
+    + '<div class="field"><label>事由</label><input id="lvWhy" placeholder="例如：家長請假、身體不適"></div>'
+    + '<p class="hint">只在夜自習上課日建立紀錄，週末與放假自動略過；同一天已有紀錄會跳過；當天若已點「到」會一併取消。</p>';
+  const m = modal('新增請假', body, '<button class="btn" data-close>取消</button><button class="btn primary" id="lvSave">建立</button>');
+  m.querySelector('[data-close]').addEventListener('click', closeModal);
+  m.querySelector('#lvSave').addEventListener('click', function(){
+    const key = m.querySelector('#lvKey').value;
+    const from = m.querySelector('#lvFrom').value;
+    const to = m.querySelector('#lvTo').value || from;
+    const why = m.querySelector('#lvWhy').value.trim() || '請假';
+    if(!key || !from){ toast('請選擇學生與日期'); return; }
+    if(to < from){ toast('迄日不能早於起日'); return; }
+    let made = 0, skip = 0;
+    const end = E.parse(to);
+    for(let cur = E.parse(from); cur <= end; cur.setDate(cur.getDate()+1)){
+      const iso = E.iso(cur);
+      if(!E.isSchoolDay(state, iso)) continue;
+      if((state.leaves||[]).some(function(l){ return l.key===key && l.date===iso; })){ skip++; continue; }
+      state.leaves.push({ id:newId('l'), key:key, date:iso, reason:why });
+      state.checkins = (state.checkins||[]).filter(function(c){ return !(c.key===key && c.date===iso); });
+      made++;
+    }
+    closeModal();
+    if(!made){ toast('沒有新增（'+(skip ? '同一天已有紀錄' : '期間內沒有上課日')+'）', 3600); return; }
+    commit();
+    toast('已建立 '+made+' 筆請假'+(skip ? '，'+skip+' 筆重複略過' : ''), 3200);
+  });
+}
+
+function deleteLeave(id){
+  const l = (state.leaves||[]).find(function(x){ return x.id===id; });
+  if(!l) return;
+  if(!confirm('刪除 '+l.date+' 的請假紀錄？')) return;
+  state.leaves = state.leaves.filter(function(x){ return x.id!==id; });
+  commit(); toast('已刪除請假紀錄');
+}
+
+function renderVio(){
+  const list = (state.violations||[]).slice().sort((a,b)=> b.date.localeCompare(a.date) || a.key.localeCompare(b.key));
+  const total = list.reduce((n,v)=>n+(Number(v.points)||1),0);
+  $('vioTools').innerHTML = '<button class="btn primary" id="btnAddVio">新增違規</button>'
+    + '<button class="btn seal" id="btnExportVio">下載違規單</button>'
+    + '<button class="btn seal" id="btnPrintVio">列印</button>'
+    + '<span class="hint">共 '+list.length+' 筆，合計 '+total+' 點，已繳紙本 '+list.filter(function(v){ return v.paper; }).length+' 筆；已勾選 '+ui.vioSel.size+' 筆，未勾選則全部列印</span>';
+  $('vioList').innerHTML = '<thead><tr><th style="width:34px"><input type="checkbox" id="vioAll"></th>'
+    + '<th style="width:110px">日期</th><th style="width:170px">學生</th><th>事由</th><th style="width:58px">點數</th>'
+    + '<th class="paper">已繳紙本</th><th style="width:130px"></th></tr></thead><tbody>'
+    + (list.length ? list.map(v=>{
+        const s = E.byKey(state,v.key);
+        return '<tr><td><input type="checkbox" data-vio="'+v.id+'"'+(ui.vioSel.has(v.id)?' checked':'')+'></td>'
+          + '<td>'+v.date+'</td><td>'+(s?s.cls+'-'+s.seat+' '+esc(s.name):esc(v.key))+'</td>'
+          + '<td>'+esc(v.reason)+'</td>'
+          + '<td class="num">'+(Number(v.points)||1)+'</td>'
+          + '<td class="paper"><label class="pbox"><input type="checkbox" data-viopaper="'+v.id+'" aria-label="已繳回紙本"'+(v.paper?' checked':'')+'></label></td>'
+          + '<td><button class="btn small" data-editvio="'+v.id+'">編輯</button>'
+          + '<button class="btn small" data-delvio="'+v.id+'">刪除</button></td></tr>';
+      }).join('') : '<tr><td colspan="7" class="hint">尚無紀錄</td></tr>')
+    + '</tbody>';
+  /* 手機版：違規紀錄用卡片 */
+  $('vioCards').innerHTML = list.length ? list.map(function(v){
+    const s = E.byKey(state, v.key);
+    return '<div class="card">'
+      + '<div class="card-h">'
+      +   '<label class="cbox"><input type="checkbox" data-vio="'+v.id+'" aria-label="勾選這筆"'+(ui.vioSel.has(v.id)?' checked':'')+'></label>'
+      +   '<span class="card-who"><b>'+v.date+'</b>'+(s ? s.cls+'-'+s.seat+' '+esc(s.name) : esc(v.key))+'</span>'
+      +   '<span class="pill">'+(Number(v.points)||1)+' 點</span>'
+      + '</div>'
+      + '<div class="card-reason">'+esc(v.reason)+'</div>'
+      + '<div class="card-foot">'
+      +   '<label class="chk-inline"><input type="checkbox" data-viopaper="'+v.id+'"'+(v.paper?' checked':'')+'> 已繳紙本</label>'
+      +   '<span class="card-btns">'
+      +     '<button class="btn tiny" data-editvio="'+v.id+'">編輯</button>'
+      +     '<button class="btn tiny" data-delvio="'+v.id+'">刪除</button>'
+      +   '</span>'
+      + '</div></div>';
+  }).join('') : '<p class="hint">尚無紀錄</p>';
+  const tot = E.vioTotals(state);
+  const over = tot.filter(t=>t.p>=3).length;
+  $('vioSum').innerHTML = '<h3>學生累積點數'+(over ? '　（'+over+' 人已達 3 點，依規定退班）' : '')+'</h3>'
+    + (tot.length ? '<div class="tablewrap"><table class="data">'
+        + '<thead><tr><th style="width:200px">學生</th><th style="width:68px">筆數</th>'
+        + '<th style="width:100px">累積點數</th><th style="width:120px">最近一次</th><th style="width:150px">狀態</th>'
+        + '<th style="width:120px">退班通知</th></tr></thead><tbody>'
+        + tot.map(function(t){
+            const s = E.byKey(state, t.key);
+            return '<tr><td>'+(s ? s.cls+'-'+s.seat+' '+esc(s.name) : esc(t.key))+'</td>'
+              + '<td class="num">'+t.n+'</td>'
+              + '<td class="num'+(t.p>=3?' over':'')+'">'+t.p+'</td>'
+              + '<td>'+t.last+'</td>'
+              + '<td>'+(t.p>=3 ? '<span class="pill seal">達 3 點，依規定退班</span>' : '<span class="pill">觀察中</span>')+'</td>'
+              + '<td><button class="btn small'+(t.p>=3?' seal':'')+'" data-exitnotice="'+t.key+'">退班通知</button></td></tr>';
+          }).join('')
+        + '</tbody></table></div>'
+      : '<p class="hint">目前沒有違規紀錄。</p>');
+}
+
+/* ---------- 輪值一週 ---------- */
+/* ---------- 輪值日誌：每日一區塊，記事逐筆登記 ---------- */
+function nowTime(){
+  const d = new Date();
+  return ('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2);
+}
+function dutyNotesOf(date){
+  return (state.dutyNotes||[]).filter(n=>n.date===date)
+    .sort((a,b)=> String(a.time||'99:99').localeCompare(String(b.time||'99:99')) || String(a.id).localeCompare(String(b.id)));
+}
+const ICO = {
+  pencil:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l10-10-4-4L4 16z"/><path d="M14.5 5.5l4 4"/></svg>',
+  check:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.5l5 5L20 6.5"/></svg>',
+  cross:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12"/><path d="M18 6L6 18"/></svg>'
+};
+/* 內文中的 90 開頭座號自動變成學生標記（只認已參加的學生） */
+/* 標記本身已含姓名，緊接在後的同名文字去掉，避免重複 */
+function dedupeName(text){
+  const idx = {};
+  E.active(state).forEach(s=>{ idx[s.cls+'-'+s.seat] = s; });
+  return String(text||'').replace(/(90\d)-?(\d{2})[\s\u3000]*([^\s\u3000]{1,8})/g, function(all, a, b, tail){
+    const s = idx[a+'-'+b];
+    if(!s) return all;
+    if(tail.indexOf(s.name) === 0) return a+'-'+b+' '+tail.slice(s.name.length);
+    return all;
+  });
+}
+function richHtml(text){
+  const idx = {};
+  E.active(state).forEach(s=>{ idx[s.cls+'-'+s.seat] = s; });
+  return esc(dedupeName(text)).replace(/(90\d)-?(\d{2})/g, function(all, a, b){
+    const s = idx[a+'-'+b];
+    if(!s) return all;
+    return '<span class="stu-tag" data-tag="'+a+'-'+b+'">'+esc(s.cls+'-'+s.seat+' '+s.name)+'</span>';
+  });
+}
+function noteRow(n, editable){
+  if(editable && ui.editNote === n.id){
+    return '<div class="nt nt-edit" data-nid="'+n.id+'">'
+      + '<input class="nt-time" type="time" data-ntime="'+n.id+'" value="'+esc(n.time||'')+'" aria-label="記事時間">'
+      + '<div class="nt-main">'
+      +   '<div class="nt-text" contenteditable="true" spellcheck="false" data-ntext="'+n.id+'" data-ph="記事內容，輸入 90129 會變成學生標記">'+richHtml(n.text||'')+'</div>'
+      +   '<div class="nt-hint">輸入 90129 或 901-29 會變成學生標記；儲存後點標記可直接建立違規單。</div>'
+      + '</div>'
+      + '<div class="nt-acts">'
+      +   '<button class="icobtn seal" data-savenote="'+n.id+'" title="儲存" aria-label="儲存">'+ICO.check+'</button>'
+      +   '<button class="btn tiny" data-cancelnote="'+n.id+'">取消</button>'
+      + '</div></div>';
+  }
+  const acts = editable
+    ? '<div class="nt-acts">'
+      + '<button class="icobtn" data-editnote="'+n.id+'" title="編輯" aria-label="編輯">'+ICO.pencil+'</button>'
+      + '<button class="icobtn" data-deln="'+n.id+'" title="刪除" aria-label="刪除">'+ICO.cross+'</button>'
+      + '</div>'
+    : '';
+  return '<div class="nt nt-view'+(editable ? '' : ' nt-ro')+'" data-nid="'+n.id+'">'
+    + '<div class="nt-time-v">'+(n.time ? esc(n.time) : '未記時間')+'</div>'
+    + '<div class="nt-text-v">'+(n.text ? richHtml(n.text) : '<span class="nt-empty">空白記事</span>')+'</div>'
+    + acts + '</div>';
+}
+function dayCard(r){
+  const isToday = r.date === ref();
+  const editing = isToday || ui.dutyEdit === r.date;
+  const off = !r.school;
+  const notes = dutyNotesOf(r.date);
+  const nums = off ? '' : '<span>應到 <b>'+r.should+'</b></span><span>實到 <b>'+r.in+'</b></span>'
+      + '<span>請假 <b>'+r.leave+'</b></span><span>未點 <b>'+r.absent+'</b></span>'
+      + '<span>違規 <b>'+r.vio+'</b></span>';
+  return '<div class="dayv'+(isToday?' today':'')+(off?' off':'')+'" data-day="'+r.date+'">'
+    + '<div class="dv-head">'
+    +   '<span class="dv-wd">星期'+r.wd+'</span>'
+    +   '<span class="dv-dt">'+r.date+'</span>'
+    +   (isToday ? '<span class="pill seal">今天</span>' : '')
+    +   '<span class="dv-teach">'+(off ? (r.label||'不上課') : (r.teacher||'未排'))+'</span>'
+    +   '<div class="dv-nums">'+nums+'</div>'
+    +   '<div class="dv-act">'
+    +     (isToday ? '' : '<button class="btn small" data-editday="'+r.date+'">'+(editing ? '完成' : '編輯這天')+'</button>')
+    +   '</div>'
+    + '</div>'
+    + '<div class="dv-body">'
+    +   (notes.length
+          ? notes.map(function(n){ return noteRow(n, editing); }).join('')
+          : '<div class="nt-empty">'+(editing ? '尚無記事，按下面按鈕可新增' : '尚無記事')+'</div>')
+    +   (editing ? '<div><button class="btn small" data-addnote="'+r.date+'">新增一筆記事</button></div>' : '')
+    + '</div></div>';
+}
+function renderDuty(){
+  const iso = ui.weekRef || ref();
+  const rows = E.weekRows(state, iso);
+  const mon = rows[0], sun = rows[4];
+  const today = ref();
+  const total = (state.dutyNotes||[]).filter(n=> n.date>=mon.date && n.date<=sun.date).length;
+  $('dutyTools').innerHTML = '<button class="btn" id="weekPrev">上一週</button>'
+    + '<button class="btn" id="weekNow">本週</button>'
+    + '<button class="btn" id="weekNext">下一週</button>'
+    + '<span class="hint">'+mon.date+' 至 '+sun.date+'　本週記事 '+total+' 筆；今天固定排在最上面可直接編輯，'
+    + '其他日子按「編輯這天」才能改；輸入 90 開頭加座號會帶出學生。</span>';
+  const order = rows.slice().sort(function(a, b){
+    if(a.date === today && b.date !== today) return -1;
+    if(b.date === today && a.date !== today) return 1;
+    return a.date.localeCompare(b.date);
+  });
+  $('week').innerHTML = order.map(dayCard).join('');
+}
+
+/* ---------- 匯出 / 設定 ---------- */
+function renderExport(){
+  const mark = function(k){ return TPL[k] ? '已就緒' : '匯出時自動讀取'; };
+  $('expTools').innerHTML = '<span class="hint">範本來源：專案內的 templates 資料夾'
+    + '（座位表 '+mark('seat')+'、違規單 '+mark('violation')+'、名單 '+mark('roster')+'）；'
+    + '讀不到也可以自己按右邊選檔</span>'
+    + '<button class="btn" id="btnPickTpl">選擇範本檔</button>';
+  const cf = state.conflicts || [];
+  $('conflictBox').innerHTML = cf.length
+    ? cf.map(c=>'<div><b>'+c.cls+'-'+c.seat+' '+esc(c.name)+'</b><div class="hint">座位表 '+c.seatDoc+'　電話表 '+c.daysSheet+'</div></div>').join('')
+    : '<p class="hint">匯入時未發現勾選矛盾。</p>';
+}
+
+function renderConfig(){
+  $('cfgGas').value = CONFIG.GAS_URL || '';
+  $('cfgPwd').value = CONFIG.PASSWORD || '';
+  $('cfgTerm').value = state.meta.term || '';
+}
+
+function render(){
+  renderShell();
+  renderTabs();
+  if(ui.tab==='today') renderToday();
+  if(ui.tab==='list') renderList();
+  if(ui.tab==='seat') renderSeat();
+  if(ui.tab==='log') renderLog();
+  if(ui.tab==='leave') renderLeave();
+  if(ui.tab==='vio') renderVio();
+  if(ui.tab==='duty') renderDuty();
+  if(ui.tab==='export') renderExport();
+  if(ui.tab==='config') renderConfig();
+}
+
+/* ---------- 事件 ---------- */
+document.addEventListener('click', e=>{
+  const tab = e.target.closest('[data-tab]');
+  if(tab){ ui.tab = tab.dataset.tab; render(); return; }
+});
+$('tabs').addEventListener('click', e=>{ const b=e.target.closest('[data-tab]'); if(b){ ui.tab=b.dataset.tab; render(); } });
+
+document.addEventListener('input', e=>{
+  if(e.target.id==='refDate'){ state.config.refDate = e.target.value; ui.weekRef = e.target.value; commit(); }
+});
+
+document.addEventListener('click', e=>{
+  // 今夜點名
+  if(e.target.id==='dayPrev' || e.target.id==='dayNext'){
+    const d = E.parse(ref());
+    d.setDate(d.getDate() + (e.target.id==='dayPrev' ? -1 : 1));
+    state.config.refDate = E.iso(d);
+    ui.weekRef = state.config.refDate;
+    commit();
+    return;
+  }
+  if(e.target.id==='btnAllIn'){ allIn(); return; }
+  if(e.target.id==='btnAllClear'){ clearCheckin(); return; }
+  const mk = e.target.closest('[data-day]');
+  if(mk){ openEnroll(mk.dataset.key, Number(mk.dataset.day)); return; }
+  const ck = e.target.closest('[data-ck]');
+  if(ck){ toggleCheckin(ck.dataset.ck); return; }
+  const pa = e.target.closest('[data-pickall]');
+  if(pa){
+    if(pa.dataset.pickall === '1') listRows().forEach(function(s){ ui.pick.add(s.key); });
+    else ui.pick.clear();
+    renderListBody(); return;
+  }
+  const pick = e.target.closest('[data-pick]');
+  if(pick){ if(pick.checked) ui.pick.add(pick.dataset.pick); else ui.pick.delete(pick.dataset.pick); renderListBatch(); return; }
+  if(e.target.id==='pickAll'){
+    const shown = listRows();
+    shown.forEach(s=>{ if(e.target.checked) ui.pick.add(s.key); else ui.pick.delete(s.key); });
+    document.querySelectorAll('#listTable [data-pick]').forEach(cb=>{ cb.checked = ui.pick.has(cb.dataset.pick); });
+    renderListBatch(); return;
+  }
+  const tg = e.target.closest('[data-toggle]');
+  if(tg){ const s0 = E.byKey(state, tg.dataset.toggle); setActive(tg.dataset.toggle, !(s0 && s0.active!==false)); return; }
+  const cbox = e.target.closest('label.cbox');
+  if(cbox && e.target.tagName !== 'INPUT') return;
+  const stu = e.target.closest('[data-stu]');
+  if(stu){ openStudent(stu.dataset.stu); return; }
+  // 座位
+  const seat = e.target.closest('[data-slot]');
+  if(seat){ placeSeat(Number(seat.dataset.slot)); return; }
+  if(e.target.id==='btnSeatOut'){ const sl = ui.sel && ui.sel.kind==='slot' ? ui.sel.slot : 0; if(sl) releaseSeat(sl); return; }
+  if(e.target.id==='btnSeatOutBot'){ const sl = ui.sel && ui.sel.kind==='slot' ? ui.sel.slot : 0; if(sl) releaseSeat(sl, 'bottom'); return; }
+  if(e.target.id==='btnSeatCancel'){ ui.sel = null; renderSeat(); return; }
+  const un = e.target.closest('[data-un]');
+  if(un){ ui.sel = (ui.sel && ui.sel.kind==='stu' && ui.sel.key===un.dataset.un) ? null : { kind:'stu', key:un.dataset.un }; renderSeat(); return; }
+  if(e.target.id==='btnAutoSeat'){ autoSeat(); return; }
+  if(e.target.id==='btnClearSeat'){ state.seats={}; ui.sel=null; commit(); return; }
+  // 異動
+  if(e.target.id==='btnNewEnroll'){ openEnrollPicker(); return; }
+  const eEdit = e.target.closest('[data-edit]');
+  if(eEdit){ openEditEnroll(eEdit.dataset.edit); return; }
+  const eDel = e.target.closest('[data-del]');
+  if(eDel){ deleteEnroll(eDel.dataset.del); return; }
+  // 違規
+  if(e.target.id==='btnAddVio'){ openNewVio(); return; }
+  if(e.target.id==='btnPrintVio'){ printVio(); return; }
+  if(e.target.id==='btnExportVio'){ exportVio(ui.vioSel.size?[...ui.vioSel]:(state.violations||[]).map(v=>v.id)); return; }
+  const vb = e.target.closest('[data-vio]');
+  if(vb && vb.type==='checkbox'){ if(vb.checked) ui.vioSel.add(vb.dataset.vio); else ui.vioSel.delete(vb.dataset.vio); return; }
+  const dv = e.target.closest('[data-delvio]');
+  if(dv){ state.violations = state.violations.filter(v=>v.id!==dv.dataset.delvio); ui.vioSel.delete(dv.dataset.delvio); commit(); return; }
+  const xv = e.target.closest('[data-exitnotice]');
+  if(xv){ openExitNotice(xv.dataset.exitnotice); return; }
+  const ev = e.target.closest('[data-editvio]');
+  if(ev){ openVioForm(ev.dataset.editvio); return; }
+  // 輪值
+  if(e.target.id==='weekPrev'||e.target.id==='weekNext'||e.target.id==='weekNow'){
+    const base = ui.weekRef || ref();
+    const d = E.parse(base);
+    const delta = e.target.id==='weekPrev' ? -7 : (e.target.id==='weekNext' ? 7 : 0);
+    if(e.target.id==='weekNow'){ ui.weekRef = ref(); } else { ui.weekRef = E.iso(new Date(d.getFullYear(), d.getMonth(), d.getDate()+delta)); }
+    renderDuty(); return;
+  }
+  // 匯出
+  if(e.target.id==='btnPickTpl'){ $('tplPicker').click(); return; }
+  if(e.target.id==='expXlsx'){ exportXlsx(); return; }
+  if(e.target.id==='expSeat'){ exportSeat(); return; }
+  if(e.target.id==='btnPrintSeat'){ printSeat(); return; }
+  if(e.target.id==='expPrintList'){ printList(); return; }
+  if(e.target.id==='expVio'){ exportVio((state.violations||[]).map(v=>v.id)); return; }
+  if(e.target.id==='expBackup'){ download(new Blob([JSON.stringify(state,null,1)],{type:'application/json'}), '夜自習備份_'+stamp()+'.json'); return; }
+  // 設定
+  if(e.target.id==='btnSaveCfg'){ saveCfg(); return; }
+  if(e.target.id==='btnReload'){ API.load().then(function(r){ if(r.ok && r.state){ state = r.state; dirty = false; normalize(); render(); toast('已重新載入雲端資料'); } else { toast('雲端沒有資料，或目前是本機模式'); } }).catch(err=>toast('載入失敗：'+err.message)); return; }
+  if(e.target.id==='btnTest'){ selfTest(); return; }
+  if(e.target.id==='btnImport'){ $('backupPicker').click(); return; }
+});
+
+document.addEventListener('change', e=>{
+  const lvPaper = e.target.dataset ? e.target.dataset.lvpaper : '';
+  if(lvPaper){
+    const l = (state.leaves||[]).find(function(x){ return x.id===lvPaper; });
+    if(l){ l.paper = e.target.checked; commit(); toast(e.target.checked ? '已標記紙本繳回' : '已取消紙本繳回'); }
+    return;
+  }
+  const vioPaper = e.target.dataset ? e.target.dataset.viopaper : '';
+  if(vioPaper){
+    const v = (state.violations||[]).find(function(x){ return x.id===vioPaper; });
+    if(v){ v.paper = e.target.checked; commit(); toast(e.target.checked ? '已標記紙本繳回' : '已取消紙本繳回'); }
+    return;
+  }
+  if(e.target.id==='vioAll'){
+    document.querySelectorAll('[data-vio]').forEach(c=>{
+      c.checked = e.target.checked;
+      if(c.checked) ui.vioSel.add(c.dataset.vio); else ui.vioSel.delete(c.dataset.vio);
+    });
+    renderVio();
+  }
+  if(e.target.id==='tplPicker'){ /* handled below */ }
+});
+
+$('tplPicker').addEventListener('change', async e=>{
+  for(const f of e.target.files){
+    const buf = await f.arrayBuffer();
+    if(f.name===CONFIG.TPL_NAMES.seat) TPL.seat = buf;
+    if(f.name===CONFIG.TPL_NAMES.violation) TPL.violation = buf;
+    if(f.name===CONFIG.TPL_NAMES.roster) TPL.roster = buf;
+  }
+  toast('範本已載入'); renderExport();
+});
+
+$('backupPicker').addEventListener('change', async e=>{
+  const f = e.target.files[0]; if(!f) return;
+  try{ state = JSON.parse(await f.text()); commit(); toast('已匯入備份'); }
+  catch(err){ toast('備份檔格式錯誤'); }
+});
+
+/* ---------- 輪值記事：逐筆登記，儲存後再以呈現樣式顯示 ---------- */
+function noteById(id){ return (state.dutyNotes||[]).find(n=>n.id===id); }
+
+function startNote(date){
+  if(ui.editNote) cancelNote(ui.editNote);
+  const rec = { id:newId('dn'), date:date, time:nowTime(), text:'', key:'' };
+  state.dutyNotes.push(rec);
+  ui.editNote = rec.id;
+  ui.noteDraft = { isNew:true, time:rec.time, text:'' };
+  render();
+  setTimeout(function(){
+    const el = document.querySelector('[data-ntext="'+rec.id+'"]');
+    if(el) el.focus();
+  }, 40);
+}
+function focusNoteText(id){
+  setTimeout(function(){
+    const el = document.querySelector('[data-ntext="'+id+'"]');
+    if(el) el.focus();
+  }, 40);
+}
+function saveNote(id){
+  const n = noteById(id); if(!n) return;
+  const box = document.querySelector('[data-nid="'+id+'"]');
+  if(!box) return;
+  const timeEl = box.querySelector('[data-ntime]');
+  const textEl = box.querySelector('[data-ntext]');
+  if(timeEl) n.time = timeEl.value;
+  if(textEl) n.text = dedupeName(textEl.innerText.replace(/\u00a0/g,' ').replace(/\n{3,}/g,'\n\n').trim()).trim();
+  hideStuPop();
+  ui.editNote = null; ui.noteDraft = null;
+  commit();
+  toast('記事已儲存');
+}
+function cancelNote(id){
+  const n = noteById(id); if(!n) return;
+  const d = ui.noteDraft || {};
+  if(d.isNew){ state.dutyNotes = (state.dutyNotes||[]).filter(x=>x.id!==id); }
+  else { n.time = d.time || ''; n.text = d.text || ''; }
+  ui.editNote = null; ui.noteDraft = null;
+  render();
+}
+function editNote(id){
+  const n = noteById(id); if(!n) return;
+  if(ui.editNote && ui.editNote !== id) cancelNote(ui.editNote);
+  ui.editNote = id;
+  ui.noteDraft = { isNew:false, time:n.time||'', text:n.text||'' };
+  render();
+  focusNoteText(id);
+}
+
+document.addEventListener('click', e=>{
+  const dayBtn = e.target.closest('[data-editday]');
+  if(dayBtn){
+    const d = dayBtn.dataset.editday;
+    if(ui.editNote) cancelNote(ui.editNote);
+    ui.dutyEdit = (ui.dutyEdit === d) ? null : d;
+    render();
+    return;
+  }
+  const add = e.target.closest('[data-addnote]');
+  if(add){ startNote(add.dataset.addnote); return; }
+  const sv = e.target.closest('[data-savenote]');
+  if(sv){ saveNote(sv.dataset.savenote); return; }
+  const cx = e.target.closest('[data-cancelnote]');
+  if(cx){ cancelNote(cx.dataset.cancelnote); return; }
+  const ed = e.target.closest('[data-editnote]');
+  if(ed){ editNote(ed.dataset.editnote); return; }
+  const del = e.target.closest('[data-deln]');
+  if(del){
+    state.dutyNotes = (state.dutyNotes||[]).filter(n=>n.id!==del.dataset.deln);
+    if(ui.editNote===del.dataset.deln){ ui.editNote = null; ui.noteDraft = null; }
+    commit(); return;
+  }
+  /* 點內文中的學生標記，直接建立違規單 */
+  const tag = e.target.closest('.stu-tag');
+  if(tag && !e.target.closest('[contenteditable="true"]')){
+    const wrap = tag.closest('[data-nid]');
+    const n = wrap ? noteById(wrap.dataset.nid) : null;
+    openVioForm(null, { key:tag.dataset.tag, date:(n ? n.date : ref()), reason:(n ? n.text : '') });
+    return;
+  }
+});
+
+/* 輸入 90 開頭跳出學生選單，選了才變成標記 */
+let stuPop = null;
+function hideStuPop(){ if(stuPop){ stuPop.remove(); stuPop = null; } }
+function applyTagToNote(nid, key){
+  const box = document.querySelector('[data-ntext="'+nid+'"]');
+  const s = E.byKey(state, key);
+  if(!box || !s) return;
+  const plain = box.innerText.replace(/\u00a0/g,' ');
+  const m = plain.match(/(90\d{0,3})\s*$/);
+  const head = m ? plain.slice(0, m.index) : plain;
+  box.innerHTML = richHtml(head + s.cls + s.seat + ' ');
+  const r = document.createRange();
+  r.selectNodeContents(box);
+  r.collapse(false);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(r);
+  box.focus();
+}
+function showStuPop(box, rows){
+  hideStuPop();
+  const p = document.createElement('div');
+  p.className = 'stu-pop';
+  p.dataset.nid = box.dataset.ntext;
+  p.innerHTML = rows.map(function(s){
+    return '<button data-stupick="'+s.key+'">'+s.cls+'-'+s.seat+'　'+esc(s.name)+'</button>';
+  }).join('');
+  document.body.appendChild(p);
+  stuPop = p;
+  const rect = box.getBoundingClientRect();
+  const w = p.offsetWidth;
+  p.style.left = Math.max(12, Math.min(window.innerWidth - w - 12, rect.left + 12)) + 'px';
+  p.style.top = (rect.bottom + window.scrollY - 8) + 'px';
+}
+document.addEventListener('input', e=>{
+  const box = e.target.closest('[data-ntext]');
+  if(!box) return;
+  const plain = box.innerText.replace(/\u00a0/g,' ');
+  const m = plain.match(/(90\d{1,3})\s*$/);
+  if(!m){ hideStuPop(); return; }
+  const digits = m[1];
+  const rows = E.active(state)
+    .filter(s=> (String(s.cls)+s.seat).indexOf(digits)===0)
+    .sort((a,b)=> a.cls-b.cls || a.seat.localeCompare(b.seat))
+    .slice(0,6);
+  if(!rows.length){ hideStuPop(); return; }
+  const exact = (digits.length === 5) ? rows.filter(s=> (String(s.cls)+s.seat)===digits)[0] : null;
+  if(exact){ hideStuPop(); applyTagToNote(box.dataset.ntext, exact.key); return; }
+  showStuPop(box, rows);
+});
+document.addEventListener('mousedown', e=>{
+  if(e.target.closest('.stu-pop')) e.preventDefault();
+});
+document.addEventListener('click', e=>{
+  const pick = e.target.closest('[data-stupick]');
+  if(pick){
+    const nid = stuPop ? stuPop.dataset.nid : '';
+    const key = pick.dataset.stupick;
+    hideStuPop();
+    applyTagToNote(nid, key);
+    return;
+  }
+  if(!e.target.closest('.stu-pop')) hideStuPop();
+});
+document.addEventListener('keydown', e=>{
+  if(!stuPop) return;
+  if(e.key === 'Escape'){ hideStuPop(); return; }
+  if(e.key === 'Enter'){
+    const first = stuPop.querySelector('[data-stupick]');
+    if(first){ e.preventDefault(); first.click(); }
+  }
+});
+
+/* ---------- 動作 ---------- */
+function allIn(){
+  const iso = ref();
+  const b = E.board(state, iso);
+  b.should.filter(s=>!E.onLeave(state,s.key,iso)).forEach(s=>{
+    const c = state.checkins.find(x=>x.key===s.key && x.date===iso);
+    if(c) c.status='到'; else state.checkins.push({ date:iso, key:s.key, status:'到' });
+  });
+  commit();
+  toast('今夜 '+b.should.length+' 人全部標記到班');
+}
+function clearCheckin(){
+  const iso = ref();
+  state.checkins = state.checkins.filter(c=>c.date!==iso);
+  commit(); toast('已清除今夜點名');
+}
+function toggleCheckin(key){
+  const iso = ref();
+  if(!E.present(state,key,iso)) return;
+  const leave = (state.leaves||[]).find(l=>l.key===key && l.date===iso);
+  const c = state.checkins.find(x=>x.key===key && x.date===iso);
+  if(leave){
+    state.leaves = state.leaves.filter(l=>l!==leave);
+    state.checkins = state.checkins.filter(x=>!(x.key===key && x.date===iso));
+  } else if(!c){
+    state.checkins.push({ date:iso, key, status:'到' });
+  } else {
+    state.checkins = state.checkins.filter(x=>x!==c);
+    state.leaves.push({ id:'l'+Date.now(), key, date:iso, reason:'當日請假' });
+  }
+  commit();
+}
+function autoSeat(){
+  const list = E.active(state).slice().sort((a,b)=> a.cls-b.cls || a.seat.localeCompare(b.seat));
+  const seats = {}, pair = {};
+  const primaries = [];
+  [1,2,3].forEach(function(b){
+    for(let col = 1; col <= 14; col++){
+      const d = CONFIG.SEAT_SLOTS.filter(function(s){ return s.band === b && s.col === col; }).sort(function(x,y){ return x.row - y.row; });
+      if(d.length) primaries.push(d[0].i);
+    }
+  });
+  let i = 0;
+  primaries.forEach(function(p){ if(list[i]){ seats[String(p)] = list[i].key; i++; } });
+  let j = i;
+  primaries.forEach(function(p){
+    if(j >= list.length) return;
+    const top = seats[String(p)];
+    if(!top) return;
+    for(let t = j; t < list.length; t++){
+      if(!E.daysOverlap(state, top, list[t].key)){ pair[String(p)] = list[t].key; j = t + 1; break; }
+    }
+  });
+  state.seats = seats;
+  state.seatPair = pair;
+  ui.sel = null;
+  commit();
+  const n = Object.keys(seats).length + Object.keys(pair).length;
+  toast('已排入 '+n+' 人'+(Object.keys(pair).length ? '（其中 '+Object.keys(pair).length+' 人與別人共用桌子）' : ''));
+}
+
+/* ---------- 對話框：學生資料 ---------- */
+function openStudent(key){
+  const s = E.byKey(state,key);
+  if(!s) return;
+  const hist = E.historyOf(state,key);
+  const body = ''
+    + '<div class="grid2">'
+    + '<div class="field"><label>姓名</label><input id="sName" value="'+esc(s.name)+'"></div>'
+    + '<div class="field"><label>電話</label><input id="sPhone" value="'+esc(s.phone||'')+'"></div>'
+    + '<div class="field"><label>便當</label><input id="sLunch" value="'+esc(s.lunch||'')+'"></div>'
+    + '</div>'
+    + '<div class="field"><label>備註</label><textarea id="sNote" rows="2">'+esc(s.note||'')+'</textarea></div>'
+    + '<div class="field"><label>目前每週參加</label><div class="days" id="sDays">'
+    + CONFIG.DAY_LABELS.map((l,i)=>'<button type="button" data-d="'+i+'" class="'+(s.days[i]?'on':'')+'">'+l+'</button>').join('')
+    + '</div></div>'
+    + '<div class="hint">最近異動：'+(hist.length ? hist.slice(-3).map(h=>h.date+' '+E.label(h.before)+'→'+E.label(h.after)).join('；') : '無')+'</div>';
+  const m = modal(s.cls+'-'+s.seat+'　'+esc(s.name), body,
+    '<button class="btn" data-close>取消</button><button class="btn primary" id="sSave">儲存</button>');
+  let days = s.days.slice();
+  m.querySelector('#sDays').addEventListener('click', ev=>{
+    const b = ev.target.closest('[data-d]'); if(!b) return;
+    const i = Number(b.dataset.d); days[i] = days[i]?0:1; b.classList.toggle('on', !!days[i]);
+  });
+  m.querySelector('[data-close]').addEventListener('click', closeModal);
+  m.querySelector('#sSave').addEventListener('click', ()=>{
+    s.name = m.querySelector('#sName').value.trim() || s.name;
+    s.phone = m.querySelector('#sPhone').value.trim();
+    s.lunch = m.querySelector('#sLunch').value.trim();
+    s.note = m.querySelector('#sNote').value.trim();
+    if(days.join('') !== s.days.join('')){
+      state.enrollments.push({ id:'e'+Date.now(), key, date:ref(), days:days.slice(), from:s.days.slice(), reason:'個別資料調整', createdAt:new Date().toISOString() });
+    }
+    closeModal(); commit(); toast('已儲存 '+s.name);
+  });
+}
+
+/* ---------- 對話框：改時間 ---------- */
+function openEnroll(key, dayIndex){
+  const s = E.byKey(state,key); if(!s) return;
+  const cur = E.daysAt(state,key,ref()).slice();
+  if(typeof dayIndex === 'number') cur[dayIndex] = cur[dayIndex]?0:1;
+  const body = '<div class="hint">'+s.cls+'-'+s.seat+'　'+esc(s.name)+'</div>'
+    + '<div class="field"><label>調整後的每週參加日</label><div class="days" id="eDays">'
+    + CONFIG.DAY_LABELS.map((l,i)=>'<button type="button" data-d="'+i+'" class="'+(cur[i]?'on':'')+'">'+l+'</button>').join('')
+    + '</div></div>'
+    + '<div class="field"><label>從哪一天開始生效</label><input type="date" id="eDate" value="'+ref()+'"></div>'
+    + '<div class="field"><label>異動原因</label><input id="eWhy" placeholder="例如：家長來電改為只留一三"></div>'
+    + '<p class="hint">生效日之前的統計與點名不受影響。</p>';
+  const m = modal('調整參加時間', body, '<button class="btn" data-close>取消</button><button class="btn primary" id="eSave">儲存異動</button>');
+  let days = cur.slice();
+  m.querySelector('#eDays').addEventListener('click', ev=>{
+    const b = ev.target.closest('[data-d]'); if(!b) return;
+    const i = Number(b.dataset.d); days[i]=days[i]?0:1; b.classList.toggle('on', !!days[i]);
+  });
+  m.querySelector('[data-close]').addEventListener('click', closeModal);
+  m.querySelector('#eSave').addEventListener('click', ()=>{
+    const date = m.querySelector('#eDate').value || ref();
+    const why = m.querySelector('#eWhy').value.trim() || '未填寫';
+    const before = E.daysAt(state,key,date).slice();
+    state.enrollments.push({ id:'e'+Date.now(), key, date, days:days.slice(), from:before, reason:why, createdAt:new Date().toISOString() });
+    closeModal(); commit(); toast('已記錄異動，'+date+' 起生效');
+  });
+}
+
+function openEnrollPicker(){
+  const opts = E.active(state).sort((a,b)=> a.cls-b.cls || a.seat.localeCompare(b.seat))
+    .map(s=>'<option value="'+s.key+'">'+s.cls+'-'+s.seat+' '+esc(s.name)+'</option>').join('');
+  const body = '<div class="field"><label>學生</label><select id="pk">'+opts+'</select></div>';
+  const m = modal('選擇學生', body, '<button class="btn" data-close>取消</button><button class="btn primary" id="pOk">下一步</button>');
+  m.querySelector('[data-close]').addEventListener('click', closeModal);
+  m.querySelector('#pOk').addEventListener('click', ()=>{ const k=m.querySelector('#pk').value; closeModal(); openEnroll(k); });
+}
+
+/* ---------- 對話框：違規（新增與編輯共用） ---------- */
+function openNewVio(){ openVioForm(null); }
+
+function openVioForm(id, pre){
+  pre = pre || {};
+  const rec = id ? (state.violations||[]).find(v=>v.id===id) : null;
+  const pickKey = rec ? rec.key : (pre.key || '');
+  const list = E.active(state).slice().sort((a,b)=> a.cls-b.cls || a.seat.localeCompare(b.seat));
+  if(pickKey && !list.some(s=>s.key===pickKey)){
+    const s = E.byKey(state, pickKey);
+    if(s) list.unshift(s);
+  }
+  const selKey = pickKey || (list[0] ? list[0].key : '');
+  const opts = list.map(s=>'<option value="'+s.key+'"'+(s.key===selKey?' selected':'')+'>'+s.cls+'-'+s.seat+' '+esc(s.name)+'</option>').join('');
+  const theDate = rec ? rec.date : (pre.date || ref());
+  const body = '<div class="field"><label>學生</label><select id="vk">'+opts+'</select></div>'
+    + '<div class="field"><label>日期</label><input type="date" id="vd" value="'+theDate+'"></div>'
+    + '<div class="field"><label>違規點數（滿 3 點依規定退班）</label><input type="number" id="vp" min="1" max="9" step="1" value="'+(rec ? (Number(rec.points)||1) : 1)+'"></div>'
+    + '<div class="field"><label>事由</label><textarea id="vr" rows="3" placeholder="例如：夜自習期間違規（打瞌睡，多次提醒）"></textarea></div>'
+    + '<p class="hint">列印與下載時會自動在事由後面加上「（記O點）」。</p>';
+  const m = modal(rec ? '編輯違規紀錄' : '新增違規紀錄', body,
+    '<button class="btn" data-close>取消</button><button class="btn primary" id="vSave">儲存</button>');
+  m.querySelector('#vr').value = rec ? (rec.reason || '') : (pre.reason || '');
+  m.querySelector('#vr').focus();
+  m.querySelector('[data-close]').addEventListener('click', closeModal);
+  m.querySelector('#vSave').addEventListener('click', ()=>{
+    const reason = m.querySelector('#vr').value.trim();
+    if(!reason){ toast('請填寫事由'); return; }
+    const key = m.querySelector('#vk').value, date = m.querySelector('#vd').value;
+    const points = Math.max(1, Number(m.querySelector('#vp').value) || 1);
+    if(!date){ toast('請選擇日期'); return; }
+    if(rec){ rec.key = key; rec.date = date; rec.reason = reason; rec.points = points; }
+    else { state.violations.push({ id:newId('v'), key:key, date:date, reason:reason, points:points }); }
+    closeModal(); commit(); toast(rec ? '已更新違規紀錄' : '已新增違規紀錄');
+  });
+}
+
+function vioPages(ids){
+  const items = E.vioItems(state, ids);
+  const pairs = [], tail = [];
+  let i = 0;
+  for(; i+1 < items.length; i += 2) pairs.push({ left: items[i], right: items[i+1] });
+  if(i < items.length) tail.push({ left: items[i] });
+  return { pairs: pairs, tail: tail };
+}
+
+/* ---------- 列印 ---------- */
+function pageStyle(size, margin){
+  let s = document.getElementById('pageStyle');
+  if(!s){ s = document.createElement('style'); s.id = 'pageStyle'; document.head.appendChild(s); }
+  s.textContent = '@page{size:'+size+';margin:'+margin+'}';
+}
+function doPrint(html, size, margin){
+  pageStyle(size, margin);
+  $('printArea').innerHTML = html;
+  setTimeout(function(){ window.print(); }, 120);
+}
+/* 通知單：三聯，依 Word 範本欄寬與列高；kind = 'vio' 違規、'exit' 退班 */
+function noticeBlock(it, kind){
+  const titles = ['第一聯 教學組留存','第二聯 導師留存','第三聯 家長留存'];
+  const isExit = kind === 'exit';
+  const head = isExit ? '建成國中夜自習退班通知單' : '建成國中夜自習違規通知單';
+  const label = isExit ? '退班事由' : '違規事由';
+  return titles.map(function(t){
+    return '<table class="wt vio"><colgroup>'
+      + '<col style="width:.70in"><col style="width:.89in"><col style="width:.75in">'
+      + '<col style="width:.95in"><col style="width:.82in"><col style="width:1.10in"></colgroup>'
+      + '<tr style="height:.37in"><td colspan="6" class="vt">'+head+'【'+t+'】</td></tr>'
+      + '<tr style="height:.37in"><td>日　　期</td><td colspan="5" class="vl">'+esc(it.dateLine)+'</td></tr>'
+      + '<tr style="height:.37in"><td>學生姓名</td><td colspan="5" class="vl">'+esc(it.studentLine)+'</td></tr>'
+      + '<tr style="height:.37in"><td>'+label+'</td><td colspan="5" class="vl">'+esc(it.reason)+'</td></tr>'
+      + '<tr style="height:.37in"><td>導師簽章</td><td></td><td>家長簽章</td><td></td><td>教務處簽章</td><td></td></tr>'
+      + '</table>';
+  }).join('<div class="cut"></div>');
+}
+/* 一頁左右各一份，落單者獨自一頁 */
+function printNotice(items, kind){
+  if(!items || !items.length){ toast('沒有可列印的資料'); return; }
+  const pages = [];
+  for(let i=0; i<items.length; i+=2) pages.push([items[i], items[i+1] || null]);
+  const html = pages.map(function(sides, i){
+    return '<div class="printpage'+(i<pages.length-1?' pagebreak':'')+'"><div class="duo">'
+      + sides.map(function(s){ return '<div class="side">'+(s ? noticeBlock(s, kind) : '')+'</div>'; }).join('')
+      + '</div></div>';
+  }).join('');
+  closeModal();
+  doPrint(html, 'A4 landscape', '0.3in');
+  toast('已送往列印，共 '+pages.length+' 頁（A4 橫式，左右各一份）');
+}
+function printVio(ids){
+  ids = ids || (ui.vioSel.size ? [...ui.vioSel] : (state.violations||[]).map(function(v){ return v.id; }));
+  if(!ids.length){ toast('尚無違規紀錄'); return; }
+  printNotice(E.vioItems(state, ids), 'vio');
+}
+/* 退班通知：與違規通知單同一格式，只把違規二字改成退班 */
+function printExitNotice(keys, why, date){
+  const items = (keys||[]).map(function(k){
+    return { dateLine:E.rocDate(date || ref()), studentLine:E.studentLine(state, k), reason:why || '' };
+  });
+  printNotice(items, 'exit');
+}
+
+/* 從累積點數區直接列印退班通知 */
+function openExitNotice(key){
+  const s = E.byKey(state, key); if(!s) return;
+  const tot = E.vioTotals(state).filter(function(t){ return t.key===key; })[0];
+  const p = tot ? tot.p : 0;
+  const def = '累積違規點數 '+p+' 點'+(p >= 3 ? '，依規定退班' : '');
+  const body = '<div class="hint">'+s.cls+'-'+s.seat+'　'+esc(s.name)+'　累積違規 '+p+' 點</div>'
+    + '<div class="field"><label>退班事由</label><textarea id="xWhy" rows="3">'+esc(def)+'</textarea></div>'
+    + '<p class="hint">格式與違規通知單相同，只把「違規」改成「退班」，A4 橫式、三聯。</p>';
+  const m = modal('列印退班通知', body,
+    '<button class="btn" data-close>取消</button><button class="btn seal" id="xPrint">列印</button>');
+  m.querySelector('[data-close]').addEventListener('click', closeModal);
+  m.querySelector('#xPrint').addEventListener('click', function(){
+    const why = m.querySelector('#xWhy').value.trim() || ('累積違規點數 '+p+' 點，依規定退班');
+    printExitNotice([key], why, ref());
+  });
+}
+
+/* 座位表：A3 橫式，0.38 吋列號欄 + 14 欄 × 1.1 吋，列高依原檔 9 列 */
+function printSeat(){
+  const labels = ['一A1','一C1','二A1','二C1','三A1','三C1','四A1','四C1','五A1','五C1','六A1','六C1','七A1','七C1'];
+  const heights = [[0.33,1.18,1.23],[0.21,1.14,1.14],[0.18,1.35,1.46]];
+  const band = {};
+  CONFIG.SEAT_SLOTS.forEach(function(s){ (band[s.band]=band[s.band]||[]).push(s); });
+  const dayLine = '一二三四五';
+
+  let html = '<table class="wt seatmap"><colgroup><col style="width:0.38in">';
+  for(let i=0;i<14;i++) html += '<col style="width:1.1in">';
+  html += '</colgroup>';
+
+  [1,2,3].forEach(function(b){
+    const slots = (band[b]||[]).slice().sort(function(x,y){ return x.col-y.col || x.row-y.row; });
+    /* 標籤列 */
+    html += '<tr style="height:'+heights[b-1][0]+'in"><td class="lbl" rowspan="2">'+b+'</td>';
+    labels.forEach(function(l){
+      html += '<td class="lbl">'+l+'</td>';
+    });
+    html += '</tr>';
+    /* 桌子列：每張桌子一個格，高度為原本兩列之和 */
+    html += '<tr style="height:'+(heights[b-1][1]+heights[b-1][2])+'in">';
+    for(let col = 1; col <= 14; col++){
+      const d = slots.filter(function(s){ return s.col === col; }).sort(function(x,y){ return x.row - y.row; });
+      if(!d.length){ html += '<td></td>'; continue; }
+      const primary = d[0].i;
+      const topKey = state.seats[String(primary)] || '';
+      const botKey = deskBotKey(primary);
+      const keys = [topKey, botKey].filter(Boolean);
+      const inner = keys.length
+        ? keys.map(function(k, ki){
+            const s = E.byKey(state,k);
+            return '<div class="sm">'
+              + (keys.length > 1 ? '<div class="sg">'+(ki ? '下' : '上')+'</div>' : '')
+              + '<div>'+dayLine+'</div>'
+              + '<div>'+E.daysNow(state,k).map(function(v){ return v?'■':'□'; }).join('')+s.cls+s.seat+'</div>'
+              + '<div>'+esc(s.name)+'</div>'
+              + '</div>';
+          }).join('')
+        : '&nbsp;';
+      html += '<td>'+inner+'</td>';
+    }
+    html += '</tr>';
+  });
+  html += '</table>';
+  doPrint(html, 'A3 landscape', '0.472in 0.354in 0.5in 0.354in');
+  toast('已送往列印（A3 橫式，版面同 Word 範本）');
+}
+
+/* 名單：A4 直式，比照電話表欄位 */
+function printList(){
+  const rows = E.seatRows(state);
+  const sum = [0,0,0,0,0];
+  rows.forEach(function(r){ r.days.forEach(function(v,i){ sum[i]+=v; }); });
+  let html = '<div class="tit">夜自習參加天數及聯絡資料（'+(state.config.refDate||E.today())+' 基準）</div>';
+  html += '<table class="wt"><colgroup>'
+    + '<col style="width:.38in"><col style="width:.42in"><col style="width:.62in">'
+    + '<col style="width:.3in"><col style="width:.3in"><col style="width:.3in"><col style="width:.3in"><col style="width:.3in">'
+    + '<col style="width:.42in"><col style="width:1in"><col style="width:.4in"><col style="width:.5in"><col>'
+    + '</colgroup>';
+  html += '<tr class="vh"><td>班級</td><td>座號</td><td>姓名</td>'
+    + CONFIG.DAY_LABELS.map(function(l){ return '<td>'+l+'</td>'; }).join('')
+    + '<td>天數</td><td>電話</td><td>輪值</td><td>便當</td><td>備註</td></tr>';
+  rows.forEach(function(r){
+    const s = E.byKey(state,r.key) || {};
+    html += '<tr><td>'+r.cls+'</td><td>'+r.seat+'</td><td class="vl">'+esc(r.name)+'</td>'
+      + r.days.map(function(v){ return '<td>'+(v?'■':'□')+'</td>'; }).join('')
+      + '<td>'+r.days.reduce(function(a,b){ return a+b; },0)+'</td>'
+      + '<td>'+esc(s.phone||'')+'</td><td>'+(s.parentDuty?'V':'')+'</td>'
+      + '<td>'+esc(s.lunch||'')+'</td><td class="vl">'+esc(s.note||'')+'</td></tr>';
+  });
+  html += '<tr class="vh"><td colspan="3">每日合計</td>'
+    + sum.map(function(v){ return '<td>'+v+'</td>'; }).join('')
+    + '<td colspan="5"></td></tr>';
+  html += '</table>';
+  doPrint(html, 'A4 portrait', '10mm');
+  toast('已送往列印（A4）');
+}
+
+/* ---------- 匯出 ---------- */
+function stamp(){ return (state.config.refDate||E.today()).replace(/-/g,''); }
+/* 印表日期：2026-10-27 → 1027（月日各兩位，與範本表頭一致） */
+function mmdd(iso){ const p = String(iso||'').split('-'); return p.length===3 ? (p[1]+p[2]) : ''; }
+function download(blob, name){
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href=url; a.download=name; document.body.appendChild(a); a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 600);
+}
+function borderAll(){ const b={style:'thin',color:{argb:'FF999999'}}; return {top:b,left:b,bottom:b,right:b}; }
+
+async function exportSeat(){
+  try{
+    const buf = await API.template('seat');
+    const DocxT = window.docxtemplater;
+    const zip = new window.PizZip(buf);
+    const doc = new DocxT(zip, { paragraphLoop:true, linebreaks:true, nullGetter:()=>'' });
+    const data = { term: state.meta.term || '', date: mmdd(ref()) };
+    CONFIG.SEAT_SLOTS.forEach(slot=>{ data['s'+slot.i] = E.seatCell(state, slot.i); });
+    doc.render(data);
+    const bytes = doc.getZip().generate({ type:'uint8array', compression:'DEFLATE' });
+    download(new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}), '夜自習座位表_'+stamp()+'.docx');
+    toast('已下載座位表');
+  }catch(err){ toast('匯出失敗：'+err.message, 5000); }
+}
+
+async function exportVio(ids){
+  if(!ids || !ids.length){ toast('沒有可匯出的違規紀錄'); return; }
+  try{
+    const buf = await API.template('violation');
+    const DocxT = window.docxtemplater;
+    const zip = new window.PizZip(buf);
+    const doc = new DocxT(zip, { paragraphLoop:true, linebreaks:true, nullGetter:()=>'' });
+    doc.render(E.vioDoc(state, ids));
+    const bytes = doc.getZip().generate({ type:'uint8array', compression:'DEFLATE' });
+    download(new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}), '夜自習違規通知單_'+stamp()+'.docx');
+    toast('已下載違規單（'+ids.length+' 位，每頁 2 張）');
+  }catch(err){ toast('匯出失敗：'+err.message, 5000); }
+}
+
+async function exportXlsx(){
+  try{
+    const buf = await API.template('roster');
+    const ExcelJS = window.ExcelJS;
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buf);
+    const iso = ref();
+    const mat = E.matrix(state, iso);
+
+    const wsT = wb.getWorksheet('總表');
+    if(wsT){
+      mat.rows.forEach(r=>{
+        for(let row=2; row<=12; row++){
+          if(Number(wsT.getCell(row,1).value)===Number(r.cls)){
+            wsT.getCell(row,2).value = r.total;
+            for(let i=0;i<5;i++) wsT.getCell(row,3+i).value = r.per[i];
+            wsT.getCell(row,8).value = r.joined;
+            wsT.getCell(row,9).value = r.notJoined;
+            break;
+          }
+        }
+      });
+    }
+
+    const oldPhone = wb.getWorksheet('參加天數及電話') || wb.getWorksheet('參加天數及電話 ');
+    if(oldPhone) wb.removeWorksheet(oldPhone.id);
+    const wsP = wb.addWorksheet('參加天數及電話', { views:[{state:'frozen',ySplit:2}] });
+    const head = ['序號','班級','座號','姓名','一','二','三','四','五','天數','電話','家長輪值','便當','備註'];
+    [6,8,7,10,5,5,5,5,5,7,15,10,8,26].forEach((w,i)=>{ wsP.getColumn(i+1).width=w; });
+    wsP.mergeCells(1,1,1,head.length);
+    wsP.getCell(1,1).value = (state.meta.term||'')+'　夜自習參加天數及聯絡資料（'+iso+' 基準）';
+    wsP.getCell(1,1).font = { name:'標楷體', size:14, bold:true };
+    wsP.getCell(1,1).alignment = { horizontal:'center' };
+    head.forEach((h,i)=>{
+      const c = wsP.getCell(2,i+1);
+      c.value=h; c.font={name:'標楷體',size:12,bold:true};
+      c.alignment={horizontal:'center',vertical:'middle'};
+      c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFEFEDE6'}};
+      c.border=borderAll();
+    });
+    const rows = E.seatRows(state);
+    rows.forEach((r,i)=>{
+      const s = E.byKey(state,r.key)||{};
+      const vals = [i+1, r.cls, r.seat, r.name].concat(r.days)
+        .concat([r.days.reduce((a,b)=>a+b,0), s.phone||'', s.parentDuty?'V':'', s.lunch||'', s.note||'']);
+      vals.forEach((v,ci)=>{
+        const c = wsP.getCell(i+3, ci+1);
+        c.value=v; c.font={name:'標楷體',size:12};
+        c.alignment={horizontal:(ci===3||ci===13)?'left':'center',vertical:'middle'};
+        c.border=borderAll();
+      });
+    });
+    const sumRow = rows.length+3;
+    wsP.getCell(sumRow,1).value='每日合計';
+    wsP.mergeCells(sumRow,1,sumRow,4);
+    for(let i=0;i<5;i++){
+      const c = wsP.getCell(sumRow,5+i);
+      c.value = rows.reduce((a,r)=>a+r.days[i],0);
+      c.alignment={horizontal:'center'}; c.font={name:'標楷體',size:12,bold:true};
+    }
+    for(let c=1;c<=head.length;c++) wsP.getCell(sumRow,c).border=borderAll();
+
+    wb.calcProperties = { fullCalcOnLoad:true };
+    const out = await wb.xlsx.writeBuffer();
+    download(new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}), '夜自習名單_'+stamp()+'.xlsx');
+    toast('已下載 Excel');
+  }catch(err){ toast('匯出失敗：'+err.message, 5000); }
+}
+
+/* ---------- 設定 ---------- */
+function saveCfg(){
+  const url = $('cfgGas').value.trim(), pwd = $('cfgPwd').value, term = $('cfgTerm').value.trim();
+  CONFIG.GAS_URL = url; CONFIG.PASSWORD = pwd;
+  state.meta.term = term;
+  localStorage.setItem('nightstudy.gas', url);
+  localStorage.setItem('nightstudy.pwd', pwd);
+  API.save().then(()=>{ render(); toast('設定已儲存'); }).catch(err=>toast('雲端連線失敗：'+err.message,5000));
+}
+
+function selfTest(){
+  const out=[];
+  const t=(n,f)=>{ try{ const r=f(); out.push('<div class="'+(r===true?'ok':'ng')+'">'+(r===true?'PASS　':'FAIL　')+n+(r===true?'':'　'+r)+'</div>'); }
+    catch(err){ out.push('<div class="ng">ERROR　'+n+'　'+err.message+'</div>'); } };
+  t('上課日 62 天', ()=>{ const n=state.calendar.filter(c=>c.status==='上課').length; return n===62||'實際 '+n; });
+  t('901 週一人數 2', ()=>{ const r=E.matrix(state,ref()).rows.find(x=>x.cls===901); return (r&&r.per[0]===2)||'實際 '+(r?r.per[0]:'-'); });
+  t('905 週四人數 5', ()=>{ const r=E.matrix(state,ref()).rows.find(x=>x.cls===905); return (r&&r.per[3]===5)||'實際 '+(r?r.per[3]:'-'); });
+  t('座位 51 格且無重複', ()=>{ const i=E.seatIssue(state); return (CONFIG.SEAT_SLOTS.length===51 && !i.dup.length)||'重複 '+i.dup.join(','); });
+  t('異動可回溯（904-34）', ()=>{
+    const before = E.daysAt(state,'904-34','2026-10-18').join('');
+    const after = E.daysAt(state,'904-34','2026-10-19').join('');
+    return (before==='10100' && after==='11000')||before+'→'+after;
+  });
+  t('異動日誌 6 筆', ()=>{ const n=E.recentLog(state).length; return n>=6||'實際 '+n; });
+  t('輪值教師 62 天', ()=>{ const n=state.duty.filter(d=>d.teacher).length; return n===62||'實際 '+n; });
+  t('違規單每頁 2 份（A4 橫式）', ()=>{ const b=E.vioPages(state,(state.violations||[]).map(v=>v.id));
+    const total = b.pairs.length*2 + b.tail.length;
+    return total===(state.violations||[]).length || '張數 '+total; });
+  $('testOut').innerHTML = out.join('');
+}
+
+/* ---------- 啟動 ---------- */
+function normalize(){
+  state.config = state.config || {};
+  if(!state.config.refDate) state.config.refDate = E.today();
+  state.config.totals = state.config.totals || {};
+  ['enrollments','calendar','leaves','violations','checkins','duty','dutyNotes','conflicts'].forEach(function(k){ state[k]=state[k]||[]; });
+  state.seats = state.seats || {};
+  state.seatPair = state.seatPair || {};
+  Object.keys(state.seatPair).forEach(function(k){
+    const key = state.seatPair[k];
+    const s = key ? E.byKey(state, key) : null;
+    if(!key || !s || s.active === false || !state.seats[k] || state.seats[k] === key) delete state.seatPair[k];
+  });
+  state.students = (state.students||[]).map(function(s){
+    if(!Array.isArray(s.days) || s.days.length!==5) s.days = [0,0,0,0,0];
+    if(s.active===undefined) s.active = true;
+    if(s.sid===undefined) s.sid = '';
+    return s;
+  });
+  /* 名冊整併：雲端若只有舊的 51 人名單，自動補齊九年級名冊中缺的學生（一律不參加） */
+  const seedAll = (window.SEED && window.SEED.students) || [];
+  const seedByKey = {};
+  seedAll.forEach(function(s){ seedByKey[s.key] = s; });
+  const have = {};
+  state.students.forEach(function(s){
+    have[s.key] = 1;
+    if(!s.sid && seedByKey[s.key]) s.sid = seedByKey[s.key].sid || '';
+  });
+  seedAll.forEach(function(s){
+    if(have[s.key]) return;
+    state.students.push({ key:s.key, cls:s.cls, seat:s.seat, name:s.name, sid:s.sid||'',
+      phone:'', lunch:'', parentDuty:false, note:'', days:[0,0,0,0,0], active:false });
+  });
+  if(state.students.length){
+    const t = {};
+    state.students.forEach(function(s){ t[s.cls] = (t[s.cls]||0)+1; });
+    state.config.totals = t;
+  }
+  ui.weekRef = ui.weekRef || state.config.refDate;
+  const byCls = {};
+  state.students.forEach(function(s){ byCls[s.cls] = (byCls[s.cls]||0)+1; });
+  const clsBox = $('cfgClsTotal');
+  if(clsBox) clsBox.textContent = '各班學生數（由九年級名冊自動計算）：'
+    + Object.keys(byCls).sort().map(function(k){ return k+' 班 '+byCls[k]+' 人'; }).join('　');
+}
+
+function emptyState(){
+  return {
+    meta:{ school:'', term:'', source:'' },
+    config:{ refDate:E.today(), totals:{} },
+    students:[], enrollments:[], calendar:[], leaves:[], violations:[],
+    checkins:[], seats:{}, seatPair:{}, duty:[], dutyNotes:[], conflicts:[]
+  };
+}
+
+async function boot(){
+  CONFIG.GAS_URL = localStorage.getItem('nightstudy.gas') || CONFIG.GAS_URL || '';
+  CONFIG.PASSWORD = localStorage.getItem('nightstudy.pwd') || CONFIG.PASSWORD || '';
+  $('cfgGas').value = CONFIG.GAS_URL;
+  $('cfgPwd').value = CONFIG.PASSWORD;
+
+  /* 先用手上的資料畫出來，不等網路 */
+  let local = null;
+  try{
+    const raw = localStorage.getItem(CONFIG.STORE_KEY);
+    if(raw){ const s = JSON.parse(raw); if(s && s.students && s.students.length) local = s; }
+  }catch(err){}
+  /* 本機有存檔就用本機，沒有就用空狀態；window.SEED 只保留給測試與匯入用，正式檔為 null */
+  state = local || (window.SEED ? JSON.parse(JSON.stringify(window.SEED)) : emptyState());
+  normalize();
+  render();
+  /* 背景先把 templates 資料夾裡的範本讀進記憶體，第一次匯出就不必等 */
+  API.warmTemplates().then(function(){
+    if(ui.tab==='export') renderExport();
+  }).catch(function(){});
+
+  if(!API.isCloud()) return;
+
+  try{
+    const r = await API.load();
+    if(r.ok && r.state && r.state.students && r.state.students.length){
+      if(dirty){
+        toast('雲端有資料，但你在載入期間已經改過，這次不覆蓋；要改用雲端版本請到「設定與檢查」按「從雲端重新載入」', 6500);
+        return;
+      }
+      state = r.state;
+      normalize();
+      render();
+    }else if(r.ok){
+      await API.save();
+      toast('雲端試算表還沒有資料，請先在「名單」工作表建立名冊，或到「設定與檢查」匯入備份檔', 7000);
+    }
+  }catch(err){
+    toast('雲端連線失敗，目前使用本機資料', 4200);
+  }
+}
+
+/* 拖曳（桌機） */
+document.addEventListener('dragstart', e=>{
+  const seat = e.target.closest('[data-slot]');
+  if(!seat) return;
+  const key = state.seats[String(seat.dataset.slot)] || '';
+  if(!key) { e.preventDefault(); return; }
+  e.dataTransfer.setData('text/plain', String(seat.dataset.slot));
+  ui.sel = { kind:'slot', slot:Number(seat.dataset.slot) };
+});
+document.addEventListener('dragover', e=>{ const s=e.target.closest('[data-slot]'); if(s) e.preventDefault(); });
+document.addEventListener('drop', e=>{
+  const s = e.target.closest('[data-slot]');
+  if(!s) return;
+  e.preventDefault();
+  const from = Number(e.dataTransfer.getData('text/plain'));
+  if(!isNaN(from)) placeSeat(Number(s.dataset.slot));
+});
+
+/* 請假紀錄：新增／刪除／篩選 */
+document.addEventListener('click', e=>{
+  if(e.target.id==='btnAddLeave'){ openLeaveNew(); return; }
+  const del = e.target.closest('[data-leavedel]');
+  if(del){ deleteLeave(del.dataset.leavedel); return; }
+  const lvf = e.target.closest('[data-lvf]');
+  if(lvf){ ui.lvFilter = lvf.dataset.lvf; renderLeave(); return; }
+});
+
+/* 學生清單：篩選與批次 */
+document.addEventListener('click', e=>{
+  const rc = e.target.closest('[data-rcls]');
+  if(rc){ ui.rcls = Number(rc.dataset.rcls) || 0; renderList(); return; }
+  const sh = e.target.closest('[data-show]');
+  if(sh){ ui.show = sh.dataset.show; renderList(); return; }
+  const bt = e.target.closest('[data-batch]');
+  if(bt){
+    const k = bt.dataset.batch;
+    if(k==='in') batchActive(true);
+    else if(k==='out') batchActive(false);
+    else if(k==='days') batchDays();
+    else { ui.pick.clear(); renderList(); }
+    return;
+  }
+});
+document.addEventListener('input', e=>{
+  if(e.target.id==='rosterQ'){ ui.q = e.target.value; renderListBody(); }
+});
+
+window.__NS = { CONFIG, get state(){ return state; }, get ui(){ return ui; }, E, API, render, renderToday, renderSeat, renderLog, renderDuty,
+  renderList, renderListBody, listRows, setActive, batchActive, batchDays, dropSeatOf,
+  releaseSeat, printVio, vioPages, openVioForm, renderLeave, openLeaveNew, deleteLeave, leaveList,
+  printSeat, autoSeat, seatPart, deskSlots, deskBotKey,
+  openExit, openExitBatch, renderLog,
+  setTemplate(n,b){ TPL[n]=b; }, setTab(t){ ui.tab=t; render(); } };
+boot();
+</script>
+</body>
+</html>
