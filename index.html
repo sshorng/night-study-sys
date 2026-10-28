@@ -3,6 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="preconnect" href="https://script.google.com">
+<link rel="preconnect" href="https://script.googleusercontent.com">
 <title>夜自習點名簿</title>
 <style>
 :root{
@@ -119,6 +121,7 @@ input,select,textarea{font-family:inherit;font-size:14px}
 .pill{display:inline-block;font-size:11px;padding:1px 8px;border-radius:999px;border:1px solid var(--rule);color:var(--ink-3);background:var(--card)}
 .pill.seal{background:var(--seal-soft);border-color:#DCB6AA;color:#7E2415}
 .pill.ok{background:var(--ok-soft);border-color:#B9CDB4;color:#2F5340}
+.pill.bad{background:#F6DCD5;border-color:#DCB6AA;color:#8C2415}
 
 /* ---------- 座位 ---------- */
 .band{margin-bottom:16px}
@@ -584,16 +587,50 @@ body.gated .sheet{opacity:.28;pointer-events:none;user-select:none}
 <div class="toast" id="toast"></div>
 <input type="file" id="tplPicker" multiple accept=".docx,.xlsx" style="display:none">
 
-<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/pizzip@3.1.7/dist/pizzip.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/docxtemplater@3.60.1/build/docxtemplater.js"></script>
+<!-- 匯出用的大檔（ExcelJS、PizZip、docxtemplater 合計約 1.2 MB）改成第一次匯出才下載，
+     開頁不必等它們，雲端名冊可以更早出現 -->
+<script>
+const LIB = {
+  URLS: {
+    exceljs: 'https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js',
+    pizzip:  'https://cdn.jsdelivr.net/npm/pizzip@3.1.7/dist/pizzip.js',
+    docx:    'https://cdn.jsdelivr.net/npm/docxtemplater@3.60.1/build/docxtemplater.js'
+  },
+  ready: { exceljs:false, pizzip:false, docx:false },
+  waiting: {},
+  load(key){
+    if(this.ready[key]) return Promise.resolve(true);
+    if(this.waiting[key]) return this.waiting[key];
+    const self = this;
+    this.waiting[key] = new Promise(function(resolve, reject){
+      const s = document.createElement('script');
+      s.src = self.URLS[key];
+      s.async = true;
+      s.onload = function(){ self.ready[key] = true; resolve(true); };
+      s.onerror = function(){ delete self.waiting[key]; reject(new Error('下載 '+key+' 失敗，請確認網路後再匯出')); };
+      document.head.appendChild(s);
+    });
+    return this.waiting[key];
+  },
+  async need(keys){
+    for(let i=0;i<keys.length;i++) await this.load(keys[i]);
+    return true;
+  },
+  /* 雲端名冊讀完、畫面閒下來之後才在背景預抓，第一次匯出就不用等 */
+  warm(){
+    const run = function(){ ['pizzip','docx','exceljs'].forEach(function(k){ LIB.load(k).catch(function(){}); }); };
+    if(window.requestIdleCallback) requestIdleCallback(run, { timeout: 8000 });
+    else setTimeout(run, 3000);
+  }
+};
+</script>
 <script>/* 資料一律從雲端試算表載入；本檔不含任何名冊或個資（window.SEED 保留給測試與匯入覆寫） */window.SEED = window.SEED || null;</script>
 <script>
 /* =====================================================================
    1. CONFIG
    ===================================================================== */
 const CONFIG = {
-  VERSION: '2.8.0',
+  VERSION: '2.10.0',
   /* 已內建的 Apps Script 部署網址：第一次使用只要在設定頁填通關密語，會記在這台裝置的瀏覽器 */
   GAS_URL: 'https://script.google.com/macros/s/AKfycbxBk3fJaCrPfyojhPVgT6xNE110x3ENSGquQLVWLBz8jdNH2FgX6QMNBQKr1lHLZ8ePtw/exec',
   PASSWORD: '',
@@ -638,13 +675,22 @@ let state = {
   seats:{}, seatPair:{}, duty:[], conflicts:[]
 };
 let dirty = false;
-/* 雲端狀態：loaded 這次成功載入過；authoritative 目前畫面就是雲端那份；pending 有修改還沒上傳 */
+/* 雲端狀態：loaded 這次成功載入過；authoritative 目前畫面就是雲端那份；pending 有修改還沒上傳
+   loading／t0 載入中與已等秒數；retries 這次重試到第幾次；lastError 上一次失敗原因 */
 const cloud = { loaded:false, authoritative:false, pending:false, noticed:false, failed:false,
-  queued:false, lastSaved:null, toastAt:0 };
+  queued:false, lastSaved:null, toastAt:0, loading:false, t0:0, retries:0, lastError:'', autoRetries:0 };
 /* 背景上傳中：true 時右上角顯示「儲存中…」 */
 let saving = false;
 let ui = { tab:'today', sel:null, vioSel:new Set(), weekRef:'', cls:'all',
   rcls:0, q:'', show:'in', pick:new Set(), lvFilter:'all', editNote:null, noteDraft:null, dutyEdit:null };
+
+/* 存檔時只送有變動的項目：改一位學生不必把整份資料再傳一次 */
+const SYNC_PARTS = ['students','enrollments','calendar','leaves','violations','checkins',
+  'seats','seatPair','duty','dutyNotes','meta','opts','config','conflicts'];
+/* 同一張工作表的項目要一起送，避免只送一半把表寫壞 */
+const SYNC_GROUPS = [['seats','seatPair'], ['meta','opts','config','conflicts']];
+/* 網址加 ?perf=1 時，每次雲端往返的耗時會印在 console，方便量測 */
+const PERF = /[?&]perf=1/.test(location.search);
 
 /* =====================================================================
    3. PURE ENGINE
@@ -906,21 +952,96 @@ const API = {
   /* 網址已內建；測試注入（window.SEED／__NS_LOCAL）或本機模式旗標時不連雲端 */
   isCloud(){ return !!CONFIG.GAS_URL && !CONFIG.LOCAL_ONLY && !window.SEED && !window.__NS_LOCAL; },
   reachable(){ return API.isCloud() && !!CONFIG.PASSWORD; },
-  async call(payload){
-    const res = await fetch(CONFIG.GAS_URL, {
-      method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'},
+  /* 單次請求：多了逾時中斷，網路卡住時不會讓整個畫面一直空等 */
+  NET_TIMEOUT: 18000,
+  lastMs: 0,
+  async raw(payload, timeoutMs){
+    const ms = timeoutMs || API.NET_TIMEOUT;
+    const ctl = (typeof AbortController === 'function') ? new AbortController() : null;
+    const opts = {
+      method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, cache:'no-store',
       body: JSON.stringify({ ...payload, password: CONFIG.PASSWORD })
-    });
-    const json = await res.json();
-    if(!json.ok) throw new Error(json.error || '雲端回應錯誤');
-    return json;
+    };
+    let timer = null;
+    if(ctl){ opts.signal = ctl.signal; timer = setTimeout(function(){ try{ ctl.abort(); }catch(err){} }, ms); }
+    const t0 = Date.now();
+    try{
+      const res = await fetch(CONFIG.GAS_URL, opts);
+      const text = await res.text();
+      let json;
+      try{ json = JSON.parse(text); }
+      catch(err){
+        /* Apps Script 忙碌或轉址出錯時會回 HTML，這裡換成人看得懂的說明 */
+        throw new Error('雲端回了無法解析的內容（HTTP ' + res.status + '），請稍後再試');
+      }
+      if(!json.ok) throw new Error(json.error || '雲端回應錯誤');
+      json.ms = Date.now() - t0;
+      return json;
+    }catch(err){
+      if(err && err.name === 'AbortError') throw new Error('連線逾時 '+Math.round(ms/1000)+' 秒');
+      const m = String((err && err.message) || '');
+      if(/Failed to fetch|NetworkError|Load failed|network/i.test(m)){
+        throw new Error(navigator.onLine === false ? '目前沒有網路' : '連不上雲端，網路可能不穩');
+      }
+      throw err;
+    }finally{
+      if(timer) clearTimeout(timer);
+    }
   },
-  async load(){
+  /* 讀取類動作自動重試（間隔 0.9 秒、2.4 秒、5 秒）；寫入不重試，避免重複寫入 */
+  async call(payload, o){
+    o = o || {};
+    const tries = o.tries || (payload.action === 'saveAll' ? 1 : 3);
+    const gaps = [0, 900, 2400, 5000];
+    let last = null;
+    for(let i=0;i<tries;i++){
+      if(gaps[i]) await new Promise(function(r){ setTimeout(r, gaps[i]); });
+      try{
+        const json = await API.raw(payload, o.timeoutMs);
+        API.lastMs = json.ms;
+        if(PERF) console.log('[GAS] ' + payload.action + '：' + json.ms + ' ms（後端 '
+          + (json.serverMs || 0) + ' ms' + (json.cached ? '，快取命中' : '') + '）');
+        return json;
+      }catch(err){
+        last = err;
+        const m = String((err && err.message) || '');
+        /* 密語不對或回應格式壞掉，重試也沒用 */
+        if(/通關密語不正確|後端還沒設定通關密語|無法解析/.test(m)) break;
+        if(o.onRetry) o.onRetry(i+1, err);
+      }
+    }
+    throw last || new Error('雲端沒有回應');
+  },
+  async load(o){
+    o = o || {};
     if(!API.reachable()){ return { ok:false }; }
-    const json = await API.call({ action:'loadAll' });
+    const payload = { action:'loadAll' };
+    if(o.fresh === true) payload.fresh = true;
+    else if(o.generation) payload.generation = o.generation;
+    const json = await API.call(payload, { onRetry:o.onRetry, tries:o.tries });
     cloud.loaded = true;
     cloud.failed = false;
-    return { ok:true, state: json.state };
+    return { ok:true, notModified:!!json.notModified, state:json.state, generation:json.generation,
+             cached:!!json.cached, ms:json.ms, serverMs:json.serverMs };
+  },
+  /* 這份畫面各項目的指紋：用來算「這次到底改了哪幾項」 */
+  snapshot(){
+    const snap = {};
+    SYNC_PARTS.forEach(function(k){ snap[k] = JSON.stringify(state[k] === undefined ? null : state[k]); });
+    return snap;
+  },
+  /* 回傳有變動的項目；沒有基準（第一次存檔）就回 null 代表整包送 */
+  partsChanged(snap){
+    if(!cloud.synced) return null;
+    const changed = [];
+    SYNC_PARTS.forEach(function(k){ if(snap[k] !== cloud.synced[k]) changed.push(k); });
+    if(!changed.length) return [];
+    /* 同一張工作表的項目要一起送，避免只送一半把表寫壞 */
+    SYNC_GROUPS.forEach(function(g){
+      if(!g.some(function(k){ return changed.indexOf(k) >= 0; })) return;
+      g.forEach(function(k){ if(changed.indexOf(k) < 0) changed.push(k); });
+    });
+    return changed;
   },
   /* 存檔：畫面先更新，背景寫回雲端試算表；成功會跳一次提醒 */
   async save(force){
@@ -938,12 +1059,31 @@ const API = {
     }
     /* 上一次還在傳：記下來，傳完再補一次，避免同時多筆請求互相蓋掉 */
     if(saving){ cloud.queued = true; return { queued:true }; }
+    /* 先算這次真正改了哪幾項，只送這些；完全沒變動就連線都不必打 */
+    const snap = API.snapshot();
+    const changed = API.partsChanged(snap);
+    if(changed && !changed.length){
+      cloud.pending = false;
+      return { saved:true, skipped:true };
+    }
+    const payload = { action:'saveAll', generation: cloud.generation || '' };
+    if(changed){
+      const sub = {};
+      changed.forEach(function(k){ sub[k] = state[k]; });
+      payload.parts = changed;
+      payload.state = sub;
+    }else{
+      payload.state = state;
+    }
     saving = true;
     renderCloudPill();
     try{
-      const r = await API.call({ action:'saveAll', state });
+      /* 寫入比讀取慢，給比較寬的逾時；寫入不自動重試，避免重複落地 */
+      const r = await API.call(payload, { timeoutMs: 30000 });
       cloud.pending = false;
       cloud.lastSaved = new Date();
+      cloud.synced = snap;
+      if(r.generation) cloud.generation = r.generation;
       saving = false;
       renderCloudPill();
       API.notifySaved();
@@ -951,6 +1091,8 @@ const API = {
       return r;
     }catch(err){
       saving = false;
+      /* 這次沒寫進去：記成「有修改還沒上傳」，下次連線時會補存，離開頁面也會提醒 */
+      cloud.pending = true;
       renderCloudPill();
       throw err;
     }
@@ -1193,19 +1335,62 @@ function renderTabs(){
   document.querySelectorAll('.page').forEach(p=>p.classList.toggle('on', p.id==='page-'+ui.tab));
 }
 
-/* 右上角雲端狀態：載入中、儲存中、已存到幾點 */
+/* 右上角雲端狀態：載入中（含已等秒數）、重試中、儲存中、已存到幾點 */
 function renderCloudPill(){
   const el = $('topRight');
   if(!el) return;
   let text = '雲端模式', cls = 'ok';
   if(!API.isCloud()){ text = '本機模式'; cls = ''; }
   else if(saving){ text = '儲存中…'; cls = ''; }
-  else if(!cloud.authoritative){ text = cloud.failed ? '無法連上雲端' : (CONFIG.PASSWORD ? '雲端載入中…' : '雲端未連線'); cls = ''; }
+  else if(cloud.loading){
+    const secs = cloud.t0 ? Math.max(0, Math.round((Date.now()-cloud.t0)/1000)) : 0;
+    text = cloud.retries ? ('連線不穩，重試 '+cloud.retries+'／3') : ('雲端載入中' + (secs ? '　'+secs+' 秒' : '…'));
+    cls = '';
+  }
+  else if(cloud.failed){ text = '無法連上雲端'; cls = 'bad'; }
+  else if(!cloud.authoritative){ text = CONFIG.PASSWORD ? '雲端載入中…' : '雲端未連線'; cls = ''; }
   else if(cloud.lastSaved){
     const d = cloud.lastSaved;
     text = '已存 ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
   }
   el.innerHTML = '<span class="pill '+cls+'">'+text+'</span>';
+}
+
+/* 載入中才開每秒計時器，其餘時間不佔資源 */
+let cloudTick = null;
+function cloudTicker(on){
+  if(on && !cloudTick){
+    cloudTick = setInterval(function(){ renderCloudPill(); renderSetupBar(); }, 1000);
+  }else if(!on && cloudTick){
+    clearInterval(cloudTick); cloudTick = null;
+  }
+}
+
+/* 最上方提示條：載入中給等待秒數，連不上時給原因與「重新連線」按鈕 */
+function renderSetupBar(){
+  const bar = $('setupBar');
+  if(!bar) return;
+  let msg = '', retry = false;
+  const secs = cloud.t0 ? Math.max(1, Math.round((Date.now()-cloud.t0)/1000)) : 0;
+  if(!API.isCloud()){
+    msg = '目前是本機模式：資料一律存在雲端試算表，本機不留名冊資料，本機模式不會存檔。要接回雲端請到「設定與檢查」取消本機模式。';
+  }else if(!CONFIG.PASSWORD){
+    msg = '還缺通關密語：請到「設定與檢查」輸入密語並按「儲存設定」，就會開始讀取試算表。';
+  }else if(cloud.loading){
+    msg = cloud.retries
+      ? ('連線不穩，正在自動重試第 '+cloud.retries+' 次…' + (cloud.lastError ? '（'+cloud.lastError+'）' : ''))
+      : ('正在從雲端試算表讀取名冊…' + (secs > 1 ? '已等 '+secs+' 秒' : ''));
+  }else if(cloud.failed){
+    msg = '連不上雲端試算表：' + (cloud.lastError || '網路不通') + '。程式最多自動重試 3 次，也可以現在按「重新連線」。'
+      + ((state.students||[]).length ? '畫面上是上次載入的名冊，還沒跟雲端同步。' : '本機不保存名冊，所以目前畫面沒有資料。');
+    retry = true;
+  }else if(!cloud.authoritative){
+    msg = '正在從雲端試算表讀取名冊…';
+  }else if(!state.students.length){
+    msg = '試算表目前沒有名冊資料：請先在「名單」工作表建立，或到「設定與檢查」匯入備份檔。';
+  }
+  bar.hidden = !msg;
+  bar.innerHTML = esc(msg) + (retry ? ' <button class="btn tiny" data-reloadcloud="1">重新連線</button>' : '');
 }
 
 function renderShell(){
@@ -1216,17 +1401,7 @@ function renderShell(){
   $('railSub').textContent = [shellOpts.school, shellOpts.term].filter(Boolean).join('　');
   renderCloudPill();
   /* 尚未設定雲端或雲端沒有名冊時，在最上方提示 */
-  const setupBar = $('setupBar');
-  if(setupBar){
-    let msg = '';
-    if(!API.isCloud()) msg = '目前是本機模式：資料一律存在雲端試算表，本機不留名冊資料，本機模式不會存檔。要接回雲端請到「設定與檢查」取消本機模式。';
-    else if(!CONFIG.PASSWORD) msg = '還缺通關密語：請到「設定與檢查」輸入密語並按「儲存設定」，就會開始讀取試算表。';
-    else if(cloud.failed) msg = '連不上雲端試算表：本機不保存資料，所以目前畫面上沒有名冊。請確認網路後按「設定與檢查」的「從雲端重新載入」。';
-    else if(!cloud.authoritative) msg = '正在從雲端試算表讀取名冊…';
-    else if(!state.students.length) msg = '試算表目前沒有名冊資料：請先在「名單」工作表建立，或到「設定與檢查」匯入備份檔。';
-    setupBar.hidden = !msg;
-    setupBar.textContent = msg;
-  }
+  renderSetupBar();
   $('stats').innerHTML = ''
     + '<h2>今夜要點</h2>'
     + '<div class="stat"><span class="n">'+board.should.length+'</span><span class="k">應到</span></div>'
@@ -2223,21 +2398,7 @@ document.addEventListener('click', e=>{
   if(e.target.id==='expBackup'){ download(new Blob([JSON.stringify(state,null,1)],{type:'application/json'}), '夜自習備份_'+stamp()+'.json'); return; }
   // 設定
   if(e.target.id==='btnSaveCfg'){ saveCfg(); return; }
-  if(e.target.id==='btnReload'){
-    API.load().then(function(r){
-      if(r.ok && r.state && r.state.students && r.state.students.length){
-        state = r.state; dirty = false; normalize(); syncToday(); render();
-        cloud.authoritative = true; cloud.pending = false;
-        try{ localStorage.removeItem('nightstudy.pendingbak'); }catch(err){}
-        toast('已重新載入雲端資料');
-      }else if(r.ok){
-        toast('雲端目前沒有名冊（本機不保留資料，畫面維持空白）', 5600);
-      }else{
-        toast('雲端沒有資料，或目前是本機模式');
-      }
-    }).catch(err=>toast('載入失敗：'+err.message));
-    return;
-  }
+  if(e.target.id==='btnReload' || e.target.closest('[data-reloadcloud]')){ reloadCloud(e.target); return; }
   if(e.target.id==='btnForgetPwd'){
     GATE.forget();
     CONFIG.PASSWORD = '';
@@ -2808,6 +2969,7 @@ function borderAll(){ const b={style:'thin',color:{argb:'FF999999'}}; return {to
 
 async function exportSeat(){
   try{
+    await LIB.need(['pizzip','docx']);
     const buf = await API.template('seat');
     const DocxT = window.docxtemplater;
     const zip = new window.PizZip(buf);
@@ -2824,6 +2986,7 @@ async function exportSeat(){
 async function exportVio(ids){
   if(!ids || !ids.length){ toast('沒有可匯出的違規紀錄'); return; }
   try{
+    await LIB.need(['pizzip','docx']);
     const buf = await API.template('violation');
     const DocxT = window.docxtemplater;
     const zip = new window.PizZip(buf);
@@ -2860,6 +3023,8 @@ async function cleanXlsxParts(buf){
 
 async function exportXlsx(){
   try{
+    /* ExcelJS 與 PizZip 第一次用到才下載，開頁時不必先等這兩支大檔 */
+    await LIB.need(['exceljs','pizzip']);
     /* 讀範本（Excel 自己存過的版本）：轉存後 Excel 才打得開 */
     const tpl = await API.template('roster');
     const ExcelJS = window.ExcelJS;
@@ -3012,7 +3177,8 @@ function saveCfg(){
     try{
       /* 先確認密語可用：雲端有名冊而這台還是空的，就以雲端為準，避免用空白把試算表蓋掉 */
       if(API.reachable()){
-        const r = await API.load();
+        /* 這裡只等一次：設定頁按下去要馬上回應，失敗就交給下面的提示 */
+        const r = await API.load({ tries:1 });
         if(r.ok && r.state && (r.state.students || []).length && !(state.students || []).length){
           state = r.state;
           normalize();
@@ -3121,6 +3287,112 @@ function emptyState(){
     checkins:[], seats:{}, seatPair:{}, duty:[], dutyNotes:[], conflicts:[]
   };
 }
+/* 從雲端讀名冊的唯一入口：開頁、「重新載入」、失敗後自動重試都走這裡 */
+async function loadFromCloud(opts){
+  opts = opts || {};
+  if(!API.reachable()){ render(); return { ok:false, error:'還沒有連上雲端' }; }
+  if(cloud.loading) return { ok:false, error:'正在載入中' };
+  cloud.loading = true; cloud.failed = false; cloud.lastError = ''; cloud.retries = 0;
+  cloud.t0 = Date.now();
+  cloudTicker(true); renderSetupBar(); renderCloudPill();
+  /* 手動重新載入一定要拿最新版（老師可能直接在試算表改過），所以不比世代、也不走快取 */
+  const fresh = opts.fresh === true;
+  const gen = (!fresh && cloud.authoritative) ? (cloud.generation || '') : '';
+  try{
+    const r = await API.load({ fresh: fresh, generation: gen, onRetry:function(n, err){
+      cloud.retries = n;
+      cloud.lastError = String((err && err.message) || '');
+      renderSetupBar(); renderCloudPill();
+    } });
+    cloud.loading = false; cloudTicker(false); cloud.retries = 0;
+    cloud.lastLoad = { at:new Date(), ms:r.ms || 0, serverMs:r.serverMs || 0,
+      cached:!!r.cached, notModified:!!r.notModified };
+    if(r.ok && r.generation) cloud.generation = r.generation;
+    if(r.ok && r.notModified){
+      /* 後端說資料沒變：直接沿用畫面上這份，一次讀表都省下來 */
+      cloud.authoritative = true; cloud.failed = false; cloud.lastError = '';
+      render();
+      return { ok:true, notModified:true, ms:r.ms, serverMs:r.serverMs };
+    }
+    return applyCloudResult(r);
+  }catch(err){
+    cloud.loading = false; cloudTicker(false); cloud.retries = 0;
+    cloud.failed = true;
+    cloud.lastError = String((err && err.message) || '連不上雲端');
+    render();
+    scheduleCloudRetry();
+    return { ok:false, error: cloud.lastError };
+  }
+}
+
+/* 雲端回來的結果怎麼套進畫面：載入期間有本機修改就保留畫面，不覆蓋也不回寫 */
+function applyCloudResult(r){
+  if(!r || !r.ok){
+    cloud.failed = true;
+    cloud.lastError = (r && r.error) || '還沒有連上雲端';
+    render();
+    return r || { ok:false };
+  }
+  const st = r.state || {};
+  const hasRoster = !!(st.students && st.students.length);
+  cloud.failed = false; cloud.lastError = ''; cloud.autoRetries = 0;
+  if(hasRoster && dirty){
+    cloud.authoritative = false;
+    render();
+    toast('雲端有資料，但你剛才的修改只在本機、還沒上傳。要用雲端版本請按「從雲端重新載入」；要以本機為準請按「儲存設定」', 9000);
+    return { ok:true, kept:true };
+  }
+  cloud.authoritative = true;
+  if(hasRoster){
+    state = st;
+    normalize(); syncToday(); dirty = false;
+    /* 記下「這份畫面已同步」的指紋，之後存檔只送有變動的項目 */
+    cloud.synced = API.snapshot();
+    render();
+    if(cloud.pending){
+      cloud.pending = false;
+      API.save().then(function(){ toast('剛才的修改已補存到雲端', 3600); }).catch(function(){});
+    }
+    return { ok:true, ms:r.ms, serverMs:r.serverMs, cached:r.cached };
+  }
+  /* 雲端還沒有名冊：把本機這份送上去（多半是空表，只是先建立表頭） */
+  render();
+  if(!dirty) API.save().catch(function(){});
+  toast('雲端試算表還沒有名冊資料，請先在「名單」工作表建立，或到「設定與檢查」匯入備份檔', 7000);
+  return { ok:true, empty:true };
+}
+
+/* 連不上時每 15 秒自動再試一次，最多 3 次，避免一直空轉 */
+let retryTimer = null;
+function scheduleCloudRetry(){
+  if(retryTimer) clearTimeout(retryTimer);
+  if(cloud.autoRetries >= 3) return;
+  retryTimer = setTimeout(function(){
+    retryTimer = null;
+    if(cloud.loading || !cloud.failed) return;
+    if(document.visibilityState === 'hidden'){ scheduleCloudRetry(); return; }
+    cloud.autoRetries++;
+    loadFromCloud();
+  }, 15000);
+}
+
+/* 「從雲端重新載入」與提示條上的「重新連線」共用；按鈕先鎖住，避免連點產生多筆請求 */
+/* 「從雲端重新載入」與提示條上的「重新連線」共用；按鈕先鎖住，避免連點產生多筆請求 */
+async function reloadCloud(btn){
+  if(cloud.loading){ toast('正在載入中，請稍等', 2200); return { ok:false, error:'正在載入中' }; }
+  const label = btn ? btn.textContent : '';
+  if(btn){ btn.disabled = true; btn.textContent = '載入中…'; }
+  cloud.autoRetries = 0;
+  const r = await loadFromCloud({ fresh:true });
+  if(btn){ btn.disabled = false; btn.textContent = label || '從雲端重新載入'; }
+  if(r.ok && r.notModified) toast('雲端沒有新資料', 2400);
+  else if(r.ok && r.ms) toast('已重新載入（前端 ' + (r.ms/1000).toFixed(1) + ' 秒／後端 '
+    + Math.round(r.serverMs || 0) + ' 毫秒' + (r.cached ? '，走快取' : '') + '）', 3600);
+  else if(r.ok && !r.kept && !r.empty) toast('已重新載入雲端資料');
+  else if(r.ok && r.empty) toast('雲端目前沒有名冊（本機不保留資料，畫面維持空白）', 5600);
+  else if(!r.ok && r.error !== '正在載入中') toast('重新載入失敗：' + (r.error || '請確認網路'), 5600);
+  return r;
+}
 async function boot(){
   CONFIG.GAS_URL = localStorage.getItem('nightstudy.gas') || CONFIG.GAS_URL || '';
   CONFIG.PASSWORD = localStorage.getItem('nightstudy.pwd') || CONFIG.PASSWORD || '';
@@ -3133,16 +3405,18 @@ async function boot(){
     const memo = await GATE.saved();
     if(memo.ok){
       unlockUI();
-      /* 背景核對：只有後端明確說密語不對，才清掉紀錄並重新上鎖 */
-      GATE.checkSaved().then(function(bad){
-        if(bad !== 'stale') return;
-        GATE.forget();
-        CONFIG.PASSWORD = '';
-        if($('cfgPwd')) $('cfgPwd').value = '';
-        renderMemoState();
-        toast('這台裝置記住的密語已失效（試算表改過），請重新輸入', 6000);
-        showGate('這台裝置記住的密語已經不能用（試算表「設定」工作表的 password 可能改過），請輸入新的密語。');
-      });
+      /* 要載入雲端時順便就驗了密語，省掉一次多餘的往返；只有在不載入時才背景核對 */
+      if(!API.reachable()){
+        GATE.checkSaved().then(function(bad){
+          if(bad !== 'stale') return;
+          GATE.forget();
+          CONFIG.PASSWORD = '';
+          if($('cfgPwd')) $('cfgPwd').value = '';
+          renderMemoState();
+          toast('這台裝置記住的密語已失效（試算表改過），請重新輸入', 6000);
+          showGate('這台裝置記住的密語已經不能用（試算表「設定」工作表的 password 可能改過），請輸入新的密語。');
+        });
+      }
     }else{
       await showGate(memo.stale ? '這台裝置的密語紀錄不完整，請重新輸入一次。' : '');
     }
@@ -3164,43 +3438,23 @@ async function boot(){
   API.warmTemplates().then(function(){
     if(ui.tab==='export') renderExport();
   }).catch(function(){});
-  /* 背景先把 templates 資料夾裡的範本讀進記憶體，第一次匯出就不必等 */
-  API.warmTemplates().then(function(){
-    if(ui.tab==='export') renderExport();
-  }).catch(function(){});
 
-  if(!API.isCloud()) return;
+  if(!API.isCloud()){ LIB.warm(); return; }
   /* 有網址但還沒有密語：先不發請求，等使用者輸入密語後再載入 */
-  if(!CONFIG.PASSWORD) return;
+  if(!CONFIG.PASSWORD){ LIB.warm(); return; }
 
-  try{
-    const r = await API.load();
-    if(r.ok && r.state && r.state.students && r.state.students.length){
-      if(dirty){
-        /* 載入期間已經改過：畫面保留本機修改，但不回寫雲端，避免把試算表蓋掉 */
-        toast('雲端有資料，但你剛才的修改只在本機、還沒上傳。要用雲端版本請按「從雲端重新載入」；要以本機為準請按「儲存設定」', 9000);
-        render();
-        return;
-      }
-      state = r.state;
-      normalize();
-      syncToday();
-      cloud.authoritative = true;
-      render();
-      if(cloud.pending){ cloud.pending = false; await API.save(); toast('剛才的修改已補存到雲端', 3600); }
-    }else if(r.ok){
-      /* 雲端還沒有名冊：以本機為準 */
-      cloud.authoritative = true;
-      await API.save();
-      toast('雲端試算表還沒有資料，請先在「名單」工作表建立名冊，或到「設定與檢查」匯入備份檔', 7000);
-    }
-    render();
-  }catch(err){
-    cloud.authoritative = false;
-    cloud.failed = true;
-    render();
-    toast('雲端連線失敗：本機不保存資料，請確認網路後按「從雲端重新載入」', 6000);
+  const r = await loadFromCloud();
+  /* 後端明確說密語不對：清掉這台裝置的紀錄，重新上鎖 */
+  if(!r.ok && /通關密語不正確/.test(r.error || '')){
+    GATE.forget();
+    CONFIG.PASSWORD = '';
+    if($('cfgPwd')) $('cfgPwd').value = '';
+    renderMemoState();
+    await showGate('雲端說通關密語不正確（試算表「設定」工作表的 password 可能改過），請輸入新的密語。');
+    if(CONFIG.PASSWORD) await loadFromCloud();
   }
+  /* 名冊讀完、畫面閒下來之後，才在背景預抓匯出用的大檔 */
+  LIB.warm();
 }
 
 /* 拖曳（桌機） */
@@ -3257,6 +3511,11 @@ window.addEventListener('beforeunload', function(e){
     e.returnValue = '資料還在存到雲端，離開可能不會存檔';
     return e.returnValue;
   }
+});
+
+/* 網路恢復時自動把還沒載完的名冊補上，不必手動按 */
+window.addEventListener('online', function(){
+  if(cloud.failed && !cloud.loading) reloadCloud(null);
 });
 
 window.__NS = { CONFIG, get state(){ return state; }, get ui(){ return ui; }, E, API, render, renderToday, renderSeat, renderLog, renderDuty,
