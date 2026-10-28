@@ -555,6 +555,7 @@ body.gated .sheet{opacity:.28;pointer-events:none;user-select:none}
             <label>通關密語</label>
             <input id="cfgPwd" type="password">
           </div>
+          <p class="hint" id="cfgMemoState" style="margin:0 0 10px"></p>
           <p class="hint" id="cfgClsTotal" style="margin-bottom:10px"></p>
           <div class="tools">
             <button class="btn primary" id="btnSaveCfg">儲存設定</button>
@@ -592,7 +593,7 @@ body.gated .sheet{opacity:.28;pointer-events:none;user-select:none}
    1. CONFIG
    ===================================================================== */
 const CONFIG = {
-  VERSION: '2.4.0',
+  VERSION: '2.5.0',
   /* 已內建的 Apps Script 部署網址：第一次使用只要在設定頁填通關密語，會記在這台裝置的瀏覽器 */
   GAS_URL: 'https://script.google.com/macros/s/AKfycbxBk3fJaCrPfyojhPVgT6xNE110x3ENSGquQLVWLBz8jdNH2FgX6QMNBQKr1lHLZ8ePtw/exec',
   PASSWORD: '',
@@ -1004,7 +1005,12 @@ const GATE = {
     const prev = CONFIG.PASSWORD;
     CONFIG.PASSWORD = pwd;
     try{
-      await API.call({ action:'ping' });
+      const r = await GATE.withTimeout(API.call({ action:'ping' }), 10000);
+      if(r && r.timedOut){
+        CONFIG.PASSWORD = prev;
+        if(savedHash && (await GATE.hash(pwd)) === savedHash) return { ok:true, offline:true };
+        return { ok:false, msg:'後端回應太慢，請再試一次' };
+      }
       return { ok:true };
     }catch(err){
       CONFIG.PASSWORD = prev;
@@ -1015,37 +1021,32 @@ const GATE = {
       return { ok:false, msg:'連不上雲端，現在無法確認密語：' + (m || '請確認網路後再試一次') };
     }
   },
-  /* 這台裝置記住的密語還能不能用：能用就直接進站，不必再輸入 */
-  async silent(){
+  /* 這台裝置有沒有記住密語：只看本機紀錄，不等網路，開頁就能進站 */
+  async saved(){
     const pwd = localStorage.getItem(GATE.KEY_PWD) || '';
     if(!pwd) return { ok:false };
     const savedHash = localStorage.getItem(GATE.KEY_HASH) || '';
-    const hashOk = async function(){ return savedHash ? (await GATE.hash(pwd)) === savedHash : false; };
-    if(!API.isCloud()){
-      if(!savedHash) return { ok:true, local:true };
-      return (await hashOk()) ? { ok:true, local:true } : { ok:false, stale:true };
+    if(savedHash){
+      let now = '';
+      try{ now = await GATE.hash(pwd); }catch(err){ now = ''; }
+      if(now && now !== savedHash) return { ok:false, stale:true };
     }
-    const prev = CONFIG.PASSWORD;
-    CONFIG.PASSWORD = pwd;
-    let r;
-    try{
-      r = await GATE.withTimeout(API.call({ action:'ping' }), 4000);
-    }catch(err){
-      CONFIG.PASSWORD = prev;
-      const m = String((err && err.message) || '');
-      if(m.indexOf('通關密語不正確') >= 0) return { ok:false, stale:true };
-      if(await hashOk()) return { ok:true, offline:true };
-      return { ok:false, msg:m };
-    }
-    /* 後端回應太慢：這台裝置先前驗證過就先用本機資料開站，不讓老師在關卡前乾等 */
-    if(r && r.timedOut){
-      CONFIG.PASSWORD = pwd;
-      if(await hashOk()) return { ok:true, offline:true };
-      CONFIG.PASSWORD = prev;
-      return { ok:false, msg:'後端回應太慢' };
-    }
-    if(!savedHash){ try{ localStorage.setItem(GATE.KEY_HASH, await GATE.hash(pwd)); }catch(err){} }
     return { ok:true };
+  },
+  /* 背景向後端確認一次：只有後端明確說密語不對才回 'stale'，連不上或太慢都當沒事 */
+  async checkSaved(){
+    const pwd = localStorage.getItem(GATE.KEY_PWD) || '';
+    if(!pwd || !API.isCloud()) return '';
+    try{
+      const r = await GATE.withTimeout(API.call({ action:'ping' }), 8000);
+      if(r && r.timedOut) return '';
+    }catch(err){
+      const m = String((err && err.message) || '');
+      if(m.indexOf('通關密語不正確') >= 0) return 'stale';
+      if(m.indexOf('後端還沒設定通關密語') >= 0) return 'stale';
+      return '';
+    }
+    return '';
   },
   withTimeout(p, ms){
     return new Promise(function(resolve, reject){
@@ -1066,6 +1067,16 @@ function unlockUI(){
   const gate = $('gate');
   if(gate) gate.hidden = true;
   document.body.classList.remove('gated');
+}
+
+/* 設定頁顯示這台裝置記住密語的狀態，一眼看出有沒有記住 */
+function renderMemoState(){
+  const el = $('cfgMemoState');
+  if(!el) return;
+  const remembered = !!localStorage.getItem(GATE.KEY_PWD);
+  el.textContent = remembered
+    ? '這台裝置已記住密語，下次開這個網址會直接進入，不會再要求輸入。'
+    : '這台裝置還沒記住密語：輸入一次之後就會自動記住。';
 }
 
 function showGate(note){
@@ -1095,6 +1106,7 @@ function showGate(note){
       localStorage.setItem(GATE.KEY_PWD, pwd);
       try{ localStorage.setItem(GATE.KEY_HASH, await GATE.hash(pwd)); }catch(err){}
       if($('cfgPwd')) $('cfgPwd').value = pwd;
+      renderMemoState();
       msg.className = 'msg ok'; msg.textContent = '密語正確，進入中…';
       unlockUI();
       if(r.offline) toast('現在連不上雲端，先用這台裝置上次同步的資料', 5200);
@@ -2155,6 +2167,7 @@ document.addEventListener('click', e=>{
     GATE.forget();
     CONFIG.PASSWORD = '';
     if($('cfgPwd')) $('cfgPwd').value = '';
+    renderMemoState();
     toast('已清除這台裝置記住的密語，下次開網頁要重新輸入', 4600);
     return;
   }
@@ -3032,21 +3045,26 @@ async function boot(){
   $('cfgGas').value = CONFIG.GAS_URL;
   $('cfgPwd').value = CONFIG.PASSWORD;
 
-  /* 一進網頁先確認身分：這台裝置記住的密語還有用就直接進站，失效或第一次才跳關卡；測試可用 window.__NS_NOGATE 跳過 */
+  /* 一進網頁先確認身分：這台裝置記住的密語直接進站，不等網路；背景再向後端核對一次 */
   if(!window.__NS_NOGATE){
-    if($('gateMsg')) $('gateMsg').textContent = '正在確認這台裝置記住的密語…';
-    const memo = await GATE.silent();
+    const memo = await GATE.saved();
     if(memo.ok){
-      /* 記住的密語還有用：直接撤掉關卡，不必輸入 */
       unlockUI();
-      if(memo.offline) toast('現在連不上雲端，先用這台裝置上次同步的資料', 5200);
+      /* 背景核對：只有後端明確說密語不對，才清掉紀錄並重新上鎖 */
+      GATE.checkSaved().then(function(bad){
+        if(bad !== 'stale') return;
+        GATE.forget();
+        CONFIG.PASSWORD = '';
+        if($('cfgPwd')) $('cfgPwd').value = '';
+        renderMemoState();
+        toast('這台裝置記住的密語已失效（試算表改過），請重新輸入', 6000);
+        showGate('這台裝置記住的密語已經不能用（試算表「設定」工作表的 password 可能改過），請輸入新的密語。');
+      });
     }else{
-      const note = memo.stale
-        ? '這台裝置記住的密語已經不能用（試算表「設定」工作表的 password 可能改過），請輸入新的密語。'
-        : (memo.msg ? '一時連不上雲端，也無法用這台裝置的紀錄確認，請重新輸入密語：' + memo.msg : '');
-      await showGate(note);
+      await showGate(memo.stale ? '這台裝置的密語紀錄不完整，請重新輸入一次。' : '');
     }
   }
+  renderMemoState();
 
   /* 先用手上的資料畫出來，不等網路 */
   let local = null;
