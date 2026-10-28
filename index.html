@@ -547,6 +547,13 @@ body.gated .sheet{opacity:.28;pointer-events:none;user-select:none}
             <button class="btn" id="expVio">下載違規通知單（.docx）</button>
             <button class="btn" id="expPrintList">列印名單（A4）</button>
             <button class="btn" id="expLinePng">下載名單圖檔（LINE 公告用 PNG）</button>
+            <label class="hint" style="display:flex;align-items:center;gap:6px;margin:2px 0 0">圖檔尺寸
+              <select id="pngSize" style="padding:4px 6px">
+                <option value="sm">小（720 寬）</option>
+                <option value="md">中（900 寬）</option>
+                <option value="lg">大（1080 寬）</option>
+              </select>
+            </label>
             <button class="btn" id="expBackup">備份全部資料（.json）</button>
           </div>
         </div>
@@ -643,7 +650,7 @@ const LIB = {
    1. CONFIG
    ===================================================================== */
 const CONFIG = {
-  VERSION: '2.15.3',
+  VERSION: '2.15.4',
   /* 已內建的 Apps Script 部署網址：第一次使用只要在設定頁填通關密語，會記在這台裝置的瀏覽器 */
   GAS_URL: 'https://script.google.com/macros/s/AKfycbxBk3fJaCrPfyojhPVgT6xNE110x3ENSGquQLVWLBz8jdNH2FgX6QMNBQKr1lHLZ8ePtw/exec',
   PASSWORD: '',
@@ -711,7 +718,7 @@ const cloud = { loaded:false, authoritative:false, pending:false, noticed:false,
 /* 背景上傳中：true 時右上角顯示「儲存中…」 */
 let saving = false;
 let ui = { tab:'today', sel:null, vioSel:new Set(), weekRef:'', cls:'all',
-  rcls:0, q:'', show:'in', pick:new Set(), lvFilter:'all', editNote:null, noteDraft:null, dutyEdit:null };
+  rcls:0, q:'', show:'in', pick:new Set(), lvFilter:'all', editNote:null, noteDraft:null, dutyEdit:null, pngSize:'sm' };
 
 /* 存檔時只送有變動的項目：改一位學生不必把整份資料再傳一次 */
 const SYNC_PARTS = ['students','enrollments','calendar','leaves','violations','checkins',
@@ -2006,6 +2013,11 @@ function renderLog(){
   $('logTools').innerHTML = '<button class="btn primary" id="btnNewEnroll">新增異動</button>'
     + '<button class="btn" id="btnCopyLog">複製文字</button>'
     + '<button class="btn" id="btnLogLinePng">下載名單圖檔（LINE 公告用 PNG）</button>'
+    + '<select id="pngSize" style="padding:4px 6px">'
+    + [['sm','小（720 寬）'],['md','中（900 寬）'],['lg','大（1080 寬）']].map(function(o){
+        return '<option value="' + o[0] + '"' + (ui.pngSize === o[0] ? ' selected' : '') + '>' + o[1] + '</option>';
+      }).join('')
+    + '</select>'
     + '<span class="hint">共 '+list.length+' 筆，記錄生效日之前的狀態不受影響</span>';
   $('logList').innerHTML = list.length ? list.map(e=>{
     const s = E.byKey(state,e.key) || { name:'（已刪除）', cls:'' };
@@ -2488,6 +2500,9 @@ function refreshOptPreviews(){
 
 function render(){
   renderShell();
+  /* 匯出頁的尺寸選單是靜態 HTML，每次重畫都跟目前的設定對齊 */
+  const pngSel = document.querySelector('#page-export select#pngSize');
+  if(pngSel) pngSel.value = ui.pngSize;
   renderTabs();
   if(ui.tab==='today') renderToday();
   if(ui.tab==='list') renderList();
@@ -2628,6 +2643,11 @@ document.addEventListener('change', e=>{
       if(c.checked) ui.vioSel.add(c.dataset.vio); else ui.vioSel.delete(c.dataset.vio);
     });
     renderVio();
+  }
+  if(e.target.id==='pngSize'){
+    ui.pngSize = e.target.value;
+    const nm = { sm:'小（720 寬）', md:'中（900 寬）', lg:'大（1080 寬）' };
+    toast('名單圖檔尺寸改為' + (nm[ui.pngSize] || '小（720 寬）'));
   }
   if(e.target.id==='tplPicker'){ /* handled below */ }
 });
@@ -3147,15 +3167,16 @@ function exportRosterPng(){
   if(!rows.length){ toast('目前沒有名單可以輸出圖檔'); return; }
 
   /* 出圖尺寸：版面座標固定 1080 寬，實際像素再乘 RATIO。
-     覺得圖太大就把 RATIO 調小（1.2 約 1296 像素寬），覺得模糊就調大。 */
-  const RATIO = 1.4;
+     按鈕旁可選：小 720、中 900、大 1080 像素寬（預設小，貼 LINE 最省版面）。 */
+  const TARGET_W = { sm:720, md:900, lg:1080 }[ui.pngSize] || 720;
   const COLS = [
     { t:'班級', w:96 }, { t:'座號', w:84 }, { t:'姓名', w:180 },
     { t:'一', w:52 }, { t:'二', w:52 }, { t:'三', w:52 }, { t:'四', w:52 }, { t:'五', w:52 },
     { t:'天數', w:80 }, { t:'備註', w:380 }
   ];
   const W = COLS.reduce(function(a,c){ return a + c.w; }, 0);
-  const TITLE_H = 118, HEAD_H = 54, ROW_H = 42, PAD = 22;
+  const RATIO = TARGET_W / W;
+  const TITLE_H = 104, HEAD_H = 48, ROW_H = 38, PAD = 18;
   const H = TITLE_H + HEAD_H + rows.length * ROW_H + PAD;
 
   const cv = document.createElement('canvas');
@@ -3171,17 +3192,17 @@ function exportRosterPng(){
   const school = E.opt(state, 'school') || '';
   g.textAlign = 'left'; g.textBaseline = 'alphabetic';
   g.fillStyle = '#1F1B15';
-  g.font = '600 30px ' + FONT;
-  g.fillText((school ? school + '　' : '') + '夜自習名單', 24, 56);
+  g.font = '600 27px ' + FONT;
+  g.fillText((school ? school + '　' : '') + '夜自習名單', 20, 50);
   g.fillStyle = '#4A4237';
-  g.font = '18px ' + FONT;
-  g.fillText((term ? term + '　' : '') + '基準日 ' + iso + '　共 ' + rows.length + ' 人', 24, 92);
+  g.font = '16px ' + FONT;
+  g.fillText((term ? term + '　' : '') + '基準日 ' + iso + '　共 ' + rows.length + ' 人', 20, 82);
 
   /* 表頭 */
   g.fillStyle = '#9E2B18';
   g.fillRect(0, TITLE_H, W, HEAD_H);
   g.fillStyle = '#FBF1EC';
-  g.font = '600 20px ' + FONT;
+  g.font = '600 19px ' + FONT;
   g.textAlign = 'center'; g.textBaseline = 'middle';
   let hx = 0;
   COLS.forEach(function(c){ g.fillText(c.t, hx + c.w / 2, TITLE_H + HEAD_H / 2 + 1); hx += c.w; });
@@ -3199,19 +3220,19 @@ function exportRosterPng(){
       .concat(r.days.map(function(v){ return v ? '■' : '□'; }))
       .concat([String(days), note]);
     g.fillStyle = '#1F1B15';
-    g.font = '19px ' + FONT;
+    g.font = '17px ' + FONT;
     let cx = 0;
     cells.forEach(function(v, ci){
       const c = COLS[ci];
       const left = (ci === 2 || ci === 9);
       g.textAlign = left ? 'left' : 'center';
       let text = String(v == null ? '' : v);
-      const maxW = c.w - 20;
+      const maxW = c.w - 16;
       if(g.measureText(text).width > maxW){
         while(text.length > 1 && g.measureText(text + '…').width > maxW) text = text.slice(0, -1);
         text += '…';
       }
-      g.fillText(text, left ? cx + 10 : cx + c.w / 2, y + ROW_H / 2 + 1);
+      g.fillText(text, left ? cx + 8 : cx + c.w / 2, y + ROW_H / 2 + 1);
       cx += c.w;
     });
   });
@@ -3238,7 +3259,7 @@ function exportRosterPng(){
 
   cv.toBlob(function(blob){
     download(blob, (E.opt(state,'exportPrefix')||'夜自習') + '_名單_' + stamp() + '.png');
-    toast('已下載名單圖檔（PNG，可直接貼到 LINE）');
+    toast('已下載名單圖檔（PNG，寬 ' + Math.round(W * RATIO) + ' 像素，可直接貼到 LINE）');
   }, 'image/png');
 }
 
