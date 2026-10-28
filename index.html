@@ -342,8 +342,8 @@ body.role-teacher .stu-tag:hover{background:var(--seal-soft)}
 
 /* ---------- 設定頁：一區一件事，閱讀順序由上到下 ---------- */
 .cfgwrap{display:flex;flex-direction:column;gap:14px;max-width:960px}
-.cfgcard{background:var(--card);border:1px solid var(--rule);border-radius:10px;padding:16px 18px 14px}
-.cfgcard h3{margin:0 0 6px;font-family:var(--serif);font-size:15px;font-weight:600;letter-spacing:.14em;color:var(--ink)}
+.cfgcard{background:var(--card);border:1px solid var(--rule);border-radius:10px;padding:14px 16px 12px}
+.cfgcard h3{margin:0 0 12px;font-family:var(--serif);font-size:15px;font-weight:600;letter-spacing:.14em;color:var(--ink)}
 .cfgcard .lead{margin:0 0 14px;font-size:13px;line-height:1.9;color:var(--ink-2);max-width:66ch}
 .cfgcols{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 18px}
 .cfgcols.one{grid-template-columns:minmax(0,1fr)}
@@ -622,7 +622,6 @@ body.gated .sheet{opacity:.28;pointer-events:none;user-select:none}
 
         <div class="cfgcard">
           <h3>密語與身分</h3>
-          <p class="lead">管理密語可以改全部資料；輪值教師密語只能點名與編輯當天日誌。兩組都放在試算表「設定」工作表的 password 那一列：管理密語在前，教師密語在後，中間用半形逗號隔開，換裝置也是同一組。</p>
           <div class="cfgcols">
             <div class="field">
               <label>管理密語</label>
@@ -644,13 +643,11 @@ body.gated .sheet{opacity:.28;pointer-events:none;user-select:none}
 
         <div class="cfgcard">
           <h3>可調參數</h3>
-          <p class="lead">同時存在試算表「設定」工作表，一項一列；直接改試算表，再按下面「從雲端重新載入」也有效。</p>
           <div id="optFields" class="cfgopts"></div>
         </div>
 
         <div class="cfgcard">
           <h3>連線</h3>
-          <p class="lead">程式已內建 Apps Script 網址，通常不必改；換了新的部署才需要貼上新的網址。</p>
           <div class="cfgcols one">
             <div class="field">
               <label>Apps Script 網址</label>
@@ -661,7 +658,6 @@ body.gated .sheet{opacity:.28;pointer-events:none;user-select:none}
 
         <div class="cfgcard">
           <h3>儲存與重新載入</h3>
-          <p class="lead">上面的密語與參數改完，按「儲存設定」一次寫回雲端試算表。</p>
           <div class="cfgfoot">
             <button class="btn primary" id="btnSaveCfg">儲存設定</button>
             <button class="btn" id="btnReload">從雲端重新載入</button>
@@ -670,11 +666,11 @@ body.gated .sheet{opacity:.28;pointer-events:none;user-select:none}
 
         <div class="cfgcard">
           <h3>資料檢查與備份</h3>
-          <p class="lead">自我檢查會核對名冊、座位與統計是否一致。匯入備份會覆蓋目前所有異動，執行前請先備份。</p>
           <div class="cfgfoot">
             <button class="btn" id="btnTest">執行自我檢查</button>
             <button class="btn" id="btnImport">匯入備份檔</button>
             <input type="file" id="backupPicker" accept=".json" style="display:none">
+            <span class="hint" style="margin:0">匯入會覆蓋目前資料</span>
           </div>
           <div class="testlist" id="testOut"></div>
         </div>
@@ -733,7 +729,7 @@ const LIB = {
    1. CONFIG
    ===================================================================== */
 const CONFIG = {
-  VERSION: '2.16.9',
+  VERSION: '2.16.10',
   GAS_URL: 'https://script.google.com/macros/s/AKfycbxBk3fJaCrPfyojhPVgT6xNE110x3ENSGquQLVWLBz8jdNH2FgX6QMNBQKr1lHLZ8ePtw/exec',
   PASSWORD: '',
   ROLE_KEY: 'nightstudy.role',
@@ -1438,15 +1434,13 @@ function renderMemoState(){
   const el = $('cfgMemoState');
   if(!el) return;
   const remembered = !!localStorage.getItem(GATE.KEY_PWD);
-  el.textContent = (remembered
-    ? '這台裝置已記住密語，下次開這個網址會直接進入，不會再要求輸入。'
-    : '這台裝置還沒記住密語：輸入一次之後就會自動記住。')
-    + (isTeacher() ? '　目前身分：輪值教師。' : '');
+  el.textContent = (remembered ? '已記住密語，下次直接進入' : '尚未記住密語')
+    + (isTeacher() ? '　目前身分：輪值教師' : '');
   const te = $('cfgTeacherState');
   if(te){
     te.textContent = cloud.hasTeacher
-      ? '試算表「設定」工作表已設定輪值教師密語，任何裝置用那組密語都能登入。'
-      : '試算表還沒設定輪值教師密語（password 那一列只有管理密語），目前只有管理員能登入。';
+      ? '已設定，任何裝置可用'
+      : '尚未設定，目前只有管理員能登入';
   }
 }
 
@@ -2725,8 +2719,8 @@ function renderConfig(){
       ? '<input type="number" data-opt="'+d.key+'" min="'+(d.min||1)+'" max="'+(d.max||999)+'" step="1" value="'+val+'">'
       : '<input data-opt="'+d.key+'" value="'+val+'">';
     const prev = LIST_OPT_KEYS.indexOf(d.key) >= 0 ? '<div class="optprev" data-prev="'+d.key+'"></div>' : '';
-    return '<div class="field" style="margin-bottom:10px"><label>'+esc(d.label)+'</label>'+input
-      + '<p class="hint" style="margin:2px 0 0">'+esc(d.hint)+'</p>'+prev+'</div>';
+    return '<div class="field" title="'+esc(d.hint)+'" style="margin-bottom:10px"><label>'+esc(d.label)+'</label>'+input
+      + prev+'</div>';
   }).join('');
   refreshOptPreviews();
 }
