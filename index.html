@@ -480,6 +480,26 @@ body.gated .sheet{opacity:.28;pointer-events:none;user-select:none}
 .gate .msg.ng{color:var(--seal)}
 .gate .msg.ok{color:var(--ok)}
 .gate .foot{margin:14px 0 0;font-size:11px;color:var(--ink-3);line-height:1.7}
+/* 雲端試算表捷徑：右上角小圖示與設定頁的大顆按鈕共用同一套線條（細筆畫、跟著字色走），
+   跟紙本與印章的調性一致，不用彩色貼圖 */
+.ico{width:16px;height:16px;display:block;flex:0 0 auto;fill:none;stroke:currentColor;
+  stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+a.iconlink{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;
+  margin-left:8px;border:1px solid var(--rule);border-radius:999px;background:var(--card);
+  color:var(--ink-2);text-decoration:none;vertical-align:middle;transition:color .15s,border-color .15s}
+a.iconlink:hover{color:var(--seal);border-color:var(--seal);background:#FFF9EA}
+a.iconlink:focus-visible{outline:2px solid var(--seal);outline-offset:2px}
+.sheetdock{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:0 0 16px;
+  padding:12px 14px;border:1px solid var(--rule);border-radius:8px;background:var(--sheet-2)}
+.sheetdock[hidden]{display:none}
+.sheetdock a.sheetopen{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:8px 16px;
+  border:1px solid var(--seal);border-radius:6px;background:var(--seal);color:#FBF1EC;text-decoration:none;
+  font-family:var(--serif);font-size:13px;letter-spacing:.16em;white-space:nowrap}
+.sheetdock a.sheetopen:hover{background:#8B2413;border-color:#8B2413}
+.sheetdock a.sheetopen:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.sheetdock a.sheetopen .ico{width:18px;height:18px}
+.sheetdock .sheetmeta{flex:1 1 260px;min-width:200px;font-size:12px;line-height:1.8;color:var(--ink-3)}
+.sheetdock .sheetname{font-family:var(--serif);color:var(--ink-2);letter-spacing:.06em}
 </style>
 </head>
 <body class="gated">
@@ -582,6 +602,8 @@ body.gated .sheet{opacity:.28;pointer-events:none;user-select:none}
     </section>
 
     <section class="page" id="page-config">
+      <!-- 這份資料放在哪一份試算表：連上雲端時這裡會出現圖示，點了另開分頁（內容由 renderSheetLink 產生） -->
+      <div class="sheetdock" id="cfgSheetBox" hidden></div>
       <div class="grid2">
         <div>
           <p class="hint">可調參數（同時存在試算表「設定」工作表，一項一列，直接改試算表也有效）</p>
@@ -744,14 +766,15 @@ let dirty = false;
 /* 目前身分：admin（管理員，全功能）或 teacher（輪值教師，受限） */
 let ROLE = 'admin';
 /* 雲端狀態：loaded 這次成功載入過；authoritative 目前畫面就是雲端那份；pending 有修改還沒上傳
-   loading／t0 載入中與已等秒數；retries 這次重試到第幾次；lastError 上一次失敗原因 */
+   loading／t0 載入中與已等秒數；retries 這次重試到第幾次；lastError 上一次失敗原因
+   sheet 後端回報的試算表（網址與名稱），管理介面用它放「另開分頁到試算表」的圖示 */
 const cloud = { loaded:false, authoritative:false, pending:false, noticed:false, failed:false,
   queued:false, lastSaved:null, toastAt:0, loading:false, t0:0, retries:0, lastError:'', autoRetries:0,
-  hasTeacher:false };
+  hasTeacher:false, sheet:null };
 /* 背景上傳中：true 時右上角顯示「儲存中…」 */
 let saving = false;
 let ui = { tab:'today', sel:null, vioSel:new Set(), weekRef:'', cls:'all',
-  rcls:0, q:'', show:'in', pick:new Set(), lvFilter:'all', editNote:null, noteDraft:null, dutyEdit:null };
+  rcls:0, q:'', show:'in', pick:new Set(), lvFilter:'all', editNote:null, noteDraft:null, dutyEdit:null, draftApplied:false };
 
 /* 存檔時只送有變動的項目：改一位學生不必把整份資料再傳一次 */
 const SYNC_PARTS = ['students','enrollments','calendar','leaves','violations','checkins',
@@ -1124,8 +1147,10 @@ const API = {
     const json = await API.call(payload, { onRetry:o.onRetry, tries:o.tries });
     cloud.loaded = true;
     cloud.failed = false;
+    /* 後端會順便回報這份資料放在哪一份試算表，管理介面的圖示連結就靠它 */
+    if(json.sheet) cloud.sheet = json.sheet;
     return { ok:true, notModified:!!json.notModified, state:json.state, generation:json.generation,
-             cached:!!json.cached, ms:json.ms, serverMs:json.serverMs };
+             cached:!!json.cached, ms:json.ms, serverMs:json.serverMs, sheet:json.sheet || null };
   },
   /* 這份畫面各項目的指紋：用來算「這次到底改了哪幾項」 */
   snapshot(){
@@ -1505,6 +1530,52 @@ function renderTabs(){
 }
 
 /* 右上角雲端狀態：載入中（含已等秒數）、重試中、儲存中、已存到幾點 */
+/* ---------- 雲端試算表捷徑 ---------- */
+/* 試算表圖示跟紙本、印章同一套線條：細筆畫、跟著字色走，放在深色按鈕上自動變白 */
+const ICON_SHEET = '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false">'
+  + '<rect x="3.2" y="4.2" width="17.6" height="15.6" rx="2.2"></rect>'
+  + '<path d="M3.2 9.3h17.6M3.2 14.7h17.6M9.2 4.2v15.6M14.8 4.2v15.6"></path></svg>';
+
+/* 後端回報的試算表：只認 Google 試算表網址，其他一律當作沒有，不給壞連結 */
+function sheetBook(){
+  const s = cloud.sheet || {};
+  const url = String(s.url || '');
+  return /^https:\/\/docs\.google\.com\/spreadsheets\//.test(url)
+    ? { url:url, name:String(s.name || ''), id:String(s.id || '') }
+    : null;
+}
+
+/* 右上角的小圖示：只有管理員看得到，點一下另開分頁到試算表 */
+function sheetShortcut(){
+  const book = sheetBook();
+  if(!book || isTeacher()) return '';
+  return '<a class="iconlink" href="' + esc(book.url) + '" target="_blank" rel="noopener noreferrer"'
+    + ' title="另開分頁到雲端試算表" aria-label="另開分頁到雲端試算表">' + ICON_SHEET + '</a>';
+}
+
+/* 設定與檢查頁最上面那一條：說清楚資料放在哪一份試算表，並給一顆按鈕另開分頁 */
+function renderSheetLink(){
+  const box = $('cfgSheetBox');
+  if(!box) return;
+  const book = sheetBook();
+  if(!API.isCloud() || isTeacher()){
+    box.hidden = true; box.innerHTML = ''; return;
+  }
+  box.hidden = false;
+  if(!book){
+    box.innerHTML = '<span class="sheetmeta">'
+      + (CONFIG.PASSWORD
+        ? '還沒拿到試算表網址：後端沒有回報，請確認 Apps Script 已重新部署（Code.gs 1.3.1 以上）。'
+        : '還沒連上雲端：連上之後這裡會出現一個圖示，點了直接另開分頁到試算表。')
+      + '</span>';
+    return;
+  }
+  box.innerHTML = '<a class="sheetopen" href="' + esc(book.url) + '" target="_blank" rel="noopener noreferrer">'
+    + ICON_SHEET + '開啟雲端試算表</a>'
+    + '<span class="sheetmeta">這份資料存在 <span class="sheetname">' + esc(book.name || 'Google 試算表') + '</span>，'
+    + '點左邊按鈕會另開分頁。要改參數或名冊，直接在試算表改完，回來按「從雲端重新載入」就生效。</span>';
+}
+
 function renderCloudPill(){
   const el = $('topRight');
   if(!el) return;
@@ -1522,7 +1593,8 @@ function renderCloudPill(){
     const d = cloud.lastSaved;
     text = '已存 ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
   }
-  el.innerHTML = '<span class="pill '+cls+'">'+text+'</span>';
+  /* 有連上試算表時，狀態燈旁邊多一顆一個小圖示，點了另開分頁到試算表 */
+  el.innerHTML = '<span class="pill '+cls+'">'+text+'</span>' + sheetShortcut();
 }
 
 /* 載入中才開每秒計時器，其餘時間不佔資源 */
@@ -2608,10 +2680,15 @@ function renderExport(){
 function renderConfig(){
   $('cfgGas').value = CONFIG.GAS_URL || '';
   $('cfgPwd').value = CONFIG.PASSWORD || '';
-  /* 進設定頁時順便問後端有沒有設定教師密語，狀態文字才準 */
+  /* 試算表捷徑先畫一次（載入時可能已經拿到網址），連上後 ping 回來再更新 */
+  renderSheetLink();
+  /* 進設定頁時順便問後端有沒有設定教師密語、資料放在哪一份試算表，狀態文字才準 */
   if(API.reachable() && !isTeacher()){
     API.call({ action:'ping' }).then(function(r){
-      if(r && r.ok){ cloud.hasTeacher = !!r.hasTeacher; renderMemoState(); }
+      if(!r || !r.ok) return;
+      cloud.hasTeacher = !!r.hasTeacher;
+      if(r.sheet) cloud.sheet = r.sheet;
+      renderMemoState(); renderSheetLink(); renderCloudPill();
     }).catch(function(){});
   }
   const cur = E.optsOf(state);
@@ -4109,7 +4186,8 @@ window.__NS = { CONFIG, get state(){ return state; }, get ui(){ return ui; }, E,
   renderList, renderListBody, listRows, setActive, batchActive, batchDays, dropSeatOf,
   releaseSeat, printVio, vioPages, openVioForm, renderLeave, openLeaveNew, deleteLeave, leaveList,
   printSeat, autoSeat, seatPart, deskSlots, deskBotKey,
-  openExit, openExitBatch, renderLog, OPTS, closeModal, renderConfig, optsOf(){ return E.optsOf(state); },
+  openExit, openExitBatch, renderLog, OPTS, closeModal, renderConfig, renderSheetLink, sheetBook,
+  get cloud(){ return cloud; }, optsOf(){ return E.optsOf(state); },
   setTemplate(n,b){ TPL[n]=b; }, setTab(t){ ui.tab=t; render(); } };
 boot();
 </script>

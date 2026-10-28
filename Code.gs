@@ -128,8 +128,9 @@ function doGet(e) {
   return json_({
     ok: true,
     service: '夜自習管理系統後端',
-    version: '1.3.0',
+    version: '1.3.1',
     sheets: Object.keys(SHEET_DEF).map(function (k) { return SHEET_DEF[k].name; }),
+    sheet: sheetInfo_(),
     templates: templates,
     message: '請用 POST 呼叫，或直接開啟 index.html 使用。',
   });
@@ -158,26 +159,29 @@ function doPost(e) {
     switch (req.action) {
       case 'ping':
         return json_({ ok: true, role: role, hasTeacher: passwordList_().length > 1,
-          pong: new Date().toISOString(), generation: generation_() });
+          pong: new Date().toISOString(), generation: generation_(), sheet: sheetInfo_() });
       case 'loadAll': {
         const loadT0 = Date.now();
         const gen = generation_();
         /* 前端手上就是這一版：不讀表、也不傳資料，只回一句「沒變」 */
         if (!req.fresh && req.generation && String(req.generation) === gen) {
-          return json_({ ok: true, notModified: true, generation: gen, serverMs: Date.now() - loadT0 });
+          return json_({ ok: true, notModified: true, generation: gen, serverMs: Date.now() - loadT0,
+            sheet: sheetInfo_() });
         }
         const cached = req.fresh === true ? '' : getCacheChunked_(cacheKeyFor_(gen));
         if (cached) {
           /* 快取命中：把先前存好的 JSON 原樣送出，省掉十張表的讀取與重新組裝 */
           return jsonRaw_('{"ok":true,"cached":true,"generation":"' + gen + '","serverMs":'
-            + (Date.now() - loadT0) + ',"state":' + cached + '}');
+            + (Date.now() - loadT0) + ',"sheet":' + JSON.stringify(sheetInfo_())
+            + ',"state":' + cached + '}');
         }
         const state = loadState_();
         const packed = JSON.stringify(state);
         if (packed.length <= CACHE_MAX_BYTES) {
           try { putCacheChunked_(cacheKeyFor_(gen), packed, CACHE_TTL_SEC); } catch (errPut) { /* 放不進快取就照常回資料 */ }
         }
-        return json_({ ok: true, state: state, generation: gen, cached: false, serverMs: Date.now() - loadT0 });
+        return json_({ ok: true, state: state, generation: gen, cached: false,
+          serverMs: Date.now() - loadT0, sheet: sheetInfo_() });
       }
       case 'saveAll': {
         const saveT0 = Date.now();
@@ -246,6 +250,20 @@ function book_() {
   if (!ss) throw new Error('這份指令碼沒有綁定試算表，請用「擴充功能 > Apps Script」從試算表開啟');
   MEMO.ss = ss;
   return ss;
+}
+
+/* 這支後端綁定的試算表是哪一份：管理介面要在適當地方放一個「另開分頁到試算表」的圖示，
+   網址一律由後端回報，前端不寫死，日後換試算表也不必改程式。
+   取不到或網址不是 Google 試算表就回 null，前端據此顯示說明，不會給一個壞連結。 */
+function sheetInfo_() {
+  try {
+    const ss = book_();
+    const url = String(ss.getUrl() || '');
+    if (!/^https:\/\/docs\.google\.com\/spreadsheets\//.test(url)) return null;
+    return { url: url, id: String(ss.getId() || ''), name: String(ss.getName() || '') };
+  } catch (err) {
+    return null;
+  }
 }
 
 function writeHeader_(sh, def) {
