@@ -629,7 +629,7 @@ const LIB = {
    1. CONFIG
    ===================================================================== */
 const CONFIG = {
-  VERSION: '2.10.2',
+  VERSION: '2.11.0',
   /* 已內建的 Apps Script 部署網址：第一次使用只要在設定頁填通關密語，會記在這台裝置的瀏覽器 */
   GAS_URL: 'https://script.google.com/macros/s/AKfycbxBk3fJaCrPfyojhPVgT6xNE110x3ENSGquQLVWLBz8jdNH2FgX6QMNBQKr1lHLZ8ePtw/exec',
   PASSWORD: '',
@@ -643,6 +643,19 @@ const CONFIG = {
   SEAT_SLOTS: [{"i":1,"band":1,"col":1,"row":0,"span":1},{"i":2,"band":1,"col":1,"row":1,"span":1},{"i":3,"band":1,"col":2,"row":0,"span":2},{"i":4,"band":1,"col":3,"row":0,"span":2},{"i":5,"band":1,"col":4,"row":0,"span":1},{"i":6,"band":1,"col":4,"row":1,"span":1},{"i":7,"band":1,"col":5,"row":0,"span":2},{"i":8,"band":1,"col":6,"row":0,"span":2},{"i":9,"band":1,"col":7,"row":0,"span":1},{"i":10,"band":1,"col":7,"row":1,"span":1},{"i":11,"band":1,"col":8,"row":0,"span":2},{"i":12,"band":1,"col":9,"row":0,"span":2},{"i":13,"band":1,"col":10,"row":0,"span":2},{"i":14,"band":1,"col":11,"row":0,"span":1},{"i":15,"band":1,"col":11,"row":1,"span":1},{"i":16,"band":1,"col":12,"row":0,"span":2},{"i":17,"band":1,"col":13,"row":0,"span":2},{"i":18,"band":1,"col":14,"row":0,"span":2},{"i":19,"band":2,"col":1,"row":0,"span":2},{"i":20,"band":2,"col":2,"row":0,"span":2},{"i":21,"band":2,"col":3,"row":0,"span":1},{"i":22,"band":2,"col":3,"row":1,"span":1},{"i":23,"band":2,"col":4,"row":0,"span":2},{"i":24,"band":2,"col":5,"row":0,"span":2},{"i":25,"band":2,"col":6,"row":0,"span":2},{"i":26,"band":2,"col":7,"row":0,"span":2},{"i":27,"band":2,"col":8,"row":0,"span":1},{"i":28,"band":2,"col":8,"row":1,"span":1},{"i":29,"band":2,"col":9,"row":0,"span":2},{"i":30,"band":2,"col":10,"row":0,"span":2},{"i":31,"band":2,"col":11,"row":0,"span":2},{"i":32,"band":2,"col":12,"row":0,"span":2},{"i":33,"band":2,"col":13,"row":0,"span":2},{"i":34,"band":2,"col":14,"row":0,"span":2},{"i":35,"band":3,"col":1,"row":0,"span":2},{"i":36,"band":3,"col":2,"row":0,"span":2},{"i":37,"band":3,"col":3,"row":0,"span":2},{"i":38,"band":3,"col":4,"row":0,"span":1},{"i":39,"band":3,"col":4,"row":1,"span":1},{"i":40,"band":3,"col":5,"row":0,"span":2},{"i":41,"band":3,"col":6,"row":0,"span":2},{"i":42,"band":3,"col":7,"row":0,"span":1},{"i":43,"band":3,"col":7,"row":1,"span":1},{"i":44,"band":3,"col":8,"row":0,"span":2},{"i":45,"band":3,"col":9,"row":0,"span":2},{"i":46,"band":3,"col":10,"row":0,"span":1},{"i":47,"band":3,"col":10,"row":1,"span":1},{"i":48,"band":3,"col":11,"row":0,"span":2},{"i":49,"band":3,"col":12,"row":0,"span":2},{"i":50,"band":3,"col":13,"row":0,"span":2},{"i":51,"band":3,"col":14,"row":0,"span":2}]
 };
 const TPL = { seat:null, violation:null, roster:null };
+
+/* 一桌一格：把 51 個座位收成 42 張桌子（同 band 同 col 是同一張桌子，可能坐上下兩位）。
+   桌號 d1 到 d42 由第 1 段第 1 欄起算，對應範本桌子列由左到右的 14 格。 */
+CONFIG.DESKS = (function(){
+  const map = {}, list = [];
+  CONFIG.SEAT_SLOTS.forEach(function(s){
+    const k = s.band + '-' + s.col;
+    if(!map[k]){ map[k] = { band:s.band, col:s.col, slots:[] }; list.push(map[k]); }
+    map[k].slots.push(s.i);
+  });
+  list.forEach(function(d){ d.slots.sort(function(a,b){ return a - b; }); });
+  return list.sort(function(a,b){ return a.band - b.band || a.col - b.col; });
+})();
 
 /* 可調參數：全部存在試算表「設定」工作表（一項一列，A 欄項目、B 欄值），
    程式只留預設值；載入時以試算表的值為準，儲存時把有效值寫回試算表 */
@@ -884,6 +897,19 @@ const E = {
     const keys = E.seatKeys(st,i);
     if(!keys.length) return '';
     const cards = keys.map(function(k){ return E.seatCard(st, k); });
+    return cards.join('\n\n');
+  },
+  /* 匯出用：一桌一格。只有一位就是那張卡；有上下兩位就分成上下兩段，不加「上／下」字樣 */
+  deskCell(st, deskNo){
+    const desk = CONFIG.DESKS[deskNo - 1];
+    if(!desk) return '';
+    const cards = [];
+    desk.slots.forEach(function(i){
+      E.seatKeys(st, i).forEach(function(k){
+        const card = E.seatCard(st, k);
+        if(card) cards.push(card);
+      });
+    });
     return cards.join('\n\n');
   },
   seatIssue(st){
@@ -2988,6 +3014,8 @@ async function exportSeat(){
     const doc = new DocxT(zip, { paragraphLoop:true, linebreaks:true, nullGetter:()=>'' });
     const data = { term: state.meta.term || '', date: mmdd(ref()) };
     CONFIG.SEAT_SLOTS.forEach(slot=>{ data['s'+slot.i] = E.seatCell(state, slot.i); });
+    /* 新版一桌一格：42 張桌子，每桌一張卡；有上下兩位就兩張卡疊在同一格 */
+    CONFIG.DESKS.forEach(function(desk, idx){ data['d'+(idx+1)] = E.deskCell(state, idx+1); });
     doc.render(data);
     const bytes = doc.getZip().generate({ type:'uint8array', compression:'DEFLATE' });
     download(new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}), (E.opt(state,'exportPrefix')||'夜自習')+'_座位表_'+stamp()+'.docx');
