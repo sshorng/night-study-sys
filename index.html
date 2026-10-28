@@ -340,6 +340,27 @@ body.role-teacher .stu-tag:hover{background:var(--seal-soft)}
 .testlist .ok{color:var(--ok)}
 .testlist .ng{color:var(--seal)}
 
+/* ---------- 設定頁：一區一件事，閱讀順序由上到下 ---------- */
+.cfgwrap{display:flex;flex-direction:column;gap:14px;max-width:960px}
+.cfgcard{background:var(--card);border:1px solid var(--rule);border-radius:10px;padding:16px 18px 14px}
+.cfgcard h3{margin:0 0 6px;font-family:var(--serif);font-size:15px;font-weight:600;letter-spacing:.14em;color:var(--ink)}
+.cfgcard .lead{margin:0 0 14px;font-size:13px;line-height:1.9;color:var(--ink-2);max-width:66ch}
+.cfgcols{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 18px}
+.cfgcols.one{grid-template-columns:minmax(0,1fr)}
+.cfgopts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 18px}
+.cfgopts .field{margin-bottom:0 !important}
+.cfgcard .hint{margin:10px 0 0;line-height:1.85;max-width:66ch}
+.cfgcard .hint:empty{display:none}
+.cfgfoot{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:14px}
+.cfgfoot.seam{padding-top:14px;border-top:1px solid var(--rule-soft)}
+.cfgfoot .spacer{flex:1 1 auto}
+.cfgcard .testlist{margin-top:12px}
+@media(max-width:820px){
+  .cfgcols,.cfgopts{grid-template-columns:minmax(0,1fr)}
+  .cfgcard{padding:14px 14px 12px}
+  .cfgcard .lead,.cfgcard .hint{max-width:none}
+}
+
 /* ---------- 窄螢幕 ---------- */
 /* 學生清單卡片：只在窄螢幕出現 */
 .cards{display:none}
@@ -484,11 +505,6 @@ body.gated .sheet{opacity:.28;pointer-events:none;user-select:none}
    跟紙本與印章的調性一致，不用彩色貼圖 */
 .ico{width:16px;height:16px;display:block;flex:0 0 auto;fill:none;stroke:currentColor;
   stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
-a.iconlink{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;
-  margin-left:8px;border:1px solid var(--rule);border-radius:999px;background:var(--card);
-  color:var(--ink-2);text-decoration:none;vertical-align:middle;transition:color .15s,border-color .15s}
-a.iconlink:hover{color:var(--seal);border-color:var(--seal);background:#FFF9EA}
-a.iconlink:focus-visible{outline:2px solid var(--seal);outline-offset:2px}
 .sheetdock{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:0 0 16px;
   padding:12px 14px;border:1px solid var(--rule);border-radius:8px;background:var(--sheet-2)}
 .sheetdock[hidden]{display:none}
@@ -604,43 +620,68 @@ a.iconlink:focus-visible{outline:2px solid var(--seal);outline-offset:2px}
     <section class="page" id="page-config">
       <!-- 這份資料放在哪一份試算表：連上雲端時這裡會出現圖示，點了另開分頁（內容由 renderSheetLink 產生） -->
       <div class="sheetdock" id="cfgSheetBox" hidden></div>
-      <div class="grid2">
-        <div>
-          <p class="hint">可調參數（同時存在試算表「設定」工作表，一項一列，直接改試算表也有效）</p>
-          <div id="optFields"></div>
-          <div class="field" style="margin-bottom:6px">
-            <label>Google Apps Script 網址（已內建，通常不必改）</label>
-            <input id="cfgGas" placeholder="https://script.google.com/macros/s/..../exec">
+      <div class="cfgwrap">
+
+        <div class="cfgcard">
+          <h3>密語與身分</h3>
+          <p class="lead">管理密語可以改全部資料；輪值教師密語只能點名與編輯當天日誌。兩組都放在試算表「設定」工作表的 password 那一列：管理密語在前，教師密語在後，中間用半形逗號隔開，換裝置也是同一組。</p>
+          <div class="cfgcols">
+            <div class="field">
+              <label>管理密語</label>
+              <input id="cfgPwd" type="password" autocomplete="current-password" placeholder="試算表 password 列的第一組">
+            </div>
+            <div class="field">
+              <label>輪值教師密語</label>
+              <input id="cfgTeacher" type="password" autocomplete="new-password" placeholder="留空表示這次不改">
+            </div>
           </div>
-          <p class="hint" style="margin:0 0 10px">開網頁時會先確認這台裝置記住的密語，還有效就直接進入，不必每次輸入。密語只存在這台裝置的瀏覽器，不會上傳；要換新密語，請先改試算表「設定」工作表的 password 那一列，再回來這裡填一樣的。</p>
-          <div class="field" style="margin-bottom:10px">
-            <label>通關密語</label>
-            <input id="cfgPwd" type="password">
-          </div>
-          <div class="field" style="margin-bottom:10px">
-            <label>輪值教師密語</label>
-            <input id="cfgTeacher" type="password" autocomplete="new-password" placeholder="留空表示這次不改">
-            <p class="hint" style="margin:2px 0 0">教師登入後只看得到「今夜點名、學生清單、座位編排、輪值日誌」四頁：點名可編輯，清單與座位唯讀，輪值日誌只能編輯當天、其他日子可以翻閱。這組密語會寫進試算表「設定」工作表 password 那一列，排在管理密語後面、中間用半形逗號隔開，任何裝置都用同一組，換裝置不必重新設定。</p>
-            <p class="hint" id="cfgTeacherState" style="margin:2px 0 0"></p>
+          <p class="hint" id="cfgTeacherState"></p>
+          <p class="hint" id="cfgMemoState"></p>
+          <div class="cfgfoot seam">
             <button class="btn tiny" id="btnTeacherClear">清除輪值教師密語</button>
-          <p class="hint" id="cfgMemoState" style="margin:0 0 10px"></p>
-          <p class="hint" id="cfgClsTotal" style="margin-bottom:10px"></p>
-          <div class="tools">
-            <button class="btn primary" id="btnSaveCfg">儲存設定</button>
-            <button class="btn" id="btnReload">從雲端重新載入</button>
-            <button class="btn" id="btnForgetPwd">清除這台裝置記住的密語</button>
+            <span class="spacer"></span>
+            <button class="btn tiny" id="btnForgetPwd">清除這台裝置記住的密語</button>
           </div>
         </div>
-        <div>
-          <p class="hint">資料檢查</p>
-          <div class="tools"><button class="btn primary" id="btnTest">執行自我檢查</button></div>
-          <div class="testlist" id="testOut"></div>
-          <div class="tools" style="margin-top:12px">
+
+        <div class="cfgcard">
+          <h3>可調參數</h3>
+          <p class="lead">同時存在試算表「設定」工作表，一項一列；直接改試算表，再按下面「從雲端重新載入」也有效。</p>
+          <div id="optFields" class="cfgopts"></div>
+        </div>
+
+        <div class="cfgcard">
+          <h3>連線</h3>
+          <p class="lead">程式已內建 Apps Script 網址，通常不必改；換了新的部署才需要貼上新的網址。</p>
+          <div class="cfgcols one">
+            <div class="field">
+              <label>Apps Script 網址</label>
+              <input id="cfgGas" placeholder="https://script.google.com/macros/s/..../exec">
+            </div>
+          </div>
+        </div>
+
+        <div class="cfgcard">
+          <h3>儲存與重新載入</h3>
+          <p class="lead">上面的密語與參數改完，按「儲存設定」一次寫回雲端試算表。</p>
+          <p class="hint" id="cfgClsTotal"></p>
+          <div class="cfgfoot">
+            <button class="btn primary" id="btnSaveCfg">儲存設定</button>
+            <button class="btn" id="btnReload">從雲端重新載入</button>
+          </div>
+        </div>
+
+        <div class="cfgcard">
+          <h3>資料檢查與備份</h3>
+          <p class="lead">自我檢查會核對名冊、座位與統計是否一致。匯入備份會覆蓋目前所有異動，執行前請先備份。</p>
+          <div class="cfgfoot">
+            <button class="btn" id="btnTest">執行自我檢查</button>
             <button class="btn" id="btnImport">匯入備份檔</button>
             <input type="file" id="backupPicker" accept=".json" style="display:none">
           </div>
-          <p class="hint">回復會覆蓋目前所有異動，執行前請先備份。</p>
+          <div class="testlist" id="testOut"></div>
         </div>
+
       </div>
     </section>
   </main>
@@ -695,7 +736,7 @@ const LIB = {
    1. CONFIG
    ===================================================================== */
 const CONFIG = {
-  VERSION: '2.16.6',
+  VERSION: '2.16.7',
   GAS_URL: 'https://script.google.com/macros/s/AKfycbxBk3fJaCrPfyojhPVgT6xNE110x3ENSGquQLVWLBz8jdNH2FgX6QMNBQKr1lHLZ8ePtw/exec',
   PASSWORD: '',
   ROLE_KEY: 'nightstudy.role',
@@ -1545,13 +1586,6 @@ function sheetBook(){
     : null;
 }
 
-/* 右上角的小圖示：只有管理員看得到，點一下另開分頁到試算表 */
-function sheetShortcut(){
-  const book = sheetBook();
-  if(!book || isTeacher()) return '';
-  return '<a class="iconlink" href="' + esc(book.url) + '" target="_blank" rel="noopener noreferrer"'
-    + ' title="另開分頁到雲端試算表" aria-label="另開分頁到雲端試算表">' + ICON_SHEET + '</a>';
-}
 
 /* 設定與檢查頁最上面那一條：說清楚資料放在哪一份試算表，並給一顆按鈕另開分頁 */
 function renderSheetLink(){
@@ -1593,8 +1627,7 @@ function renderCloudPill(){
     const d = cloud.lastSaved;
     text = '已存 ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
   }
-  /* 有連上試算表時，狀態燈旁邊多一顆一個小圖示，點了另開分頁到試算表 */
-  el.innerHTML = '<span class="pill '+cls+'">'+text+'</span>' + sheetShortcut();
+  el.innerHTML = '<span class="pill '+cls+'">'+text+'</span>';
 }
 
 /* 載入中才開每秒計時器，其餘時間不佔資源 */
