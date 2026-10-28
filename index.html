@@ -237,6 +237,13 @@ input[type=checkbox]{accent-color:var(--seal)}
 .nt-ro{grid-template-columns:132px minmax(0,1fr);grid-template-areas:"time main"}
 .nt-edit .nt-text{min-height:130px}
 .nt-time{grid-area:time}
+.nt-timecol{grid-area:time;display:flex;flex-direction:column;gap:6px;min-width:0}
+.nt-timechips{display:flex;flex-direction:column;gap:4px}
+.nt-timechips .tchip{font-size:11px;line-height:1.6;padding:3px 6px;border:1px solid var(--rule);
+  border-radius:4px;background:var(--card);color:var(--ink-2);cursor:pointer;text-align:left;
+  font-family:var(--serif);letter-spacing:.02em}
+.nt-timechips .tchip:hover{border-color:var(--seal);color:var(--seal);background:#FFF9EA}
+.nt-timechips .tchip:focus-visible{outline:2px solid var(--seal);outline-offset:1px}
 .nt-main{grid-area:main;min-width:0;display:flex;flex-direction:column;gap:6px}
 .nt-acts{grid-area:acts;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
 .nt-hint{font-size:11px;color:var(--ink-3)}
@@ -656,10 +663,19 @@ const LIB = {
    1. CONFIG
    ===================================================================== */
 const CONFIG = {
-  VERSION: '2.16.5',
+  VERSION: '2.16.6',
   GAS_URL: 'https://script.google.com/macros/s/AKfycbxBk3fJaCrPfyojhPVgT6xNE110x3ENSGquQLVWLBz8jdNH2FgX6QMNBQKr1lHLZ8ePtw/exec',
   PASSWORD: '',
   ROLE_KEY: 'nightstudy.role',
+  /* 夜自習作息：起始時間，記事編輯時可一鍵帶入（按鈕文字＝名稱＋起始時間） */
+  RUN_SLOTS: [
+    { time:'17:00', label:'晚餐' },
+    { time:'17:40', label:'專心讀書' },
+    { time:'18:00', label:'晚休' },
+    { time:'18:30', label:'專心讀書' },
+    { time:'19:50', label:'休息一下' },
+    { time:'20:00', label:'專心讀書' }
+  ],
   LOCAL_ONLY: false,
   DAY_LABELS: ['一','二','三','四','五'],
   WEEKDAY: ['日','一','二','三','四','五','六'],
@@ -2465,8 +2481,14 @@ function richHtml(text){
 }
 function noteRow(n, editable){
   if(editable && ui.editNote === n.id){
+    const timeChips = (CONFIG.RUN_SLOTS || []).map(function(s){
+      return '<button type="button" class="tchip" data-ntimepick="'+s.time+'">'+esc(s.label+s.time)+'</button>';
+    }).join('');
     return '<div class="nt nt-edit" data-nid="'+n.id+'">'
-      + '<input class="nt-time" type="time" data-ntime="'+n.id+'" value="'+esc(n.time||'')+'" aria-label="記事時間">'
+      + '<div class="nt-timecol">'
+      +   '<input class="nt-time" type="time" data-ntime="'+n.id+'" value="'+esc(n.time||'')+'" aria-label="記事時間">'
+      +   '<div class="nt-timechips">'+timeChips+'</div>'
+      + '</div>'
       + '<div class="nt-main">'
       +   '<div class="nt-text" contenteditable="true" spellcheck="false" data-ntext="'+n.id+'" data-ph="記事內容，輸入 90101 會變成學生標記">'+richHtml(n.text||'')+'</div>'
       +   '<div class="nt-hint">輸入 90101 或 901-01 會變成學生標記' + (isTeacher() ? '。' : '；儲存後點標記可直接建立違規單。') + '</div>'
@@ -2831,6 +2853,14 @@ document.addEventListener('click', e=>{
   }
   const add = e.target.closest('[data-addnote]');
   if(add){ startNote(add.dataset.addnote); return; }
+  /* 記事時間的快速帶入：點一下就填進時間欄 */
+  const tpick = e.target.closest('[data-ntimepick]');
+  if(tpick){
+    const box = tpick.closest('[data-nid]');
+    const inp = box && box.querySelector('[data-ntime]');
+    if(inp){ inp.value = tpick.dataset.ntimepick; try{ inp.focus(); }catch(err){} }
+    return;
+  }
   const sv = e.target.closest('[data-savenote]');
   if(sv){ saveNote(sv.dataset.savenote); return; }
   const cx = e.target.closest('[data-cancelnote]');
