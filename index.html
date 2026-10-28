@@ -2575,6 +2575,7 @@ function dayCard(r){
 }
 function renderDuty(){
   const iso = ui.weekRef || ref();
+  applyNoteDraftOnce();
   const rows = E.weekRows(state, iso);
   const mon = rows[0], sun = rows[4];
   const today = ref();
@@ -2866,6 +2867,7 @@ function saveNote(id){
   if(textEl) n.text = dedupeName(textEl.innerText.replace(/\u00a0/g,' ').replace(/\n{3,}/g,'\n\n').trim()).trim();
   hideStuPop();
   ui.editNote = null; ui.noteDraft = null;
+  clearNoteDraft();
   commit();
   toast('記事已儲存');
 }
@@ -2875,6 +2877,7 @@ function cancelNote(id){
   if(d.isNew){ state.dutyNotes = (state.dutyNotes||[]).filter(x=>x.id!==id); }
   else { n.time = d.time || ''; n.text = d.text || ''; }
   ui.editNote = null; ui.noteDraft = null;
+  clearNoteDraft();
   render();
 }
 function editNote(id){
@@ -2885,6 +2888,57 @@ function editNote(id){
   render();
   focusNoteText(id);
 }
+
+/* 未送出的日誌草稿存在這台裝置，重整不會不見；按「儲存」送出或按「取消」清掉才會消失 */
+const DRAFT_KEY = 'nightstudy.notedraft';
+function readNoteDraft(){
+  try{ const d = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null'); return (d && d.id) ? d : null; }catch(err){ return null; }
+}
+function writeNoteDraft(d){
+  try{
+    if(d && d.id) localStorage.setItem(DRAFT_KEY, JSON.stringify(d));
+    else localStorage.removeItem(DRAFT_KEY);
+  }catch(err){}
+}
+function clearNoteDraft(){ try{ localStorage.removeItem(DRAFT_KEY); }catch(err){} }
+/* 把畫面上正在編輯的那一則寫進本機草稿 */
+function persistNoteDraft(){
+  const box = document.querySelector('.nt-edit [data-ntext]');
+  if(!box) return;
+  const wrap = box.closest('.nt-edit');
+  const t = wrap && wrap.querySelector('[data-ntime]');
+  const id = box.dataset.ntext;
+  const rec = noteById(id) || {};
+  writeNoteDraft({
+    id: id,
+    date: rec.date || ref(),
+    time: t ? twentyFour(t.value) : '',
+    text: String(box.innerText || '').replace(/\u00a0/g, ' '),
+    isNew: ui.noteDraft ? !!ui.noteDraft.isNew : !rec.id
+  });
+}
+/* 開頁或重畫時把草稿接回來（只做一次） */
+function applyNoteDraftOnce(){
+  if(ui.draftApplied) return;
+  ui.draftApplied = true;
+  const d = readNoteDraft();
+  if(!d) return;
+  let rec = (state.dutyNotes || []).find(function(x){ return x.id === d.id; });
+  if(!rec){
+    rec = { id:d.id, date:d.date || ref(), time:d.time || '', text:'', key:'' };
+    state.dutyNotes.push(rec);
+  }
+  if(d.time) rec.time = d.time;
+  if(d.text) rec.text = d.text;
+  ui.editNote = d.id;
+  ui.noteDraft = { isNew: !!d.isNew, time: rec.time || '', text: rec.text || '' };
+}
+document.addEventListener('input', function(e){
+  if(e.target && e.target.closest && e.target.closest('.nt-edit')) persistNoteDraft();
+});
+document.addEventListener('change', function(e){
+  if(e.target && e.target.closest && e.target.closest('.nt-edit')) persistNoteDraft();
+});
 
 document.addEventListener('click', e=>{
   const dayBtn = e.target.closest('[data-editday]');
