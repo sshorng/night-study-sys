@@ -409,6 +409,15 @@ input[type=checkbox]{accent-color:var(--seal)}
 #printArea .lian .t{background:#EDEDED}
 /* 套 Word 範本尺寸的列印表格 */
 #printArea .wt{border-collapse:collapse;table-layout:fixed;width:100%;font-family:"標楷體","DFKai-SB",serif}
+/* 座位表：版面比照 Word 範本（A3 橫式，15 欄、6 列） */
+#printArea .seattit{font-family:"標楷體","DFKai-SB",serif;font-size:16pt;text-align:center;margin:0 0 2mm;letter-spacing:.05em}
+#printArea .seatscr{width:1.104in;margin:0 auto 1.5mm;border:1pt solid #000;text-align:center;
+  font-family:"標楷體",serif;font-size:11pt;padding:1pt 0}
+#printArea table.seatmap{width:15.835in;margin:0 auto;border:2pt double #000;table-layout:fixed}
+#printArea table.seatmap td{border:.5pt solid #000;padding:1pt 2pt;vertical-align:middle;text-align:center}
+#printArea table.seatmap td.bandcell{font-family:"華康平劇體W7","標楷體",serif;font-size:14pt;font-weight:700;letter-spacing:.1em}
+#printArea table.seatmap td.seatlb{font-family:"標楷體",serif;font-size:16pt;font-weight:700;line-height:1.1}
+#printArea table.seatmap td.seatcell{font-family:"標楷體",serif;font-size:10pt;line-height:1.25;white-space:pre-line}
 #printArea .wt td{border:.5pt solid #000;padding:.4mm 1mm;text-align:center;vertical-align:middle;
   font-size:9.5pt;line-height:1.2;font-family:"標楷體","DFKai-SB",serif}
 #printArea .wt .vt{font-size:12pt;font-weight:700}
@@ -633,7 +642,7 @@ const LIB = {
    1. CONFIG
    ===================================================================== */
 const CONFIG = {
-  VERSION: '2.14.1',
+  VERSION: '2.15.0',
   /* 已內建的 Apps Script 部署網址：第一次使用只要在設定頁填通關密語，會記在這台裝置的瀏覽器 */
   GAS_URL: 'https://script.google.com/macros/s/AKfycbxBk3fJaCrPfyojhPVgT6xNE110x3ENSGquQLVWLBz8jdNH2FgX6QMNBQKr1lHLZ8ePtw/exec',
   PASSWORD: '',
@@ -3023,50 +3032,35 @@ function openExitNotice(key){
 
 /* 座位表：A3 橫式，0.38 吋列號欄 + 14 欄 × 1.1 吋，列高依原檔 9 列 */
 function printSeat(){
-  const labels = ['一A1','一C1','二A1','二C1','三A1','三C1','四A1','四C1','五A1','五C1','六A1','六C1','七A1','七C1'];
-  const heights = [[0.33,1.18,1.23],[0.21,1.14,1.14],[0.18,1.35,1.46]];
-  const band = {};
-  CONFIG.SEAT_SLOTS.forEach(function(s){ (band[s.band]=band[s.band]||[]).push(s); });
-  const dayLine = '一二三四五';
+  const iso = ref();
+  const term = E.opt(state,'term') || '';
+  /* 版面比照 Word 範本：A3 橫式；左側段號欄 0.379 吋，右邊 14 欄各 1.104 吋；
+     標籤列高 473／300／255 twips，桌子列 3476／3375／4141 twips */
+  const HEAD_H = [0.328, 0.208, 0.177];
+  const DESK_H = [2.414, 2.344, 2.876];
 
-  let html = '<table class="wt seatmap"><colgroup><col style="width:0.38in">';
-  for(let i=0;i<14;i++) html += '<col style="width:1.1in">';
+  let html = '<div class="seattit">'+esc(term)+'夜自習座位表('+mmdd(iso)+')</div>'
+    + '<div class="seatscr">大屏</div>'
+    + '<table class="wt seatmap"><colgroup><col style="width:0.379in">';
+  for(let i=0;i<14;i++) html += '<col style="width:1.104in">';
   html += '</colgroup>';
 
   [1,2,3].forEach(function(b){
-    const slots = (band[b]||[]).slice().sort(function(x,y){ return x.col-y.col || x.row-y.row; });
-    /* 標籤列 */
-    html += '<tr style="height:'+heights[b-1][0]+'in"><td class="lbl" rowspan="2">'+b+'</td>';
-    labels.forEach(function(l){
-      html += '<td class="lbl">'+l+'</td>';
-    });
+    /* 標籤列：段號往下合併兩列，右邊 14 格寫「一A1、一C1…七C1」 */
+    html += '<tr style="height:'+HEAD_H[b-1]+'in"><td class="bandcell" rowspan="2">'+b+'</td>';
+    CONFIG.SEAT_GROUPS.forEach(function(g){ html += '<td class="seatlb">'+g+b+'</td>'; });
     html += '</tr>';
-    /* 桌子列：每張桌子一個格，高度為原本兩列之和 */
-    html += '<tr style="height:'+(heights[b-1][1]+heights[b-1][2])+'in">';
+    /* 桌子列：一桌一格，內容與匯出的 Word 完全相同（四行、上下位之間有分隔線） */
+    html += '<tr style="height:'+DESK_H[b-1]+'in">';
     for(let col = 1; col <= 14; col++){
-      const d = slots.filter(function(s){ return s.col === col; }).sort(function(x,y){ return x.row - y.row; });
-      if(!d.length){ html += '<td></td>'; continue; }
-      const primary = d[0].i;
-      const topKey = state.seats[String(primary)] || '';
-      const botKey = deskBotKey(primary);
-      const keys = [topKey, botKey].filter(Boolean);
-      const inner = keys.length
-        ? keys.map(function(k){
-            const s = E.byKey(state,k);
-            return '<div class="sm">'
-              + '<div>'+dayLine+'</div>'
-              + '<div>'+E.daysNow(state,k).map(function(v){ return v?'■':'□'; }).join('')+s.cls+s.seat+'</div>'
-              + '<div>'+esc(s.name)+'</div>'
-              + '</div>';
-          }).join('')
-        : '&nbsp;';
-      html += '<td>'+inner+'</td>';
+      const deskNo = CONFIG.DESKS.findIndex(function(d){ return d.band === b && d.col === col; }) + 1;
+      html += '<td class="seatcell">'+esc(deskNo ? E.deskCell(state, deskNo) : '')+'</td>';
     }
     html += '</tr>';
   });
   html += '</table>';
   doPrint(html, 'A3 landscape', '0.472in 0.354in 0.5in 0.354in');
-  toast('已送往列印（A3 橫式，版面同 Word 範本）');
+  toast('已送往列印（A3 橫式，同 Word 版）');
 }
 
 /* 名單：A4 直式，比照電話表欄位（已移除家長輪值） */
