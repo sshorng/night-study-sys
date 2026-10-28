@@ -1422,12 +1422,27 @@ function commit(){
   render();
   API.save().catch(function(err){ toast('儲存失敗：'+err.message, 4200); });
 }
-function modal(title, bodyHTML, footHTML, wide){
-  $('modalRoot').innerHTML = '<div class="overlay"><div class="modal'+(wide?' wide':'')+'"><h3>'+title+'</h3>'
+/* 開彈窗；onCancel 是「取消」時要補做的事（例如把狀態退回去），不給就只是關掉 */
+function modal(title, bodyHTML, footHTML, wide, onCancel){
+  const root = $('modalRoot');
+  root.__onCancel = typeof onCancel === 'function' ? onCancel : null;
+  root.innerHTML = '<div class="overlay"><div class="modal'+(wide?' wide':'')+'"><h3>'+title+'</h3>'
     +'<div class="body">'+bodyHTML+'</div><div class="foot">'+footHTML+'</div></div></div>';
-  return $('modalRoot').firstElementChild;
+  return root.firstElementChild;
 }
-function closeModal(){ $('modalRoot').innerHTML=''; }
+function closeModal(){
+  const root = $('modalRoot');
+  root.__onCancel = null;
+  root.innerHTML='';
+}
+/* 取消（按取消鍵或點外面）：先把「要補做的事」記下來，關掉之後再執行 */
+function cancelModal(){
+  const root = $('modalRoot');
+  const hook = root.__onCancel;
+  root.__onCancel = null;
+  root.innerHTML='';
+  if(typeof hook === 'function'){ try{ hook(); }catch(err){} }
+}
 
 /* 點彈窗外面的空白處就關閉：按下與放開都在遮罩上才算，拖曳選字或滑動不會誤關 */
 let overlayDown = false;
@@ -1438,9 +1453,8 @@ document.addEventListener('click', function(e){
   const onOverlay = !!(e.target && e.target.classList && e.target.classList.contains('overlay'));
   const wasDown = overlayDown;
   overlayDown = false;
-  if(onOverlay && wasDown) closeModal();
+  if(onOverlay && wasDown) cancelModal();
 });
-
 /* 站內確認視窗：取代瀏覽器原生 confirm，手機也看得清楚 */
 function confirmModal(title, messageHTML, onOk, okLabel){
   const m = modal(title,
@@ -2322,8 +2336,14 @@ function openLeaveReason(key, iso){
     + '<div class="field"><label>請假事由</label><input id="lvrWhy" list="lvrWhyDL" placeholder="例如：家長請假、身體不適">'
     + dlOptions('lvrWhyDL', E.optList(state,'leaveReasons'))+'</div>'
     + (chips ? '<div class="tools" style="flex-wrap:wrap">'+chips+'</div>' : '');
-  const m = modal('標記請假', body, '<button class="btn" data-close>取消</button><button class="btn primary" id="lvrSave">確定請假</button>');
-  m.querySelector('[data-close]').addEventListener('click', closeModal);
+  /* 取消（按取消或點外面）就把這一點退回未到，不然會卡在「到」，再點也只會一直問事由 */
+  const m = modal('標記請假', body, '<button class="btn" data-close>取消</button><button class="btn primary" id="lvrSave">確定請假</button>',
+    false, function(){
+      state.checkins = (state.checkins||[]).filter(function(c){ return !(c.key===key && c.date===iso); });
+      commit();
+      toast('已取消請假，記回未到', 2600);
+    });
+  m.querySelector('[data-close]').addEventListener('click', cancelModal);
   Array.prototype.forEach.call(m.querySelectorAll('[data-lvreason]'), function(b){
     b.addEventListener('click', function(){
       const inp = m.querySelector('#lvrWhy');
