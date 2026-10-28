@@ -2499,6 +2499,21 @@ function twentyFour(t){
   if(h > 23) h = 23;
   return (h < 10 ? '0' + h : String(h)) + ':' + m[2];
 }
+/* 記事裡的「907-27 王小明」只是標記用，帶進違規事由時要拿掉，不然事由會重複班級座號與姓名 */
+function stripStuPrefix(text, key, name){
+  let s = String(text==null ? '' : text).replace(/<[^>]*>/g, ' ');
+  const m = String(key==null ? '' : key).match(/^(\d{2,3})-(\d{2})$/);
+  if(m){
+    s = s.replace(new RegExp('^[\\s　]*' + m[1] + '[-－]?' + m[2] + '(?![0-9])'), ' ');
+  }
+  const nm = String(name==null ? '' : name).trim();
+  if(nm){
+    const escNm = nm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    s = s.replace(new RegExp('^[\\s　]*' + escNm), ' ');
+  }
+  s = s.replace(/^[\s　:：、,，。]+/, '');
+  return s.trim();
+}
 function noteRow(n, editable){
   if(editable && ui.editNote === n.id){
     const timeChips = (CONFIG.RUN_SLOTS || []).map(function(s){
@@ -2925,7 +2940,7 @@ document.addEventListener('click', e=>{
     if(isTeacher()){ return; }
     const wrap = tag.closest('[data-nid]');
     const n = wrap ? noteById(wrap.dataset.nid) : null;
-    openVioForm(null, { key:tag.dataset.tag, date:(n ? n.date : ref()), reason:(n ? n.text : '') });
+    openVioForm(null, { key:tag.dataset.tag, date:(n ? n.date : ref()), reason:(n ? stripStuPrefix(n.text, tag.dataset.tag, (E.byKey(state, tag.dataset.tag)||{}).name) : '') });
     return;
   }
 });
