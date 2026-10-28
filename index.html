@@ -160,6 +160,7 @@ input,select,textarea{font-family:inherit;font-size:14px}
 .chip{border:1px solid var(--rule);background:var(--card);border-radius:999px;padding:4px 12px;min-height:44px;display:inline-flex;align-items:center;font-size:12px;cursor:pointer}
 .optprev{margin-top:6px;line-height:2}
 .optprev .pill{margin:0 4px 0 0}
+.copytxt{width:100%;min-height:220px;font-family:var(--mono);font-size:13px;line-height:1.9;white-space:pre}
 .chip.sel{background:var(--seal);border-color:var(--seal);color:#FBF1EC}
 
 /* ---------- 異動日誌 ---------- */
@@ -642,7 +643,7 @@ const LIB = {
    1. CONFIG
    ===================================================================== */
 const CONFIG = {
-  VERSION: '2.15.1',
+  VERSION: '2.15.2',
   /* 已內建的 Apps Script 部署網址：第一次使用只要在設定頁填通關密語，會記在這台裝置的瀏覽器 */
   GAS_URL: 'https://script.google.com/macros/s/AKfycbxBk3fJaCrPfyojhPVgT6xNE110x3ENSGquQLVWLBz8jdNH2FgX6QMNBQKr1lHLZ8ePtw/exec',
   PASSWORD: '',
@@ -774,7 +775,7 @@ const E = {
   },
   label(days){
     const d = Array.isArray(days) ? days : [0,0,0,0,0];
-    return d.map((v,i)=>v?CONFIG.DAY_LABELS[i]:'').join('') || '不参加';
+    return d.map((v,i)=>v?CONFIG.DAY_LABELS[i]:'').join('') || '不參加';
   },
 
   daysAt(st,key,iso){
@@ -2003,6 +2004,7 @@ function releaseSeat(slot, which){
 function renderLog(){
   const list = E.recentLog(state);
   $('logTools').innerHTML = '<button class="btn primary" id="btnNewEnroll">新增異動</button>'
+    + '<button class="btn" id="btnCopyLog">複製文字</button>'
     + '<span class="hint">共 '+list.length+' 筆，記錄生效日之前的狀態不受影響</span>';
   $('logList').innerHTML = list.length ? list.map(e=>{
     const s = E.byKey(state,e.key) || { name:'（已刪除）', cls:'' };
@@ -2016,6 +2018,48 @@ function renderLog(){
       + '</span></div>'
       + '<div class="why">'+esc(e.reason||'')+'</div></li>';
   }).join('') : '<li><div class="hint">尚無異動紀錄</div></li>';
+}
+
+/* 異動日誌的純文字版：10/1 90201一二四改一二 */
+function logPlainText(){
+  const rows = E.recentLog(state).slice().sort(function(a,b){
+    return a.date.localeCompare(b.date) || ((a.order||0) - (b.order||0));
+  });
+  return rows.map(function(e){
+    const p = String(e.date).split('-');
+    const dm = Number(p[1]) + '/' + Number(p[2]);
+    const s = E.byKey(state, e.key);
+    const who = (s ? s.cls : E.clsOf(e.key)) + (s ? s.seat : E.seatOf(e.key));
+    const hasBefore = (e.before || []).some(Boolean);
+    const hasAfter = (e.after || []).some(Boolean);
+    if(!hasBefore && hasAfter) return dm + ' 新增' + who + E.label(e.after);
+    if(hasBefore && !hasAfter) return dm + ' ' + who + E.label(e.before) + '改不參加';
+    return dm + ' ' + who + E.label(e.before) + '改' + E.label(e.after);
+  }).join('\n');
+}
+
+/* 複製到剪貼簿；非安全來源或瀏覽器不給權限時，開視窗讓老師自己選取 */
+async function copyText(text, okMsg){
+  try{
+    if(navigator.clipboard && window.isSecureContext){
+      await navigator.clipboard.writeText(text);
+    }else{
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed'; ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      ta.remove();
+    }
+    toast(okMsg || '已複製', 2800);
+  }catch(err){
+    const m = modal('複製文字', '<p class="hint" style="margin:0 0 6px">瀏覽器不讓程式直接寫入剪貼簿，請按 Ctrl+C（手機長按）複製下面這段。</p>'
+      + '<textarea class="copytxt" readonly>'+esc(text)+'</textarea>',
+      '<button class="btn" data-close>關閉</button>', true);
+    m.querySelector('[data-close]').addEventListener('click', closeModal);
+    try{ m.querySelector('textarea').select(); }catch(err2){}
+  }
 }
 
 function openEditEnroll(id){
@@ -2514,6 +2558,7 @@ document.addEventListener('click', e=>{
   if(e.target.id==='btnClearSeat'){ state.seats={}; ui.sel=null; commit(); return; }
   // 異動
   if(e.target.id==='btnNewEnroll'){ openEnrollPicker(); return; }
+  if(e.target.id==='btnCopyLog'){ copyText(logPlainText(), '已複製 '+E.recentLog(state).length+' 筆異動文字'); return; }
   const eEdit = e.target.closest('[data-edit]');
   if(eEdit){ openEditEnroll(eEdit.dataset.edit); return; }
   const eDel = e.target.closest('[data-del]');
