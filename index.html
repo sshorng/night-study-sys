@@ -2986,6 +2986,8 @@ function autoSeat(){
 
 /* ---------- 對話框：學生資料 ---------- */
 function openStudent(key){
+  /* 輪值教師本來就不能改，乾脆不開窗，一句話說明就好 */
+  if(isTeacher()){ toast('輪值教師只能查看名單，學生資料不開放編輯', 3600); return; }
   const s = E.byKey(state,key);
   if(!s) return;
   const hist = E.historyOf(state,key);
