@@ -650,7 +650,7 @@ const CONFIG = {
   LOCAL_ONLY: false,
   DAY_LABELS: ['一','二','三','四','五'],
   WEEKDAY: ['日','一','二','三','四','五','六'],
-  VERSION: '2.15.6',
+  VERSION: '2.15.7',
   SEAT_GROUPS: ['一A','一C','二A','二C','三A','三C','四A','四C','五A','五C','六A','六C','七A','七C'],
   STORE_KEY: 'nightstudy.state.v2',
   TPL_NAMES: { seat:'座位表-範本.docx', violation:'違規單-範本.docx', roster:'名單範本.xlsx' },
@@ -2395,8 +2395,7 @@ function dayCard(r){
   const off = !r.school;
   const notes = dutyNotesOf(r.date);
   const nums = off ? '' : '<span>應到 <b>'+r.should+'</b></span><span>實到 <b>'+r.in+'</b></span>'
-      + '<span>請假 <b>'+r.leave+'</b></span><span>未點 <b>'+r.absent+'</b></span>'
-      + '<span>違規 <b>'+r.vio+'</b></span>';
+      + '<span>請假 <b>'+r.leave+'</b></span><span>未點 <b>'+r.absent+'</b></span>';
   return '<div class="dayv'+(isToday?' today':'')+(off?' off':'')+'" data-day="'+r.date+'">'
     + '<div class="dv-head">'
     +   '<span class="dv-wd">星期'+r.wd+'</span>'
