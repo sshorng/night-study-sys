@@ -630,7 +630,7 @@ const LIB = {
    1. CONFIG
    ===================================================================== */
 const CONFIG = {
-  VERSION: '2.10.0',
+  VERSION: '2.10.1',
   /* 已內建的 Apps Script 部署網址：第一次使用只要在設定頁填通關密語，會記在這台裝置的瀏覽器 */
   GAS_URL: 'https://script.google.com/macros/s/AKfycbxBk3fJaCrPfyojhPVgT6xNE110x3ENSGquQLVWLBz8jdNH2FgX6QMNBQKr1lHLZ8ePtw/exec',
   PASSWORD: '',
@@ -743,7 +743,10 @@ const E = {
     const taken = twins.filter(s=>!!((st.seats||{})[String(s.i)])).length;
     return taken >= 2 ? (slot.row===0 ? '上' : '下') : '';
   },
-  label(days){ return days.map((v,i)=>v?CONFIG.DAY_LABELS[i]:'').join('') || '不参加'; },
+  label(days){
+    const d = Array.isArray(days) ? days : [0,0,0,0,0];
+    return d.map((v,i)=>v?CONFIG.DAY_LABELS[i]:'').join('') || '不参加';
+  },
 
   daysAt(st,key,iso){
     const base = E.byKey(st,key);
@@ -760,9 +763,19 @@ const E = {
     return hits.length ? hits[hits.length-1].days.slice() : base.days.slice();
   },
   /* 這個日期之後才生效的異動，用來標示「之後已改」，不會動到當天 */
+  /* 這個日期之後才生效的異動，用來標示「之後已改」，不會動到當天。
+     回傳時一併補上 from（變更前那一天生效的設定），畫面才說得出「A 改成 B」。 */
   changesAfter(st,key,iso){
+    let prev = E.daysAt(st,key,iso);
     return (st.enrollments||[]).filter(e=>e.key===key && e.date>iso)
-      .sort((a,b)=> a.date<b.date?-1:(a.date>b.date?1:0));
+      .sort((a,b)=> a.date<b.date?-1:(a.date>b.date?1:0))
+      .map(function(e){
+        const days = Array.isArray(e.days) ? e.days : [0,0,0,0,0];
+        const from = Array.isArray(e.from) ? e.from : prev;
+        const out = Object.assign({}, e, { days: days, from: from });
+        prev = days;
+        return out;
+      });
   },
   isSchoolDay(st,iso){
     const c = (st.calendar||[]).find(x=>x.date===iso);
