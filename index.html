@@ -514,12 +514,11 @@ input[type=checkbox]{accent-color:var(--seal)}
         <div>
           <p class="hint">可調參數（同時存在試算表「設定」工作表，一項一列，直接改試算表也有效）</p>
           <div id="optFields"></div>
-          <p class="hint">連線設定</p>
-          <p class="hint">連線設定</p>
-          <div class="field" style="margin-bottom:10px">
-            <label>Google Apps Script 網址</label>
+          <div class="field" style="margin-bottom:6px">
+            <label>Google Apps Script 網址（已內建，通常不必改）</label>
             <input id="cfgGas" placeholder="https://script.google.com/macros/s/..../exec">
           </div>
+          <p class="hint" style="margin:0 0 10px">程式裡已寫好你的部署網址，第一次使用只要填下面的通關密語；密語只記在這台裝置的瀏覽器，不會上傳。</p>
           <div class="field" style="margin-bottom:10px">
             <label>通關密語</label>
             <input id="cfgPwd" type="password">
@@ -561,8 +560,10 @@ input[type=checkbox]{accent-color:var(--seal)}
    ===================================================================== */
 const CONFIG = {
   VERSION: '2.0.0',
-  GAS_URL: '',
+  /* 已內建的 Apps Script 部署網址：第一次使用只要在設定頁填通關密語，會記在這台裝置的瀏覽器 */
+  GAS_URL: 'https://script.google.com/macros/s/AKfycbxBk3fJaCrPfyojhPVgT6xNE110x3ENSGquQLVWLBz8jdNH2FgX6QMNBQKr1lHLZ8ePtw/exec',
   PASSWORD: '',
+  LOCAL_ONLY: false,
   DAY_LABELS: ['一','二','三','四','五'],
   WEEKDAY: ['日','一','二','三','四','五','六'],
   /* 原檔座位欄標籤：一A、一C…七C（A 上列、C 下列，段號接在後面） */
@@ -863,7 +864,9 @@ const E = {
    4. API
    ===================================================================== */
 const API = {
-  isCloud(){ return !!CONFIG.GAS_URL; },
+  /* 網址已內建；測試注入（window.SEED／__NS_LOCAL）或本機模式旗標時不連雲端 */
+  isCloud(){ return !!CONFIG.GAS_URL && !CONFIG.LOCAL_ONLY && !window.SEED && !window.__NS_LOCAL; },
+  reachable(){ return API.isCloud() && !!CONFIG.PASSWORD; },
   async call(payload){
     const res = await fetch(CONFIG.GAS_URL, {
       method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'},
@@ -874,13 +877,13 @@ const API = {
     return json;
   },
   async load(){
-    if(!API.isCloud()){ return { ok:false }; }
+    if(!API.reachable()){ return { ok:false }; }
     const json = await API.call({ action:'loadAll' });
     return { ok:true, state: json.state };
   },
   async save(){
     localStorage.setItem(CONFIG.STORE_KEY, JSON.stringify(state));
-    if(!API.isCloud()) return;
+    if(!API.reachable()) return;
     await API.call({ action:'saveAll', state });
   },
   /* 範本優先讀專案內的 templates/ 相對路徑，讀不到才退回雲端範本 */
@@ -972,8 +975,8 @@ function renderShell(){
   const setupBar = $('setupBar');
   if(setupBar){
     let msg = '';
-    if(!API.isCloud()) msg = '尚未設定雲端：請到「設定與檢查」填入 Apps Script 網址與通關密語，所有資料都從試算表讀取。';
-    else if(!CONFIG.PASSWORD) msg = '已有網址但沒有通關密語：請到「設定與檢查」輸入密語後按「儲存設定」。';
+    if(!API.isCloud()) msg = '目前是本機模式（只在這台電腦）：資料不會同步到試算表。要接回雲端請到「設定與檢查」取消本機模式。';
+    else if(!CONFIG.PASSWORD) msg = 'Apps Script 網址已內建，還缺通關密語：請到「設定與檢查」輸入密語，按「儲存設定」就會開始讀取試算表。';
     else if(!state.students.length) msg = '試算表目前沒有名冊資料：請先在「名單」工作表建立，或到「設定與檢查」按「從雲端重新載入」。';
     setupBar.hidden = !msg;
     setupBar.textContent = msg;
@@ -2635,19 +2638,38 @@ async function exportXlsx(){
 
 /* ---------- 設定 ---------- */
 function saveCfg(){
-  const url = $('cfgGas').value.trim(), pwd = $('cfgPwd').value;
+  const url = $('cfgGas').value.trim() || CONFIG.GAS_URL, pwd = $('cfgPwd').value;
   CONFIG.GAS_URL = url; CONFIG.PASSWORD = pwd;
-  state.opts = state.opts || {};
+  const edited = {};
   Array.prototype.forEach.call(document.querySelectorAll('[data-opt]'), function(el){
-    state.opts[el.dataset.opt] = String(el.value || '').trim();
+    edited[el.dataset.opt] = String(el.value || '').trim();
   });
-  /* meta 同步一份，讓舊資料、Excel 與座位表範本照樣拿得到 */
-  state.meta = state.meta || {};
-  state.meta.school = state.opts.school || '';
-  state.meta.term = state.opts.term || '';
   localStorage.setItem('nightstudy.gas', url);
   localStorage.setItem('nightstudy.pwd', pwd);
-  API.save().then(()=>{ render(); toast('設定已儲存'); }).catch(err=>toast('雲端連線失敗：'+err.message,5000));
+  (async function(){
+    try{
+      /* 先確認密語可用：雲端有名冊而這台還是空的，就以雲端為準，避免用空白把試算表蓋掉 */
+      if(API.reachable()){
+        const r = await API.load();
+        if(r.ok && r.state && (r.state.students || []).length && !(state.students || []).length){
+          state = r.state;
+          normalize();
+          toast('已載入試算表資料');
+        }
+      }
+      state.opts = state.opts || {};
+      Object.keys(edited).forEach(function(k){ state.opts[k] = edited[k]; });
+      state.meta = state.meta || {};
+      state.meta.school = state.opts.school || '';
+      state.meta.term = state.opts.term || '';
+      await API.save();
+      render();
+      toast(state.students && state.students.length ? '設定已儲存' : '設定已儲存（試算表還沒名冊資料）', 4200);
+    }catch(err){
+      render();
+      toast('雲端連線失敗：'+err.message, 5000);
+    }
+  })();
 }
 
 function selfTest(){
@@ -2736,10 +2758,10 @@ function emptyState(){
     checkins:[], seats:{}, seatPair:{}, duty:[], dutyNotes:[], conflicts:[]
   };
 }
-
 async function boot(){
   CONFIG.GAS_URL = localStorage.getItem('nightstudy.gas') || CONFIG.GAS_URL || '';
   CONFIG.PASSWORD = localStorage.getItem('nightstudy.pwd') || CONFIG.PASSWORD || '';
+  CONFIG.LOCAL_ONLY = localStorage.getItem('nightstudy.local')==='1' || !!window.__NS_LOCAL;
   $('cfgGas').value = CONFIG.GAS_URL;
   $('cfgPwd').value = CONFIG.PASSWORD;
 
@@ -2759,6 +2781,8 @@ async function boot(){
   }).catch(function(){});
 
   if(!API.isCloud()) return;
+  /* 有網址但還沒有密語：先不發請求，等使用者輸入密語後再載入 */
+  if(!CONFIG.PASSWORD) return;
 
   try{
     const r = await API.load();
