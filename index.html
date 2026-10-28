@@ -592,7 +592,7 @@ body.gated .sheet{opacity:.28;pointer-events:none;user-select:none}
    1. CONFIG
    ===================================================================== */
 const CONFIG = {
-  VERSION: '2.3.0',
+  VERSION: '2.4.0',
   /* 已內建的 Apps Script 部署網址：第一次使用只要在設定頁填通關密語，會記在這台裝置的瀏覽器 */
   GAS_URL: 'https://script.google.com/macros/s/AKfycbxBk3fJaCrPfyojhPVgT6xNE110x3ENSGquQLVWLBz8jdNH2FgX6QMNBQKr1lHLZ8ePtw/exec',
   PASSWORD: '',
@@ -2772,7 +2772,7 @@ async function cleanXlsxParts(buf){
 
 async function exportXlsx(){
   try{
-    /* 讀範本（10 張表都保留）：範本必須是 Excel 自己存過的版本，轉存後 Excel 才打得開 */
+    /* 讀範本（Excel 自己存過的版本）：轉存後 Excel 才打得開 */
     const tpl = await API.template('roster');
     const ExcelJS = window.ExcelJS;
     const wb = new ExcelJS.Workbook();
@@ -2780,31 +2780,23 @@ async function exportXlsx(){
     const iso = ref();
     const mat = E.matrix(state, iso);
 
-    /* 總表：只把數字填進範本既有的格位，欄寬、框線、字型全部沿用 */
-    const wsT = wb.getWorksheet('總表');
-    if(wsT){
-      mat.rows.forEach(function(r){
-        for(let row=2; row<=12; row++){
-          if(Number(wsT.getCell(row,1).value)===Number(r.cls)){
-            wsT.getCell(row,2).value = r.total;
-            for(let i=0;i<5;i++) wsT.getCell(row,3+i).value = r.per[i];
-            wsT.getCell(row,8).value = r.joined;
-            wsT.getCell(row,9).value = r.notJoined;
-    const widths = [6,8,7,12,6,6,6,6,6,7,15,10,8,28];
-          }
-        }
-      });
-    }
+    /* 範本裡那張空白的「參加天數及電話」手寫表與自動產生的名單重複，直接拿掉 */
+    const blank = wb.getWorksheet('參加天數及電話 ') || wb.getWorksheet('參加天數及電話');
+    if(blank) wb.removeWorksheet(blank.id);
 
-    /* 名單（自動產生）：每次重新產生一份乾淨表格，不動範本裡原有那張手寫表 */
+    /* 名單（自動產生）：每次重新產生，內容乾淨、可直接列印 */
     const SHEET = '名單（自動產生）';
     const oldSheet = wb.getWorksheet(SHEET);
     if(oldSheet) wb.removeWorksheet(oldSheet.id);
     const wsP = wb.addWorksheet(SHEET, { views:[{state:'frozen',ySplit:2}] });
     const head = ['序號','班級','座號','姓名','一','二','三','四','五','天數','電話','家長輪值','便當','備註'];
-    const widths = [6,8,7,12,4.5,4.5,4.5,4.5,4.5,7,15,10,8,28];
-    widths.forEach(function(w,i){ wsP.getColumn(i+1).width = w; });
-    const rows = E.seatRows(state);
+    [6,8,7,12,6,6,6,6,6,7,15,10,8,28].forEach(function(w,i){ wsP.getColumn(i+1).width = w; });
+    /* 名單用「基準日當天生效」的參加設定，和總表、點名頁同一套算法 */
+    const rows = E.active(state).map(function(s){
+      return { key:s.key, cls:s.cls, seat:s.seat, name:s.name, days:E.daysAt(state, s.key, iso) };
+    }).sort(function(a,b){ return a.cls-b.cls || String(a.seat).localeCompare(String(b.seat)); });
+    const first = 3, last = rows.length+2, sumRow = last+1;
+    const hasRows = rows.length > 0;
     wsP.mergeCells(1,1,1,head.length);
     wsP.getCell(1,1).value = (state.meta.term||'')+'　夜自習名單（'+iso+' 基準，共 '+rows.length+' 人）';
     wsP.getCell(1,1).font = { name:'標楷體', size:14, bold:true };
@@ -2821,23 +2813,34 @@ async function exportXlsx(){
     wsP.getRow(2).height = 22;
     rows.forEach(function(r,i){
       const s = E.byKey(state,r.key)||{};
+      const row = i+first;
+      const days = r.days.reduce(function(a,b){ return a+b; },0);
       const vals = [i+1, r.cls, r.seat, r.name].concat(r.days)
-        .concat([r.days.reduce((a,b)=>a+b,0), s.phone||'', s.parentDuty?'V':'', s.lunch||'', s.note||'']);
+        .concat([null, s.phone||'', s.parentDuty?'V':'', s.lunch||'', s.note||'']);
       vals.forEach(function(v,ci){
-        const c = wsP.getCell(i+3, ci+1);
+        const c = wsP.getCell(row, ci+1);
         c.value = v;
         c.font = { name:'標楷體', size:11 };
         c.alignment = { horizontal:(ci===3||ci===10||ci===13)?'left':'center', vertical:'middle' };
         c.border = borderAll();
       });
+      /* 天數用加總公式，改勾選就自己重算 */
+      wsP.getCell(row,10).value = { formula:'SUM(E'+row+':I'+row+')', result:days };
     });
-    const sumRow = rows.length+3;
     wsP.getCell(sumRow,1).value = '每日合計';
     wsP.mergeCells(sumRow,1,sumRow,4);
+    const dayCols = ['E','F','G','H','I'];
     for(let i=0;i<5;i++){
-      wsP.getCell(sumRow,5+i).value = rows.reduce(function(a,r){ return a+r.days[i]; },0);
+      const col = dayCols[i];
+      const total = rows.reduce(function(a,r){ return a+r.days[i]; },0);
+      wsP.getCell(sumRow,5+i).value = hasRows
+        ? { formula:'SUM('+col+first+':'+col+last+')', result:total }
+        : total;
     }
-    wsP.getCell(sumRow,10).value = rows.reduce(function(a,r){ return a+r.days.reduce(function(x,y){ return x+y; },0); },0);
+    const daySum = rows.reduce(function(a,r){ return a+r.days.reduce(function(x,y){ return x+y; },0); },0);
+    wsP.getCell(sumRow,10).value = hasRows
+      ? { formula:'SUM(J'+first+':J'+last+')', result:daySum }
+      : daySum;
     for(let c=1; c<=head.length; c++){
       const cell = wsP.getCell(sumRow,c);
       cell.font = { name:'標楷體', size:11, bold:true };
@@ -2848,6 +2851,49 @@ async function exportXlsx(){
     wsP.pageSetup = { paperSize:9, orientation:'landscape', fitToPage:true, fitToWidth:1, fitToHeight:0,
       printTitlesRow:'1:2', horizontalCentered:true,
       margins:{ left:0.4, right:0.4, top:0.5, bottom:0.5, header:0.2, footer:0.2 } };
+
+    /* 總表：各班五天人數直接引用名單，改名單就自己重算（總數是班級名冊人數，維持固定值） */
+    const Q = "'"+SHEET+"'!";
+    const wsT = wb.getWorksheet('總表');
+    const dayTotals = [0,0,0,0,0];
+    mat.rows.forEach(function(r){ for(let i=0;i<5;i++) dayTotals[i] += r.per[i]; });
+    if(wsT){
+      mat.rows.forEach(function(r){
+        for(let row=2; row<=12; row++){
+          if(Number(wsT.getCell(row,1).value)===Number(r.cls)){
+            wsT.getCell(row,2).value = r.total;
+            for(let i=0;i<5;i++){
+              wsT.getCell(row,3+i).value = hasRows
+                ? { formula:'COUNTIFS('+Q+'$B$'+first+':$B$'+last+',$A'+row+','+Q+'$'+dayCols[i]+'$'+first+':$'+dayCols[i]+'$'+last+',1)',
+                    result:r.per[i] }
+                : r.per[i];
+            }
+            wsT.getCell(row,8).value = hasRows
+              ? { formula:'COUNTIFS('+Q+'$B$'+first+':$B$'+last+',$A'+row+','+Q+'$J$'+first+':$J$'+last+',">0")',
+                  result:r.joined }
+              : r.joined;
+            wsT.getCell(row,9).value = { formula:'B'+row+'-H'+row, result:r.notJoined };
+            break;
+          }
+        }
+      });
+
+      /* 合計列：保留範本的 SUM 公式，補上算好的結果，不重算的檢視器也看得到數字 */
+      const totals = [mat.total, dayTotals[0], dayTotals[1], dayTotals[2], dayTotals[3], dayTotals[4], mat.joined, mat.notJoined];
+      for(let row=2; row<=wsT.rowCount; row++){
+        const a = wsT.getCell(row,1).value;
+        if(typeof a === 'string' && a.indexOf('總計')===0){
+          totals.forEach(function(v,i){
+            const cell = wsT.getCell(row, i+2);
+            const cur = cell.value;
+            if(cur && typeof cur === 'object' && (cur.formula || cur.shareType === 'shared' || cur.sharedFormula)){
+              cell.value = Object.assign({}, cur, { result:v });
+            }
+          });
+          break;
+        }
+      }
+    }
 
     wb.calcProperties = { fullCalcOnLoad:true };
     const raw = await wb.xlsx.writeBuffer();
