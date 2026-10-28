@@ -43,6 +43,7 @@ input,select,textarea{font-family:inherit;font-size:14px}
 .stat.warn .n{color:var(--seal)}
 .stats .quote{margin-top:auto;font-size:12px;color:var(--ink-3);line-height:1.9}
 .stats .quote b{display:block;font-family:var(--serif);font-size:13px;color:var(--ink-2);letter-spacing:.1em}
+.stats .quote .qsum{font-family:var(--serif);color:var(--ink-2);letter-spacing:.1em}
 
 /* ---------- 中：主區 ---------- */
 .main{min-width:0;display:flex;flex-direction:column}
@@ -630,7 +631,7 @@ const LIB = {
    1. CONFIG
    ===================================================================== */
 const CONFIG = {
-  VERSION: '2.13.1',
+  VERSION: '2.13.2',
   /* 已內建的 Apps Script 部署網址：第一次使用只要在設定頁填通關密語，會記在這台裝置的瀏覽器 */
   GAS_URL: 'https://script.google.com/macros/s/AKfycbxBk3fJaCrPfyojhPVgT6xNE110x3ENSGquQLVWLBz8jdNH2FgX6QMNBQKr1lHLZ8ePtw/exec',
   PASSWORD: '',
@@ -1448,13 +1449,20 @@ function renderShell(){
   renderCloudPill();
   /* 尚未設定雲端或雲端沒有名冊時，在最上方提示 */
   renderSetupBar();
+  /* 五天人數：各班一行，最後補一列「總」把它們加起來 */
+  const mat = E.matrix(state, iso);
+  const dayTotals = [0,0,0,0,0];
+  mat.rows.forEach(function(r){ r.per.forEach(function(v,i){ dayTotals[i] += v; }); });
   $('stats').innerHTML = ''
     + '<h2>今夜要點</h2>'
     + '<div class="stat"><span class="n">'+board.should.length+'</span><span class="k">應到</span></div>'
     + '<div class="stat ok"><span class="n">'+board.in.length+'</span><span class="k">實到</span></div>'
     + '<div class="stat"><span class="n">'+board.leave.length+'</span><span class="k">請假</span></div>'
     + '<div class="stat warn"><span class="n">'+board.absent.length+'</span><span class="k">未點</span></div>'
-    + '<div class="quote"><b>五天人數</b>'+E.matrix(state,iso).rows.map(r=>r.cls+'　'+r.per.join('／')).join('<br>')+'</div>';
+    + '<div class="quote"><b>五天人數</b>'
+      + mat.rows.map(r=>r.cls+'　'+r.per.join('／')).join('<br>')
+      + '<br><span class="qsum">總</span>　' + dayTotals.join('／')
+      + '</div>';
 }
 
 /* ---------- 今夜點名 ---------- */
