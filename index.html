@@ -505,7 +505,7 @@ body.gated .sheet{opacity:.28;pointer-events:none;user-select:none}
           <p class="meta" id="railSub">建成國中　115 學年度第 1 學期</p>
         </div>
         <div class="when">
-          <span class="pill seal" id="roleTag" hidden style="margin-right:8px">輪值教師</span>
+          <span class="pill seal" id="roleTag" hidden style="margin-right:8px;cursor:pointer" title="點一下切換身分">輪值教師</span>
           <span class="meta" id="topMeta"></span>
         </div>
         <span class="right" id="topRight"></span>
@@ -2670,6 +2670,16 @@ document.addEventListener('click', e=>{
     if(blocked) return;
   }
   // 今夜點名
+  /* 點右上角「輪值教師」標記＝切換身分（不再另設按鈕） */
+  if(e.target.id==='roleTag'){
+    ROLE = 'admin';
+    localStorage.removeItem(CONFIG.ROLE_KEY);
+    CONFIG.PASSWORD = '';
+    if($('cfgPwd')) $('cfgPwd').value = '';
+    applyRole(); renderMemoState(); render();
+    showGate('請輸入管理密語切換回管理員，或輸入教師密語繼續以教師身分使用。');
+    return;
+  }
   if(e.target.id==='dayPrev' || e.target.id==='dayNext'){
     const d = E.parse(ref());
     d.setDate(d.getDate() + (e.target.id==='dayPrev' ? -1 : 1));
