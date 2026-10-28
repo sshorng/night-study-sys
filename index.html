@@ -245,6 +245,14 @@ input[type=checkbox]{accent-color:var(--seal)}
   font-family:var(--serif);letter-spacing:.02em}
 .nt-timechips .tchip:hover{border-color:var(--seal);color:var(--seal);background:#FFF9EA}
 .nt-timechips .tchip:focus-visible{outline:2px solid var(--seal);outline-offset:1px}
+.nt-timewrap{position:relative;display:flex;gap:4px;align-items:center}
+.nt-timewrap .nt-time{flex:1 1 auto;min-width:0}
+.nt-clock{width:32px;height:32px;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;
+  border:1px solid var(--rule);border-radius:6px;background:var(--card);color:var(--ink-2);cursor:pointer}
+.nt-clock svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.nt-clock:hover{border-color:var(--seal);color:var(--seal)}
+.nt-clock:focus-visible{outline:2px solid var(--seal);outline-offset:1px}
+.nt-time-native{position:absolute;right:0;bottom:0;width:1px;height:1px;opacity:0;pointer-events:none;border:0;padding:0}
 .nt-main{grid-area:main;min-width:0;display:flex;flex-direction:column;gap:6px}
 .nt-acts{grid-area:acts;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
 .nt-hint{font-size:11px;color:var(--ink-3)}
@@ -2456,7 +2464,8 @@ function dutyNotesOf(date){
 const ICO = {
   pencil:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l10-10-4-4L4 16z"/><path d="M14.5 5.5l4 4"/></svg>',
   check:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.5l5 5L20 6.5"/></svg>',
-  cross:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12"/><path d="M18 6L6 18"/></svg>'
+  cross:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12"/><path d="M18 6L6 18"/></svg>',
+  clock:'<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.6V12l3.1 2"/></svg>'
 };
 /* 內文中的 90 開頭座號自動變成學生標記（只認已參加的學生） */
 /* 標記本身已含姓名，緊接在後的同名文字去掉，避免重複 */
@@ -2497,7 +2506,11 @@ function noteRow(n, editable){
     }).join('');
     return '<div class="nt nt-edit" data-nid="'+n.id+'">'
       + '<div class="nt-timecol">'
-      +   '<input class="nt-time" type="text" inputmode="numeric" placeholder="18:40" data-ntime="'+n.id+'" value="'+esc(twentyFour(n.time||''))+'" aria-label="記事時間">'
+      +   '<div class="nt-timewrap">'
+      +     '<input class="nt-time" type="text" inputmode="numeric" placeholder="18:40" data-ntime="'+n.id+'" value="'+esc(twentyFour(n.time||''))+'" aria-label="記事時間">'
+      +     '<button type="button" class="nt-clock" data-timepick="'+n.id+'" title="選時間" aria-label="選時間">'+ICO.clock+'</button>'
+      +     '<input class="nt-time-native" type="time" data-ntimenative="'+n.id+'" tabindex="-1" aria-hidden="true" value="'+esc(twentyFour(n.time||''))+'">'
+      +   '</div>'
       +   '<div class="nt-timechips">'+timeChips+'</div>'
       + '</div>'
       + '<div class="nt-main">'
@@ -2762,6 +2775,13 @@ document.addEventListener('click', e=>{
 });
 
 document.addEventListener('change', e=>{
+  const natT = e.target.closest ? e.target.closest('[data-ntimenative]') : null;
+  if(natT){
+    const wrap = natT.closest('.nt-timewrap');
+    const txt = wrap && wrap.querySelector('[data-ntime]');
+    if(txt && natT.value) txt.value = natT.value;
+    return;
+  }
   const lvPaper = e.target.dataset ? e.target.dataset.lvpaper : '';
   if(lvPaper){
     const l = (state.leaves||[]).find(function(x){ return x.id===lvPaper; });
@@ -2827,7 +2847,7 @@ function saveNote(id){
   if(!box) return;
   const timeEl = box.querySelector('[data-ntime]');
   const textEl = box.querySelector('[data-ntext]');
-  if(timeEl) n.time = timeEl.value;
+  if(timeEl) n.time = twentyFour(timeEl.value);
   if(textEl) n.text = dedupeName(textEl.innerText.replace(/\u00a0/g,' ').replace(/\n{3,}/g,'\n\n').trim()).trim();
   hideStuPop();
   ui.editNote = null; ui.noteDraft = null;
@@ -2870,6 +2890,21 @@ document.addEventListener('click', e=>{
     const box = tpick.closest('[data-nid]');
     const inp = box && box.querySelector('[data-ntime]');
     if(inp){ inp.value = tpick.dataset.ntimepick; try{ inp.focus(); }catch(err){} }
+    return;
+  }
+  /* 時鐘按鈕：叫出瀏覽器原生的選時面板，選完寫回 24 小時制文字框 */
+  const clock = e.target.closest('[data-timepick]');
+  if(clock){
+    const wrap = clock.closest('.nt-timewrap');
+    const nat = wrap && wrap.querySelector('[data-ntimenative]');
+    const txt = wrap && wrap.querySelector('[data-ntime]');
+    if(nat && txt){
+      nat.value = twentyFour(txt.value) || '';
+      try{
+        if(typeof nat.showPicker === 'function') nat.showPicker();
+        else nat.click();
+      }catch(err){ try{ nat.click(); }catch(err2){} }
+    }
     return;
   }
   const sv = e.target.closest('[data-savenote]');
