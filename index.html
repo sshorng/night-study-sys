@@ -484,6 +484,8 @@ body.gated .sheet{opacity:.28;pointer-events:none;user-select:none}
           <p class="meta" id="railSub">建成國中　115 學年度第 1 學期</p>
         </div>
         <div class="when">
+          <button class="btn tiny" id="btnSwitchRole" hidden style="margin-right:8px">切換身分</button>
+          <span class="pill seal" id="roleTag" hidden style="margin-right:8px">輪值教師</span>
           <span class="meta" id="topMeta"></span>
         </div>
         <span class="right" id="topRight"></span>
@@ -571,6 +573,12 @@ body.gated .sheet{opacity:.28;pointer-events:none;user-select:none}
             <label>通關密語</label>
             <input id="cfgPwd" type="password">
           </div>
+          <div class="field" style="margin-bottom:10px">
+            <label>輪值教師密語</label>
+            <input id="cfgTeacher" type="password" autocomplete="new-password" placeholder="留空表示這次不改">
+            <p class="hint" style="margin:2px 0 0">教師登入後只看得到「今夜點名、學生清單、座位編排、輪值日誌」四頁：點名可編輯，清單與座位唯讀，輪值日誌只能編輯當天、其他日子可以翻閱。教師登入要沿用這台裝置記住的雲端密語，管理員先登入一次即可。</p>
+            <p class="hint" id="cfgTeacherState" style="margin:2px 0 0"></p>
+            <button class="btn tiny" id="btnTeacherClear">清除輪值教師密語</button>
           <p class="hint" id="cfgMemoState" style="margin:0 0 10px"></p>
           <p class="hint" id="cfgClsTotal" style="margin-bottom:10px"></p>
           <div class="tools">
@@ -644,9 +652,12 @@ const LIB = {
    ===================================================================== */
 const CONFIG = {
   VERSION: '2.15.5',
-  /* 已內建的 Apps Script 部署網址：第一次使用只要在設定頁填通關密語，會記在這台裝置的瀏覽器 */
+  VERSION: '2.16.0',
   GAS_URL: 'https://script.google.com/macros/s/AKfycbxBk3fJaCrPfyojhPVgT6xNE110x3ENSGquQLVWLBz8jdNH2FgX6QMNBQKr1lHLZ8ePtw/exec',
   PASSWORD: '',
+  TEACHER_KEY: 'nightstudy.tpwdhash',
+  CLOUD_KEY: 'nightstudy.cloudpwd',
+  ROLE_KEY: 'nightstudy.role',
   LOCAL_ONLY: false,
   DAY_LABELS: ['一','二','三','四','五'],
   WEEKDAY: ['日','一','二','三','四','五','六'],
@@ -704,6 +715,8 @@ let state = {
   seats:{}, seatPair:{}, duty:[], conflicts:[]
 };
 let dirty = false;
+/* 目前身分：admin（管理員，全功能）或 teacher（輪值教師，受限） */
+let ROLE = 'admin';
 /* 雲端狀態：loaded 這次成功載入過；authoritative 目前畫面就是雲端那份；pending 有修改還沒上傳
    loading／t0 載入中與已等秒數；retries 這次重試到第幾次；lastError 上一次失敗原因 */
 const cloud = { loaded:false, authoritative:false, pending:false, noticed:false, failed:false,
@@ -1316,16 +1329,36 @@ function unlockUI(){
   const gate = $('gate');
   if(gate) gate.hidden = true;
   document.body.classList.remove('gated');
+  applyRole();
+}
+
+/* 身分：admin 全功能；teacher 只有點名、清單、座位、輪值日誌四頁 */
+function isTeacher(){ return ROLE === 'teacher'; }
+function allowedTabs(){ return isTeacher() ? ['today','list','seat','duty'] : TABS.map(function(t){ return t[0]; }); }
+function applyRole(){
+  document.body.classList.toggle('role-teacher', isTeacher());
+  if(allowedTabs().indexOf(ui.tab) < 0) ui.tab = 'today';
+  const tag = $('roleTag');
+  if(tag) tag.hidden = !isTeacher();
+  const sw = $('btnSwitchRole');
+  if(sw) sw.hidden = !isTeacher();
 }
 
 /* 設定頁顯示這台裝置記住密語的狀態，一眼看出有沒有記住 */
 function renderMemoState(){
   const el = $('cfgMemoState');
   if(!el) return;
-  const remembered = !!localStorage.getItem(GATE.KEY_PWD);
-  el.textContent = remembered
+  const remembered = !!localStorage.getItem(CONFIG.CLOUD_KEY) || !!localStorage.getItem(GATE.KEY_PWD);
+  el.textContent = (remembered
     ? '這台裝置已記住密語，下次開這個網址會直接進入，不會再要求輸入。'
-    : '這台裝置還沒記住密語：輸入一次之後就會自動記住。';
+    : '這台裝置還沒記住密語：輸入一次之後就會自動記住。')
+    + (isTeacher() ? '　目前身分：輪值教師。' : '');
+  const te = $('cfgTeacherState');
+  if(te){
+    te.textContent = localStorage.getItem(CONFIG.TEACHER_KEY)
+      ? '已設定輪值教師密語（只存雜湊，不保存明碼）。'
+      : '尚未設定輪值教師密語，目前只有管理密語能登入。';
+  }
 }
 
 function showGate(note){
@@ -1340,6 +1373,27 @@ function showGate(note){
     async function submit(){
       if(busy) return;
       const pwd = inp.value;
+      /* 先比對輪值教師密語：只在本機比雜湊，不送後端 */
+      const tHash = localStorage.getItem(CONFIG.TEACHER_KEY) || '';
+      if(tHash && pwd){
+        let h = '';
+        try{ h = await GATE.hash(pwd); }catch(err){ h = ''; }
+        if(h && h === tHash){
+          ROLE = 'teacher';
+          localStorage.setItem(CONFIG.ROLE_KEY, 'teacher');
+          const cloudPwd = localStorage.getItem(CONFIG.CLOUD_KEY) || '';
+          CONFIG.PASSWORD = cloudPwd;
+          busy = false; go.disabled = false;
+          if($('cfgPwd')) $('cfgPwd').value = '';
+          unlockUI(); renderMemoState();
+          msg.className = 'msg ok'; msg.textContent = '輪值教師登入中…';
+          toast(cloudPwd
+            ? '輪值教師登入：可點名、可編輯今天的輪值日誌'
+            : '輪值教師登入：這台裝置沒有存雲端密語，請管理員先登入一次', 6000);
+          resolve();
+          return;
+        }
+      }
       busy = true; go.disabled = true;
       msg.className = 'msg'; msg.textContent = '正在確認密語…';
       let r;
@@ -1353,6 +1407,9 @@ function showGate(note){
       }
       CONFIG.PASSWORD = pwd;
       localStorage.setItem(GATE.KEY_PWD, pwd);
+      ROLE = 'admin';
+      localStorage.setItem(CONFIG.ROLE_KEY, 'admin');
+      localStorage.setItem(CONFIG.CLOUD_KEY, pwd);
       try{ localStorage.setItem(GATE.KEY_HASH, await GATE.hash(pwd)); }catch(err){}
       if($('cfgPwd')) $('cfgPwd').value = pwd;
       renderMemoState();
@@ -1360,12 +1417,15 @@ function showGate(note){
       unlockUI();
       if(r.offline) toast('現在連不上雲端，先用這台裝置上次同步的資料', 5200);
       else if(r.local) toast('本機模式：資料只存在這台裝置', 4200);
+      /* 身分剛切換過來時畫面上可能還沒有名冊，補載一次 */
+      if(API.reachable() && !(state.students || []).length) loadFromCloud().catch(function(){});
       resolve();
     }
-    go.addEventListener('click', submit);
-    inp.addEventListener('keydown', function(e){
+    /* 用 onclick 指派，反覆開關卡也不會疊出多個監聽 */
+    go.onclick = submit;
+    inp.onkeydown = function(e){
       if(e.key === 'Enter'){ e.preventDefault(); submit(); }
-    });
+    };
   });
 }
 
@@ -1402,7 +1462,8 @@ const TABS = [
 ];
 
 function renderTabs(){
-  $('tabs').innerHTML = TABS.map(([id,label])=>
+  const allow = allowedTabs();
+  $('tabs').innerHTML = TABS.filter(function(t){ return allow.indexOf(t[0]) >= 0; }).map(([id,label])=>
     '<button role="tab" data-tab="'+id+'" aria-selected="'+(ui.tab===id)+'">'+label+'</button>').join('');
   document.querySelectorAll('.page').forEach(p=>p.classList.toggle('on', p.id==='page-'+ui.tab));
 }
@@ -1444,7 +1505,9 @@ function renderSetupBar(){
   if(!bar) return;
   let msg = '', retry = false;
   const secs = cloud.t0 ? Math.max(1, Math.round((Date.now()-cloud.t0)/1000)) : 0;
-  if(!API.isCloud()){
+  if(isTeacher() && (!API.isCloud() || !CONFIG.PASSWORD)){
+    msg = '輪值教師模式：這台裝置沒有記住雲端密語，現在讀不到雲端資料。請管理員用管理密語在這台裝置登入一次，之後教師登入就能直接讀取。';
+  }else if(!API.isCloud()){
     msg = '目前是本機模式：資料一律存在雲端試算表，本機不留名冊資料，本機模式不會存檔。要接回雲端請到「設定與檢查」取消本機模式。';
   }else if(!CONFIG.PASSWORD){
     msg = '還缺通關密語：請到「設定與檢查」輸入密語並按「儲存設定」，就會開始讀取試算表。';
@@ -1587,6 +1650,10 @@ function listHit(s, q){
 
 function renderListBatch(){
   const rows = listRows();
+  if(isTeacher()){
+    $('listBatch').innerHTML = '<span class="hint">輪值教師模式：學生清單唯讀，只能查看</span>';
+    return;
+  }
   const allOn = rows.length && rows.every(function(s){ return ui.pick.has(s.key); });
   $('listBatch').innerHTML = (ui.pick.size
     ? '<span class="hint">已選 <b>'+ui.pick.size+'</b> 人</span>'
@@ -1600,6 +1667,7 @@ function renderListBatch(){
 
 function renderListBody(){
   const rows = listRows();
+  const RO = isTeacher();
   const all = state.students;
   const on = all.filter(s=>s.active!==false);
   const pending = on.filter(s=>!E.daysNow(state,s.key).some(Boolean)).length;
@@ -1629,7 +1697,7 @@ function renderListBody(){
     + '<col style="width:6.7%"><col style="width:6.7%"><col style="width:9.8%"><col style="width:11.2%">'
     + '</colgroup>'
     + '<thead><tr>'
-    + '<th class="pick"><label class="cbox"><input type="checkbox" id="pickAll" aria-label="全選目前顯示的學生"'+(rows.length && rows.every(s=>ui.pick.has(s.key)) ? ' checked' : '')+'></label></th>'
+    + (RO ? '<th class="pick"></th>' : '<th class="pick"><label class="cbox"><input type="checkbox" id="pickAll" aria-label="全選目前顯示的學生"'+(rows.length && rows.every(s=>ui.pick.has(s.key)) ? ' checked' : '')+'></label></th>')
     + '<th>班級</th><th>座號</th><th>姓名</th><th class="d5h"><span class="d5g">'+CONFIG.DAY_LABELS.map(l=>'<i>'+l+'</i>').join('')+'</span></th><th>電話</th><th>便當</th>'
     + '<th class="cnt">請假</th><th class="cnt">違規</th><th>狀態</th><th>操作</th></tr></thead><tbody>'
     + rows.map(s=>{
@@ -1637,7 +1705,7 @@ function renderListBody(){
         const d = E.daysNow(state,s.key);
         const noDay = joined && !d.some(Boolean);
         return '<tr class="person'+(joined?'':' off')+'" data-stu="'+s.key+'">'
-          + '<td class="pick"><label class="cbox"><input type="checkbox" data-pick="'+s.key+'" aria-label="選取 '+esc(s.name)+'"'+(ui.pick.has(s.key)?' checked':'')+'></label></td>'
+          + (RO ? '<td class="pick"></td>' : '<td class="pick"><label class="cbox"><input type="checkbox" data-pick="'+s.key+'" aria-label="選取 '+esc(s.name)+'"'+(ui.pick.has(s.key)?' checked':'')+'></label></td>')
           + '<td>'+s.cls+'</td><td>'+s.seat+'</td>'
           + '<td class="nm">'+esc(s.name)+'</td>'
           + '<td class="d5"><span class="d5g">'+d.map(v=>'<i class="'+(v?'on':'off')+'">'+(v?'■':'□')+'</i>').join('')+'</span></td>'
@@ -1646,7 +1714,7 @@ function renderListBody(){
           + cntCell(lvMap[s.key], true)
           + cntCell(viMap[s.key], false)
           + '<td>'+(joined ? (noDay?'<span class="pill seal">待設日</span>':'<span class="pill ok">參加</span>') : '<span class="pill">不參加</span>')+'</td>'
-          + '<td><button class="btn tiny" data-toggle="'+s.key+'">'+(joined?'退出':'加入')+'</button></td>'
+          + (RO ? '<td></td>' : '<td><button class="btn tiny" data-toggle="'+s.key+'">'+(joined?'退出':'加入')+'</button></td>')
           + '</tr>';
       }).join('')
     + '</tbody>';
@@ -1659,7 +1727,7 @@ function renderListBody(){
     const vp = (viMap[s.key]||[]).reduce(function(x,v){ return x + (Number(v.points)||1); }, 0);
     return '<div class="card'+(joined?'':' off')+'">'
       + '<div class="card-h">'
-      +   '<label class="cbox"><input type="checkbox" data-pick="'+s.key+'" aria-label="選取 '+esc(s.name)+'"'+(ui.pick.has(s.key)?' checked':'')+'></label>'
+      +   (RO ? '' : '<label class="cbox"><input type="checkbox" data-pick="'+s.key+'" aria-label="選取 '+esc(s.name)+'"'+(ui.pick.has(s.key)?' checked':'')+'></label>')
       +   '<span class="card-who" data-stu="'+s.key+'"><b>'+s.cls+'-'+s.seat+'</b>'+esc(s.name)+'</span>'
       +   (joined ? (noDay?'<span class="pill seal">待設日</span>':'<span class="pill ok">參加</span>') : '<span class="pill">不參加</span>')
       + '</div>'
@@ -1670,7 +1738,7 @@ function renderListBody(){
       + '<div class="card-foot">'
       +   '<span>'+esc(s.phone||'—')+'</span>'
       +   '<span>便當 '+esc(s.lunch||'—')+'</span>'
-      +   '<button class="btn tiny" data-toggle="'+s.key+'">'+(joined?'退出':'加入')+'</button>'
+      +   (RO ? '' : '<button class="btn tiny" data-toggle="'+s.key+'">'+(joined?'退出':'加入')+'</button>')
       + '</div></div>';
   }).join('');
 }
@@ -1831,13 +1899,15 @@ function renderSeat(){
   const iso = ref();
   const issue = E.seatIssue(state);
   const dup = new Set(issue.dup);
-  $('seatTools').innerHTML = ''
-    + '<button class="btn primary" id="btnAutoSeat">依班級座號自動排</button>'
-    + '<button class="btn" id="btnClearSeat">清空座位</button>'
-    + '<button class="btn seal" id="btnPrintSeat">列印座位表（A3）</button>'
-    + (E.active(state).length > CONFIG.SEAT_SLOTS.length
-        ? '<span class="hint" style="color:var(--seal)">參加 '+E.active(state).length+' 人，超過座位表 '+CONFIG.SEAT_SLOTS.length+' 格，匯出前請先調整</span>'
-        : '')
+  $('seatTools').innerHTML = isTeacher()
+    ? '<button class="btn seal" id="btnPrintSeat">列印座位表（A3）</button>'
+      + '<span class="hint">輪值教師模式：座位編排唯讀，只能查看與列印</span>'
+    : '<button class="btn primary" id="btnAutoSeat">依班級座號自動排</button>'
+      + '<button class="btn" id="btnClearSeat">清空座位</button>'
+      + '<button class="btn seal" id="btnPrintSeat">列印座位表（A3）</button>'
+      + (E.active(state).length > CONFIG.SEAT_SLOTS.length
+          ? '<span class="hint" style="color:var(--seal)">參加 '+E.active(state).length+' 人，超過座位表 '+CONFIG.SEAT_SLOTS.length+' 格，匯出前請先調整</span>'
+          : '');
 
   /* 以「桌子」為單位：每張桌子固定佔兩列，可坐 1 人或 2 人 */
   const desks = {};
@@ -1863,7 +1933,7 @@ function renderSeat(){
         + ' style="grid-column:'+col+';grid-row:1 / span 2"'
         + ' data-slot="'+primary+'"'
         + (d.slots[1] ? ' data-second="'+d.slots[1].i+'"' : '')
-        + ' draggable="'+(people.length ? 'true' : 'false')+'"'
+        + ' draggable="'+(!isTeacher() && people.length ? 'true' : 'false')+'"'
         + ' title="'+E.seatLabel(primary)+'　第 '+primary+' 格'+(names ? '　'+names : '')+'">'
         + (people.length > 1 ? '' : '<span class="no">'+E.seatLabel(primary)+'</span>')
         + (people.length
@@ -1885,7 +1955,9 @@ function renderSeat(){
     return s ? esc(s.name) + '（' + s.cls + '-' + s.seat + '）' : '';
   };
   const selCount = (selTop ? 1 : 0) + (selBot ? 1 : 0);
-  $('seatAct').innerHTML = selSlot
+  $('seatAct').innerHTML = isTeacher()
+    ? '<span class="hint">輪值教師模式：座位編排唯讀，只能查看與列印</span>'
+    : (selSlot
     ? '<span class="hint">已選 <b>'+E.seatLabel(selSlot)+'</b>'
         + (selCount
             ? '　' + (selCount > 1 ? '上：' + who(selTop) + '　下：' + who(selBot) : who(selTop || selBot))
@@ -1894,7 +1966,7 @@ function renderSeat(){
       + (selTop ? '<button class="btn seal" id="btnSeatOut">移出座位</button>' : '')
       + (selBot ? '<button class="btn" id="btnSeatOutBot">移出下方</button>' : '')
       + '<button class="btn" id="btnSeatCancel">取消選取</button>'
-    : '<span class="hint">點「尚未入座」的學生再點桌子即可入座；同一張桌子可坐兩人，前提是兩人不會同一天到；拖曳或點兩張桌子可交換</span>';
+    : '<span class="hint">點「尚未入座」的學生再點桌子即可入座；同一張桌子可坐兩人，前提是兩人不會同一天到；拖曳或點兩張桌子可交換</span>');
 
   const un = E.active(state).filter(function(s){ return issue.unseated.includes(s.key); });
   $('unseated').innerHTML = un.length
@@ -2391,7 +2463,7 @@ function noteRow(n, editable){
 }
 function dayCard(r){
   const isToday = r.date === ref();
-  const editing = isToday || ui.dutyEdit === r.date;
+  const editing = isToday || (!isTeacher() && ui.dutyEdit === r.date);
   const off = !r.school;
   const notes = dutyNotesOf(r.date);
   const nums = off ? '' : '<span>應到 <b>'+r.should+'</b></span><span>實到 <b>'+r.in+'</b></span>'
@@ -2404,8 +2476,7 @@ function dayCard(r){
     +   '<span class="dv-teach">'+(off ? (r.label||'不上課') : (r.teacher||'未排'))+'</span>'
     +   '<div class="dv-nums">'+nums+'</div>'
     +   '<div class="dv-act">'
-    +     (isToday ? '' : '<button class="btn small" data-editday="'+r.date+'">'+(editing ? '完成' : '編輯這天')+'</button>')
-    +   '</div>'
+    +   (isToday || isTeacher() ? '' : '<button class="btn small" data-editday="'+r.date+'">'+(editing ? '完成' : '編輯這天')+'</button>')
     + '</div>'
     + '<div class="dv-body">'
     +   (notes.length
@@ -2501,6 +2572,21 @@ document.addEventListener('input', e=>{
 });
 
 document.addEventListener('click', e=>{
+  /* 輪值教師：只開放點名與今天的日誌，其餘一律擋下 */
+  if(isTeacher()){
+    const blocked = e.target.closest('[data-toggle],[data-batch],[data-pickall],[data-day][data-key],[data-slot],[data-un],#btnAutoSeat,#btnClearSeat,#btnSeatOut,#btnSeatOutBot');
+    if(blocked){ toast('輪值教師模式：只能處理點名，不能改參加日期'); return; }
+  }
+  // 切換身分（只出現在輪值教師）
+  if(e.target.id==='btnSwitchRole'){
+    ROLE = 'admin';
+    localStorage.removeItem(CONFIG.ROLE_KEY);
+    CONFIG.PASSWORD = '';
+    if($('cfgPwd')) $('cfgPwd').value = '';
+    applyRole(); renderMemoState();
+    showGate('請輸入管理密語切換回管理員，或輸入教師密語繼續以教師身分使用。');
+    return;
+  }
   // 今夜點名
   if(e.target.id==='dayPrev' || e.target.id==='dayNext'){
     const d = E.parse(ref());
@@ -2588,6 +2674,8 @@ document.addEventListener('click', e=>{
   if(e.target.id==='btnReload' || e.target.closest('[data-reloadcloud]')){ reloadCloud(e.target); return; }
   if(e.target.id==='btnForgetPwd'){
     GATE.forget();
+    localStorage.removeItem(CONFIG.CLOUD_KEY);
+    localStorage.removeItem(CONFIG.ROLE_KEY);
     CONFIG.PASSWORD = '';
     if($('cfgPwd')) $('cfgPwd').value = '';
     renderMemoState();
@@ -2595,6 +2683,12 @@ document.addEventListener('click', e=>{
     return;
   }
   if(e.target.id==='btnTest'){ selfTest(); return; }
+  if(e.target.id==='btnTeacherClear'){
+    localStorage.removeItem(CONFIG.TEACHER_KEY);
+    renderMemoState();
+    toast('已清除輪值教師密語，之後只有管理密語能登入', 4200);
+    return;
+  }
   if(e.target.id==='btnImport'){ $('backupPicker').click(); return; }
 });
 
@@ -2692,6 +2786,8 @@ document.addEventListener('click', e=>{
   const dayBtn = e.target.closest('[data-editday]');
   if(dayBtn){
     const d = dayBtn.dataset.editday;
+    /* 輪值教師只能改今天的日誌，其他日子只看得到 */
+    if(isTeacher() && d !== ref()){ toast('輪值教師只能編輯今天的日誌，其他日子只能查看'); return; }
     if(ui.editNote) cancelNote(ui.editNote);
     ui.dutyEdit = (ui.dutyEdit === d) ? null : d;
     render();
@@ -2874,14 +2970,21 @@ function openStudent(key){
     + CONFIG.DAY_LABELS.map((l,i)=>'<button type="button" data-d="'+i+'" class="'+(s.days[i]?'on':'')+'">'+l+'</button>').join('')
     + '</div></div>'
     + '<div class="hint">最近異動：'+(hist.length ? hist.slice(-3).map(h=>h.date+' '+E.label(h.before)+'→'+E.label(h.after)).join('；') : '無')+'</div>';
-  const m = modal(s.cls+'-'+s.seat+'　'+esc(s.name), body,
-    '<button class="btn" data-close>取消</button><button class="btn primary" id="sSave">儲存</button>');
+  const m = modal(s.cls+'-'+s.seat+'　'+esc(s.name) + (isTeacher() ? '　（唯讀）' : ''), body,
+    '<button class="btn" data-close>關閉</button>'
+    + (isTeacher() ? '' : '<button class="btn primary" id="sSave">儲存</button>'));
   let days = s.days.slice();
   m.querySelector('#sDays').addEventListener('click', ev=>{
+    if(isTeacher()) return;
     const b = ev.target.closest('[data-d]'); if(!b) return;
     const i = Number(b.dataset.d); days[i] = days[i]?0:1; b.classList.toggle('on', !!days[i]);
   });
   m.querySelector('[data-close]').addEventListener('click', closeModal);
+  /* 輪值教師：看得到資料，但不能改 */
+  if(isTeacher()){
+    m.querySelectorAll('input,textarea,[data-d]').forEach(function(el){ el.disabled = true; });
+    return;
+  }
   m.querySelector('#sSave').addEventListener('click', ()=>{
     s.name = m.querySelector('#sName').value.trim() || s.name;
     s.phone = m.querySelector('#sPhone').value.trim();
@@ -3450,6 +3553,17 @@ function saveCfg(){
   });
   localStorage.setItem('nightstudy.gas', url);
   localStorage.setItem('nightstudy.pwd', pwd);
+  /* 管理員的雲端密語另存一份，輪值教師登入時直接沿用 */
+  if(pwd && !isTeacher()) localStorage.setItem(CONFIG.CLOUD_KEY, pwd);
+  /* 輪值教師密語只存雜湊，不保存明碼；留空表示這次不改 */
+  const tpRaw = $('cfgTeacher') ? String($('cfgTeacher').value || '').trim() : '';
+  if(tpRaw){
+    GATE.hash(tpRaw).then(function(h){
+      localStorage.setItem(CONFIG.TEACHER_KEY, h);
+      if($('cfgTeacher')) $('cfgTeacher').value = '';
+      renderMemoState();
+    });
+  }
   (async function(){
     try{
       /* 先確認密語可用：雲端有名冊而這台還是空的，就以雲端為準，避免用空白把試算表蓋掉 */
@@ -3672,8 +3786,12 @@ async function reloadCloud(btn){
 }
 async function boot(){
   CONFIG.GAS_URL = localStorage.getItem('nightstudy.gas') || CONFIG.GAS_URL || '';
-  CONFIG.PASSWORD = localStorage.getItem('nightstudy.pwd') || CONFIG.PASSWORD || '';
-  CONFIG.LOCAL_ONLY = localStorage.getItem('nightstudy.local')==='1' || !!window.__NS_LOCAL;
+  /* 身分：教師登入時只沿用管理員留在這台裝置的雲端密語，自己不保存明碼 */
+  ROLE = localStorage.getItem(CONFIG.ROLE_KEY) === 'teacher' ? 'teacher' : 'admin';
+  const cloudPwd = localStorage.getItem(CONFIG.CLOUD_KEY) || '';
+  CONFIG.PASSWORD = isTeacher()
+    ? (cloudPwd || localStorage.getItem('nightstudy.pwd') || '')
+    : (localStorage.getItem('nightstudy.pwd') || CONFIG.PASSWORD || '');
   $('cfgGas').value = CONFIG.GAS_URL;
   $('cfgPwd').value = CONFIG.PASSWORD;
 
