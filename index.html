@@ -630,7 +630,7 @@ const LIB = {
    1. CONFIG
    ===================================================================== */
 const CONFIG = {
-  VERSION: '2.13.0',
+  VERSION: '2.13.1',
   /* 已內建的 Apps Script 部署網址：第一次使用只要在設定頁填通關密語，會記在這台裝置的瀏覽器 */
   GAS_URL: 'https://script.google.com/macros/s/AKfycbxBk3fJaCrPfyojhPVgT6xNE110x3ENSGquQLVWLBz8jdNH2FgX6QMNBQKr1lHLZ8ePtw/exec',
   PASSWORD: '',
@@ -1484,11 +1484,9 @@ function renderToday(){
     + (leaveList.length
         ? leaveList.map(function(s){ return '<span>'+s.cls+s.seat+'　'+esc(s.name)+'</span>'; }).join('')
         : '<span class="none">今日無人請假</span>')
-    + '</div>'
-    + '<div class="lv"><i>本頁規則</i><span class="none">依 '+iso+' 當天生效的設定；之後才生效的異動不回寫這一天，也不會動到已記錄的點名。</span></div>';
+    + '</div>';
 
   const rows = [];
-  const changed = [];
   E.classes(state).forEach(cls=>{
     const list = E.active(state).filter(s=>s.cls===cls).sort((a,b)=>a.seat.localeCompare(b.seat));
     if(!list.length) return;
@@ -1501,7 +1499,6 @@ function renderToday(){
       const later = E.changesAfter(state, s.key, iso);
       let chgTip = '';
       if(later.length){
-        changed.push({ s:s, last:later[later.length-1] });
         chgTip = '　（'+later.map(function(e){ return e.date+' 起 '+E.label(e.days); }).join('、')+'）';
       }
       const marks = d.map((v,i)=>'<td class="d'+(i===wdIdx?' wk-hot':'')+'"><button class="mkbtn '+(v?'on':'off')+'" data-day="'+i+'" data-key="'+s.key+'" title="'+iso+' 當天：'+(v?'參加':'不參加')+' 星期'+CONFIG.DAY_LABELS[i]+chgTip+'">'
@@ -1522,14 +1519,6 @@ function renderToday(){
         + '</tr>');
     });
   });
-  if(changed.length){
-    $('todayBrief').insertAdjacentHTML('beforeend',
-      '<div class="lv"><i>之後有異動（'+changed.length+' 人，不影響 '+iso+' 這一天）</i>'
-      + changed.map(function(c){
-          return '<span>'+c.s.cls+c.s.seat+'　'+esc(c.s.name)+'　'+c.last.date+' 起 '+E.label(c.last.days)+'</span>';
-        }).join('')
-      + '</div>');
-  }
   $('roster').innerHTML = '<thead><tr><th>班級</th><th>座號</th><th>姓名</th>'
     + CONFIG.DAY_LABELS.map((l,i)=>'<th class="d'+(i===wdIdx?' wk-hot':'')+'">'+l+(i===wdIdx?'<span>'+iso.slice(5).replace('-','/')+'</span>':'')+'</th>').join('')
     + '<th class="d">今夜</th><th>備註</th></tr></thead>' + rows.join('');
