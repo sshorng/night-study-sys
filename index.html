@@ -651,7 +651,7 @@ const LIB = {
    1. CONFIG
    ===================================================================== */
 const CONFIG = {
-  VERSION: '2.16.3',
+  VERSION: '2.16.4',
   GAS_URL: 'https://script.google.com/macros/s/AKfycbxBk3fJaCrPfyojhPVgT6xNE110x3ENSGquQLVWLBz8jdNH2FgX6QMNBQKr1lHLZ8ePtw/exec',
   PASSWORD: '',
   ROLE_KEY: 'nightstudy.role',
@@ -1518,7 +1518,7 @@ function renderShell(){
   $('railSub').textContent = [shellOpts.school, shellOpts.term].filter(Boolean).join('　');
   /* 分頁標題前面加上校名，開多個分頁時一眼看得出來是哪一所 */
   const schoolName = String(shellOpts.school || '').trim();
-  const wantTitle = (schoolName ? schoolName + '　' : '') + '夜自習點名簿';
+  const wantTitle = (schoolName || '') + '夜自習點名簿';
   if(document.title !== wantTitle) document.title = wantTitle;
   renderCloudPill();
   /* 尚未設定雲端或雲端沒有名冊時，在最上方提示 */
