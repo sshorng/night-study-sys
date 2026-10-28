@@ -633,7 +633,7 @@ const LIB = {
    1. CONFIG
    ===================================================================== */
 const CONFIG = {
-  VERSION: '2.13.3',
+  VERSION: '2.14.0',
   /* 已內建的 Apps Script 部署網址：第一次使用只要在設定頁填通關密語，會記在這台裝置的瀏覽器 */
   GAS_URL: 'https://script.google.com/macros/s/AKfycbxBk3fJaCrPfyojhPVgT6xNE110x3ENSGquQLVWLBz8jdNH2FgX6QMNBQKr1lHLZ8ePtw/exec',
   PASSWORD: '',
@@ -2079,7 +2079,7 @@ function renderLeave(){
           + '<td>'+s.cls+'</td><td>'+s.seat+'</td><td>'+esc(s.name)+'</td>'
           + '<td>'+esc(l.reason||'')+'</td>'
           + '<td class="paper"><label class="pbox"><input type="checkbox" data-lvpaper="'+l.id+'" aria-label="已繳回紙本"'+(l.paper?' checked':'')+'></label></td>'
-          + '<td><button class="btn tiny" data-leavedel="'+l.id+'">刪除</button></td></tr>';
+          + '<td><button class="btn tiny" data-lvedit="'+l.id+'">編輯</button> <button class="btn tiny" data-leavedel="'+l.id+'">刪除</button></td></tr>';
       }).join('') : '<tr><td colspan="7" class="hint">目前沒有符合條件的請假紀錄</td></tr>')
     + '</tbody>';
   /* 手機版：請假紀錄用卡片 */
@@ -2093,7 +2093,7 @@ function renderLeave(){
       + '<div class="card-reason">'+esc(l.reason||'')+'</div>'
       + '<div class="card-foot">'
       +   '<label class="chk-inline"><input type="checkbox" data-lvpaper="'+l.id+'"'+(l.paper?' checked':'')+'> 已繳紙本</label>'
-      +   '<span class="card-btns"><button class="btn tiny" data-leavedel="'+l.id+'">刪除</button></span>'
+      +   '<span class="card-btns"><button class="btn tiny" data-lvedit="'+l.id+'">編輯</button><button class="btn tiny" data-leavedel="'+l.id+'">刪除</button></span>'
       + '</div></div>';
   }).join('') : '<p class="hint">目前沒有符合條件的請假紀錄</p>';
 }
@@ -2146,6 +2146,64 @@ function deleteLeave(id){
   if(!confirm('刪除 '+l.date+' 的請假紀錄？')) return;
   state.leaves = state.leaves.filter(function(x){ return x.id!==id; });
   commit(); toast('已刪除請假紀錄');
+}
+
+/* 編輯既有請假紀錄：日期、事由、是否已繳紙本 */
+function openLeaveEdit(id){
+  const l = (state.leaves||[]).find(function(x){ return x.id===id; });
+  if(!l) return;
+  const s = E.byKey(state, l.key) || { cls:'', seat:'', name:l.key };
+  const body = '<div class="hint" style="margin:0 0 4px">'+s.cls+'-'+s.seat+'　'+esc(s.name)+'</div>'
+    + '<div class="field"><label>日期</label><input type="date" id="lveDate" value="'+l.date+'"></div>'
+    + '<div class="field"><label>事由</label><input id="lveWhy" list="lveWhyDL" value="'+esc(l.reason||'')+'">'
+    + dlOptions('lveWhyDL', E.optList(state,'leaveReasons'))+'</div>'
+    + '<label class="chk"><input type="checkbox" id="lvePaper"'+(l.paper?' checked':'')+'> 已繳回紙本</label>';
+  const m = modal('編輯請假', body, '<button class="btn" data-close>取消</button><button class="btn primary" id="lveSave">儲存</button>');
+  m.querySelector('[data-close]').addEventListener('click', closeModal);
+  m.querySelector('#lveSave').addEventListener('click', function(){
+    const date = m.querySelector('#lveDate').value;
+    const why = m.querySelector('#lveWhy').value.trim() || '請假';
+    const paper = m.querySelector('#lvePaper').checked;
+    if(!date){ toast('請選日期'); return; }
+    const dup = (state.leaves||[]).some(function(x){ return x.id!==id && x.key===l.key && x.date===date; });
+    if(dup){ toast('這一天已經有請假紀錄了', 3600); return; }
+    l.date = date; l.reason = why; l.paper = paper;
+    state.checkins = (state.checkins||[]).filter(function(c){ return !(c.key===l.key && c.date===date); });
+    closeModal();
+    commit();
+    toast('已更新請假紀錄', 2600);
+  });
+}
+
+/* 點名單按到「假」時先問事由，確定才寫入請假紀錄 */
+function openLeaveReason(key, iso){
+  const s = E.byKey(state, key) || { cls:'', seat:'', name:key };
+  const chips = E.optList(state,'leaveReasons').map(function(v){
+    return '<button type="button" class="btn small" data-lvreason="'+esc(v)+'">'+esc(v)+'</button>';
+  }).join(' ');
+  const body = '<div class="hint" style="margin:0 0 4px">'+s.cls+'-'+s.seat+'　'+esc(s.name)
+      + '　'+iso+'（'+CONFIG.WEEKDAY[E.wd(iso)]+'）</div>'
+    + '<div class="field"><label>請假事由</label><input id="lvrWhy" list="lvrWhyDL" placeholder="例如：家長請假、身體不適">'
+    + dlOptions('lvrWhyDL', E.optList(state,'leaveReasons'))+'</div>'
+    + (chips ? '<div class="tools" style="flex-wrap:wrap">'+chips+'</div>' : '');
+  const m = modal('標記請假', body, '<button class="btn" data-close>取消</button><button class="btn primary" id="lvrSave">確定請假</button>');
+  m.querySelector('[data-close]').addEventListener('click', closeModal);
+  Array.prototype.forEach.call(m.querySelectorAll('[data-lvreason]'), function(b){
+    b.addEventListener('click', function(){
+      const inp = m.querySelector('#lvrWhy');
+      inp.value = b.dataset.lvreason;
+      inp.focus();
+    });
+  });
+  setTimeout(function(){ try{ m.querySelector('#lvrWhy').focus(); }catch(err){} }, 60);
+  m.querySelector('#lvrSave').addEventListener('click', function(){
+    const why = m.querySelector('#lvrWhy').value.trim() || '請假';
+    state.checkins = (state.checkins||[]).filter(function(c){ return !(c.key===key && c.date===iso); });
+    state.leaves.push({ id:newId('l'), key:key, date:iso, reason:why });
+    closeModal();
+    commit();
+    toast('已標記請假：'+why, 2600);
+  });
 }
 
 function renderVio(){
@@ -2694,15 +2752,18 @@ function toggleCheckin(key){
   const leave = (state.leaves||[]).find(l=>l.key===key && l.date===iso);
   const c = state.checkins.find(x=>x.key===key && x.date===iso);
   if(leave){
+    /* 目前是假：點一下取消請假（點名紀錄一起清掉） */
     state.leaves = state.leaves.filter(l=>l!==leave);
     state.checkins = state.checkins.filter(x=>!(x.key===key && x.date===iso));
+    commit();
   } else if(!c){
+    /* 未 → 到 */
     state.checkins.push({ date:iso, key, status:'到' });
+    commit();
   } else {
-    state.checkins = state.checkins.filter(x=>x!==c);
-    state.leaves.push({ id:'l'+Date.now(), key, date:iso, reason:'當日請假' });
+    /* 到 → 假：先問事由，確定才寫入 */
+    openLeaveReason(key, iso);
   }
-  commit();
 }
 function autoSeat(){
   const list = E.active(state).slice().sort((a,b)=> a.cls-b.cls || a.seat.localeCompare(b.seat));
@@ -3645,6 +3706,8 @@ document.addEventListener('drop', e=>{
 document.addEventListener('click', e=>{
   if(e.target.id==='btnAddLeave'){ openLeaveNew(); return; }
   const del = e.target.closest('[data-leavedel]');
+  const lve = e.target.closest('[data-lvedit]');
+  if(lve){ openLeaveEdit(lve.dataset.lvedit); return; }
   if(del){ deleteLeave(del.dataset.leavedel); return; }
   const lvf = e.target.closest('[data-lvf]');
   if(lvf){ ui.lvFilter = lvf.dataset.lvf; renderLeave(); return; }
