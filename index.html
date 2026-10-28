@@ -592,7 +592,7 @@ body.gated .sheet{opacity:.28;pointer-events:none;user-select:none}
    1. CONFIG
    ===================================================================== */
 const CONFIG = {
-  VERSION: '2.2.0',
+  VERSION: '2.3.0',
   /* 已內建的 Apps Script 部署網址：第一次使用只要在設定頁填通關密語，會記在這台裝置的瀏覽器 */
   GAS_URL: 'https://script.google.com/macros/s/AKfycbxBk3fJaCrPfyojhPVgT6xNE110x3ENSGquQLVWLBz8jdNH2FgX6QMNBQKr1lHLZ8ePtw/exec',
   PASSWORD: '',
@@ -2772,92 +2772,82 @@ async function cleanXlsxParts(buf){
 
 async function exportXlsx(){
   try{
+    /* 讀範本（10 張表都保留）：範本必須是 Excel 自己存過的版本，轉存後 Excel 才打得開 */
+    const tpl = await API.template('roster');
     const ExcelJS = window.ExcelJS;
     const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(tpl);
     const iso = ref();
     const mat = E.matrix(state, iso);
 
-    /* 總表：各班五天人數（整份自己產生，不再轉存範本檔，避免 Excel 判定檔案損毀） */
-    const wsT = wb.addWorksheet('總表', { views:[{state:'frozen',ySplit:2}] });
-    const tHead = ['班級','總數','一','二','三','四','五','參加人數','不參加人數'];
-    [10,8,7,7,7,7,7,11,12].forEach((w,i)=>{ wsT.getColumn(i+1).width=w; });
-    wsT.mergeCells(1,1,1,tHead.length);
-    wsT.getCell(1,1).value = (state.meta.term||'')+'　夜自習各班參加人數（'+iso+' 基準）';
-    wsT.getCell(1,1).font = { name:'標楷體', size:14, bold:true };
-    wsT.getCell(1,1).alignment = { horizontal:'center', vertical:'middle' };
-    wsT.getRow(1).height = 26;
-    tHead.forEach((h,i)=>{
-      const c = wsT.getCell(2,i+1);
-      c.value=h; c.font={name:'標楷體',size:12,bold:true};
-      c.alignment={horizontal:'center',vertical:'middle'};
-      c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFEFEDE6'}};
-      c.border=borderAll();
-    });
-    const dayTotals = [0,0,0,0,0];
-    mat.rows.forEach((r,i)=>{
-      for(let d=0; d<5; d++) dayTotals[d] += r.per[d];
-      const vals = [r.cls, r.total, r.per[0], r.per[1], r.per[2], r.per[3], r.per[4], r.joined, r.notJoined];
-      vals.forEach((v,ci)=>{
-        const c = wsT.getCell(i+3, ci+1);
-        c.value=v; c.font={name:'標楷體',size:12};
-        c.alignment={horizontal:'center',vertical:'middle'};
-        c.border=borderAll();
+    /* 總表：只把數字填進範本既有的格位，欄寬、框線、字型全部沿用 */
+    const wsT = wb.getWorksheet('總表');
+    if(wsT){
+      mat.rows.forEach(function(r){
+        for(let row=2; row<=12; row++){
+          if(Number(wsT.getCell(row,1).value)===Number(r.cls)){
+            wsT.getCell(row,2).value = r.total;
+            for(let i=0;i<5;i++) wsT.getCell(row,3+i).value = r.per[i];
+            wsT.getCell(row,8).value = r.joined;
+            wsT.getCell(row,9).value = r.notJoined;
+    const widths = [6,8,7,12,6,6,6,6,6,7,15,10,8,28];
+          }
+        }
       });
-    });
-    const tSum = mat.rows.length+3;
-    wsT.getCell(tSum,1).value='合計';
-    wsT.mergeCells(tSum,1,tSum,2);
-    const sumVals = [mat.total, dayTotals[0], dayTotals[1], dayTotals[2], dayTotals[3], dayTotals[4], mat.joined, mat.notJoined];
-    for(let ci=0; ci<sumVals.length; ci++){
-      const c = wsT.getCell(tSum, ci+3);
-      c.value = sumVals[ci];
-      c.alignment={horizontal:'center',vertical:'middle'};
     }
-    for(let c=1; c<=tHead.length; c++){
-      const cell = wsT.getCell(tSum,c);
-      cell.font={name:'標楷體',size:12,bold:true};
-      cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFF6F1E4'}};
-      cell.border=borderAll();
-    }
-    wsT.pageSetup = { paperSize:9, orientation:'landscape', fitToPage:true, fitToWidth:1, fitToHeight:0 };
 
-    /* 參加天數及電話：全班名單、五天勾選、電話與便當 */
-    const wsP = wb.addWorksheet('參加天數及電話', { views:[{state:'frozen',ySplit:2}] });
+    /* 名單（自動產生）：每次重新產生一份乾淨表格，不動範本裡原有那張手寫表 */
+    const SHEET = '名單（自動產生）';
+    const oldSheet = wb.getWorksheet(SHEET);
+    if(oldSheet) wb.removeWorksheet(oldSheet.id);
+    const wsP = wb.addWorksheet(SHEET, { views:[{state:'frozen',ySplit:2}] });
     const head = ['序號','班級','座號','姓名','一','二','三','四','五','天數','電話','家長輪值','便當','備註'];
-    [6,8,7,10,5,5,5,5,5,7,15,10,8,26].forEach((w,i)=>{ wsP.getColumn(i+1).width=w; });
-    wsP.mergeCells(1,1,1,head.length);
-    wsP.getCell(1,1).value = (state.meta.term||'')+'　夜自習參加天數及聯絡資料（'+iso+' 基準）';
-    wsP.getCell(1,1).font = { name:'標楷體', size:14, bold:true };
-    wsP.getCell(1,1).alignment = { horizontal:'center' };
-    head.forEach((h,i)=>{
-      const c = wsP.getCell(2,i+1);
-      c.value=h; c.font={name:'標楷體',size:12,bold:true};
-      c.alignment={horizontal:'center',vertical:'middle'};
-      c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFEFEDE6'}};
-      c.border=borderAll();
-    });
+    const widths = [6,8,7,12,4.5,4.5,4.5,4.5,4.5,7,15,10,8,28];
+    widths.forEach(function(w,i){ wsP.getColumn(i+1).width = w; });
     const rows = E.seatRows(state);
-    rows.forEach((r,i)=>{
+    wsP.mergeCells(1,1,1,head.length);
+    wsP.getCell(1,1).value = (state.meta.term||'')+'　夜自習名單（'+iso+' 基準，共 '+rows.length+' 人）';
+    wsP.getCell(1,1).font = { name:'標楷體', size:14, bold:true };
+    wsP.getCell(1,1).alignment = { horizontal:'center', vertical:'middle' };
+    wsP.getRow(1).height = 26;
+    head.forEach(function(h,i){
+      const c = wsP.getCell(2,i+1);
+      c.value = h;
+      c.font = { name:'標楷體', size:11, bold:true };
+      c.alignment = { horizontal:'center', vertical:'middle', wrapText:true };
+      c.fill = { type:'pattern', pattern:'solid', fgColor:{ argb:'FFEDE6D6' } };
+      c.border = borderAll();
+    });
+    wsP.getRow(2).height = 22;
+    rows.forEach(function(r,i){
       const s = E.byKey(state,r.key)||{};
       const vals = [i+1, r.cls, r.seat, r.name].concat(r.days)
         .concat([r.days.reduce((a,b)=>a+b,0), s.phone||'', s.parentDuty?'V':'', s.lunch||'', s.note||'']);
-      vals.forEach((v,ci)=>{
+      vals.forEach(function(v,ci){
         const c = wsP.getCell(i+3, ci+1);
-        c.value=v; c.font={name:'標楷體',size:12};
-        c.alignment={horizontal:(ci===3||ci===13)?'left':'center',vertical:'middle'};
-        c.border=borderAll();
+        c.value = v;
+        c.font = { name:'標楷體', size:11 };
+        c.alignment = { horizontal:(ci===3||ci===10||ci===13)?'left':'center', vertical:'middle' };
+        c.border = borderAll();
       });
     });
     const sumRow = rows.length+3;
-    wsP.getCell(sumRow,1).value='每日合計';
+    wsP.getCell(sumRow,1).value = '每日合計';
     wsP.mergeCells(sumRow,1,sumRow,4);
     for(let i=0;i<5;i++){
-      const c = wsP.getCell(sumRow,5+i);
-      c.value = rows.reduce((a,r)=>a+r.days[i],0);
-      c.alignment={horizontal:'center'}; c.font={name:'標楷體',size:12,bold:true};
+      wsP.getCell(sumRow,5+i).value = rows.reduce(function(a,r){ return a+r.days[i]; },0);
     }
-    for(let c=1;c<=head.length;c++) wsP.getCell(sumRow,c).border=borderAll();
-    wsP.pageSetup = { paperSize:9, orientation:'landscape', fitToPage:true, fitToWidth:1, fitToHeight:0 };
+    wsP.getCell(sumRow,10).value = rows.reduce(function(a,r){ return a+r.days.reduce(function(x,y){ return x+y; },0); },0);
+    for(let c=1; c<=head.length; c++){
+      const cell = wsP.getCell(sumRow,c);
+      cell.font = { name:'標楷體', size:11, bold:true };
+      cell.alignment = { horizontal:'center', vertical:'middle' };
+      cell.fill = { type:'pattern', pattern:'solid', fgColor:{ argb:'FFF6F1E4' } };
+      cell.border = borderAll();
+    }
+    wsP.pageSetup = { paperSize:9, orientation:'landscape', fitToPage:true, fitToWidth:1, fitToHeight:0,
+      printTitlesRow:'1:2', horizontalCentered:true,
+      margins:{ left:0.4, right:0.4, top:0.5, bottom:0.5, header:0.2, footer:0.2 } };
 
     wb.calcProperties = { fullCalcOnLoad:true };
     const raw = await wb.xlsx.writeBuffer();
