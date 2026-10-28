@@ -2,8 +2,16 @@
 
 一份名單，四張表。改一個學生的參加時間，總表、電話表、座位表、違規單一次同步。
 
+- 線上版本（GitHub Pages）：https://sshorng.github.io/night-study-sys/
 - 主程式：`index.html`（單檔，雙擊可用）
 - 雲端後端：`Code.gs`（Google Apps Script，選用）
+
+## v6 更新（改成公開網址）
+
+- 倉庫改為公開，並開啟 GitHub Pages，網址 https://sshorng.github.io/night-study-sys/ 直接可用，不必再本機開伺服器
+- 公開前已掃過整個 git 歷史（2 筆提交、全部檔案內容）：沒有任何學生姓名、電話、學號或教師姓名；程式裡也沒有 Apps Script 網址與通關密語
+- 範本用相對路徑 `templates/` 讀取，在 Pages 上會自動就緒，匯出可直接用
+- 任何人打開這個網址只會看到空白狀態，要接上自己的試算表（設定頁填網址與密語）才會有資料
 
 ## v5 更新（可調參數集中到試算表「設定」工作表）
 
