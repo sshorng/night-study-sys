@@ -2488,16 +2488,16 @@ function richHtml(text){
     return '<span class="stu-tag" data-tag="'+a+'-'+b+'">'+esc(s.cls+'-'+s.seat+' '+s.name)+'</span>';
   });
 }
-/* 時間統一二十四小時制：7:50 視為 19:50、19:50 原樣、12:00 保持 12:00 */
+/* 時間一律二十四小時制：只把格式補成 HH:MM（7:50 變 07:50），不再自作主張換算上下午 */
 function twentyFour(t){
   const s = String(t==null ? '' : t).trim();
-  const m = s.match(/^(\d{1,2}):(\d{2})$/);
+  const m = s.match(/^(\d{1,2})[:：](\d{1,2})$/);
   if(!m) return s;
-  let h = Number(m[1]);
-  if(!isFinite(h)) return s;
-  if(h < 12) h += 12;
+  let h = Number(m[1]), mi = Number(m[2]);
+  if(!isFinite(h) || !isFinite(mi)) return s;
   if(h > 23) h = 23;
-  return (h < 10 ? '0' + h : String(h)) + ':' + m[2];
+  if(mi > 59) mi = 59;
+  return (h < 10 ? '0' + h : String(h)) + ':' + (mi < 10 ? '0' + mi : String(mi));
 }
 /* 記事裡的「907-27 王小明」只是標記用，帶進違規事由時要拿掉，不然事由會重複班級座號與姓名 */
 function stripStuPrefix(text, key, name){
