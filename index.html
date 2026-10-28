@@ -158,6 +158,8 @@ input,select,textarea{font-family:inherit;font-size:14px}
 #printArea .sm+.sm{border-top:.5pt dashed #000;margin-top:1mm;padding-top:1mm}
 .chips{display:flex;gap:6px;flex-wrap:wrap}
 .chip{border:1px solid var(--rule);background:var(--card);border-radius:999px;padding:4px 12px;min-height:44px;display:inline-flex;align-items:center;font-size:12px;cursor:pointer}
+.optprev{margin-top:6px;line-height:2}
+.optprev .pill{margin:0 4px 0 0}
 .chip.sel{background:var(--seal);border-color:var(--seal);color:#FBF1EC}
 
 /* ---------- 異動日誌 ---------- */
@@ -631,7 +633,7 @@ const LIB = {
    1. CONFIG
    ===================================================================== */
 const CONFIG = {
-  VERSION: '2.13.2',
+  VERSION: '2.13.3',
   /* 已內建的 Apps Script 部署網址：第一次使用只要在設定頁填通關密語，會記在這台裝置的瀏覽器 */
   GAS_URL: 'https://script.google.com/macros/s/AKfycbxBk3fJaCrPfyojhPVgT6xNE110x3ENSGquQLVWLBz8jdNH2FgX6QMNBQKr1lHLZ8ePtw/exec',
   PASSWORD: '',
@@ -669,14 +671,17 @@ const OPTS = [
   { key:'vioLimit',     label:'退班點數門檻',     def:'3',     type:'number', min:1, max:9,
     hint:'累積達這個點數就標示「依規定退班」' },
   { key:'vioReasons',   label:'違規事由常用清單', def:'滑手機、聊天喧譁、趴睡、未帶作業、離開座位', type:'text',
-    hint:'以頓號分隔，新增違規時可一鍵填入' },
+    hint:'以頓號分隔；句子裡的逗號不會被切開，新增違規時可一鍵填入' },
   { key:'leaveReasons', label:'請假事由常用清單', def:'事假、病假、家庭因素、公假、臨時就醫', type:'text',
-    hint:'以頓號分隔，新增請假時可從清單挑' },
+    hint:'以頓號分隔；句子裡的逗號不會被切開，新增請假時可從清單挑' },
   { key:'lunchOptions', label:'便當選項',         def:'葷、素、不訂', type:'text',
     hint:'以頓號分隔，編輯學生時可從清單挑' },
   { key:'exportPrefix', label:'匯出檔名前綴',     def:'夜自習', type:'text',
     hint:'下載的檔案會是「前綴_座位表_日期.docx」' }
 ];
+
+/* 這三個參數是「常用清單」，設定頁會即時預覽會切成幾個按鈕 */
+const LIST_OPT_KEYS = ['vioReasons','leaveReasons','lunchOptions'];
 
 /* =====================================================================
    2. STATE
@@ -732,8 +737,9 @@ const E = {
     if(isFinite(n) && n > 0) return n;
     return Number(d ? d.def : 1) || 1;
   },
+  /* 常用清單只認頓號：像「打瞌睡，多次提醒」這種句子裡的逗號不會被切成兩個按鈕 */
   optList(st,key){
-    return String(E.opt(st,key)||'').split(/[、,，;；]/)
+    return String(E.opt(st,key)||'').split('、')
       .map(function(s){ return s.trim(); }).filter(Boolean);
   },
   parse(iso){ const [y,m,d]=iso.split('-').map(Number); return new Date(y,m-1,d); },
@@ -2329,9 +2335,24 @@ function renderConfig(){
     const input = d.type==='number'
       ? '<input type="number" data-opt="'+d.key+'" min="'+(d.min||1)+'" max="'+(d.max||999)+'" step="1" value="'+val+'">'
       : '<input data-opt="'+d.key+'" value="'+val+'">';
+    const prev = LIST_OPT_KEYS.indexOf(d.key) >= 0 ? '<div class="optprev" data-prev="'+d.key+'"></div>' : '';
     return '<div class="field" style="margin-bottom:10px"><label>'+esc(d.label)+'</label>'+input
-      + '<p class="hint" style="margin:2px 0 0">'+esc(d.hint)+'</p></div>';
+      + '<p class="hint" style="margin:2px 0 0">'+esc(d.hint)+'</p>'+prev+'</div>';
   }).join('');
+  refreshOptPreviews();
+}
+
+/* 常用清單即時預覽：一眼看出會被切成幾個按鈕 */
+function refreshOptPreviews(){
+  Array.prototype.forEach.call(document.querySelectorAll('[data-prev]'), function(box){
+    const input = document.querySelector('[data-opt="'+box.dataset.prev+'"]');
+    const list = String(input ? input.value : '').split('、')
+      .map(function(s){ return s.trim(); }).filter(Boolean);
+    box.innerHTML = list.length
+      ? '<span class="hint">會變成 '+list.length+' 個按鈕：</span> '
+        + list.map(function(v){ return '<span class="pill">'+esc(v)+'</span>'; }).join(' ')
+      : '<span class="hint">目前沒有項目</span>';
+  });
 }
 
 function render(){
@@ -3647,6 +3668,11 @@ document.addEventListener('click', e=>{
 });
 document.addEventListener('input', e=>{
   if(e.target.id==='rosterQ'){ ui.q = e.target.value; renderListBody(); }
+});
+
+/* 設定頁的常用清單：邊打字邊預覽會變成幾個按鈕（只認頓號，逗號不切） */
+document.addEventListener('input', e=>{
+  if(e.target && e.target.dataset && e.target.dataset.opt) refreshOptPreviews();
 });
 
 /* 有修改還在傳（或雲端沒載入）就離開頁面時提醒一下，避免資料沒寫進試算表 */
