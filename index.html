@@ -729,7 +729,7 @@ const LIB = {
    1. CONFIG
    ===================================================================== */
 const CONFIG = {
-  VERSION: '2.16.10',
+  VERSION: '2.16.11',
   GAS_URL: 'https://script.google.com/macros/s/AKfycbxBk3fJaCrPfyojhPVgT6xNE110x3ENSGquQLVWLBz8jdNH2FgX6QMNBQKr1lHLZ8ePtw/exec',
   PASSWORD: '',
   ROLE_KEY: 'nightstudy.role',
@@ -773,8 +773,8 @@ const OPTS = [
     hint:'例：115學年度第1學期，會印在座位表與 Excel 表頭' },
   { key:'vioLimit',     label:'退班點數門檻',     def:'3',     type:'number', min:1, max:9,
     hint:'累積達這個點數就標示「依規定退班」' },
-  { key:'vioReasons',   label:'違規事由常用清單', def:'滑手機、聊天喧譁、趴睡、未帶作業、離開座位', type:'text',
-    hint:'以頓號分隔；句子裡的逗號不會被切開，新增違規時可一鍵填入' },
+  { key:'vioReasons',   label:'違規事由常用清單', def:'滑手機；聊天喧譁；趴睡；未帶作業；離開座位', type:'text',
+    hint:'以分號分隔；句子裡的逗號不會被切開，新增違規時可一鍵填入' },
   { key:'leaveReasons', label:'請假事由常用清單', def:'事假、病假、家庭因素、公假、臨時就醫', type:'text',
     hint:'以頓號分隔；句子裡的逗號不會被切開，新增請假時可從清單挑' },
   { key:'lunchOptions', label:'便當選項',         def:'葷、素、不訂', type:'text',
@@ -844,9 +844,9 @@ const E = {
     if(isFinite(n) && n > 0) return n;
     return Number(d ? d.def : 1) || 1;
   },
-  /* 常用清單只認頓號：像「打瞌睡，多次提醒」這種句子裡的逗號不會被切成兩個按鈕 */
+  /* 常用清單的項目分隔用頓號或分號：像「打瞌睡，多次提醒」這種句子裡的逗號不會被切成兩個按鈕 */
   optList(st,key){
-    return String(E.opt(st,key)||'').split('、')
+    return String(E.opt(st,key)||'').split(/[、；]/)
       .map(function(s){ return s.trim(); }).filter(Boolean);
   },
   parse(iso){ const [y,m,d]=iso.split('-').map(Number); return new Date(y,m-1,d); },
@@ -2729,7 +2729,7 @@ function renderConfig(){
 function refreshOptPreviews(){
   Array.prototype.forEach.call(document.querySelectorAll('[data-prev]'), function(box){
     const input = document.querySelector('[data-opt="'+box.dataset.prev+'"]');
-    const list = String(input ? input.value : '').split('、')
+    const list = String(input ? input.value : '').split(/[、；]/)
       .map(function(s){ return s.trim(); }).filter(Boolean);
     box.innerHTML = list.length
       ? '<span class="hint">會變成 '+list.length+' 個按鈕：</span> '
@@ -3340,7 +3340,7 @@ function openVioForm(id, pre){
     + '<div class="field"><label>事由</label><textarea id="vr" rows="3" placeholder="例如：夜自習期間違規（打瞌睡，多次提醒）"></textarea>'
     + (chips ? '<div class="tools" style="margin-top:6px;flex-wrap:wrap">'+chips+'</div>' : '')
     + '</div>'
-    + '<p class="hint">點上面的常用事由可快速填入；列印與下載時會自動在事由後面加上「（記O點）」。</p>';
+    + '<p class="hint">列印與下載時會自動在事由後面加上「（記O點）」。</p>';
   const m = modal(rec ? '編輯違規紀錄' : '新增違規紀錄', body,
     '<button class="btn" data-close>取消</button><button class="btn primary" id="vSave">儲存</button>');
   m.querySelector('#vr').value = rec ? (rec.reason || '') : (pre.reason || '');
