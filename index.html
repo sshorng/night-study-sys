@@ -155,7 +155,6 @@ input,select,textarea{font-family:inherit;font-size:14px}
 .chip.un .un-days{font-family:var(--mono);font-size:10px;letter-spacing:1.5px;color:var(--ink-3)}
 .chip.un.sel .un-days{color:#FBF1EC}
 #printArea .sm+.sm{border-top:.5pt dashed #000;margin-top:1mm;padding-top:1mm}
-#printArea .sg{font-size:7pt;line-height:1.2}
 .chips{display:flex;gap:6px;flex-wrap:wrap}
 .chip{border:1px solid var(--rule);background:var(--card);border-radius:999px;padding:4px 12px;min-height:44px;display:inline-flex;align-items:center;font-size:12px;cursor:pointer}
 .chip.sel{background:var(--seal);border-color:var(--seal);color:#FBF1EC}
@@ -630,7 +629,7 @@ const LIB = {
    1. CONFIG
    ===================================================================== */
 const CONFIG = {
-  VERSION: '2.10.1',
+  VERSION: '2.10.2',
   /* 已內建的 Apps Script 部署網址：第一次使用只要在設定頁填通關密語，會記在這台裝置的瀏覽器 */
   GAS_URL: 'https://script.google.com/macros/s/AKfycbxBk3fJaCrPfyojhPVgT6xNE110x3ENSGquQLVWLBz8jdNH2FgX6QMNBQKr1lHLZ8ePtw/exec',
   PASSWORD: '',
@@ -879,12 +878,13 @@ const E = {
     for(let i=0;i<5;i++) if(x[i] && y[i]) return true;
     return false;
   },
-  /* 匯出用：同一格若有上下兩位，兩份座位卡中間加一條分隔 */
+  /* 匯出用：一格只有一位就是那張座位卡，不加「上／下」字樣；
+     一格擠兩位（上下）才分成上下兩段，兩段之間留一個空行。 */
   seatCell(st,i){
     const keys = E.seatKeys(st,i);
     if(!keys.length) return '';
-    if(keys.length === 1) return E.seatCard(st, keys[0]);
-    return '─── 上 ───\n' + E.seatCard(st, keys[0]) + '\n─── 下 ───\n' + E.seatCard(st, keys[1]);
+    const cards = keys.map(function(k){ return E.seatCard(st, k); });
+    return cards.join('\n\n');
   },
   seatIssue(st){
     const used={}, dup=[];
@@ -2919,10 +2919,9 @@ function printSeat(){
       const botKey = deskBotKey(primary);
       const keys = [topKey, botKey].filter(Boolean);
       const inner = keys.length
-        ? keys.map(function(k, ki){
+        ? keys.map(function(k){
             const s = E.byKey(state,k);
             return '<div class="sm">'
-              + (keys.length > 1 ? '<div class="sg">'+(ki ? '下' : '上')+'</div>' : '')
               + '<div>'+dayLine+'</div>'
               + '<div>'+E.daysNow(state,k).map(function(v){ return v?'■':'□'; }).join('')+s.cls+s.seat+'</div>'
               + '<div>'+esc(s.name)+'</div>'
