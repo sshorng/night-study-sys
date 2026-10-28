@@ -593,7 +593,7 @@ body.gated .sheet{opacity:.28;pointer-events:none;user-select:none}
    1. CONFIG
    ===================================================================== */
 const CONFIG = {
-  VERSION: '2.5.0',
+  VERSION: '2.6.0',
   /* 已內建的 Apps Script 部署網址：第一次使用只要在設定頁填通關密語，會記在這台裝置的瀏覽器 */
   GAS_URL: 'https://script.google.com/macros/s/AKfycbxBk3fJaCrPfyojhPVgT6xNE110x3ENSGquQLVWLBz8jdNH2FgX6QMNBQKr1lHLZ8ePtw/exec',
   PASSWORD: '',
@@ -638,6 +638,8 @@ let state = {
   seats:{}, seatPair:{}, duty:[], conflicts:[]
 };
 let dirty = false;
+/* 雲端狀態：loaded 這次成功載入過；authoritative 目前畫面就是雲端那份；pending 有修改還沒上傳 */
+const cloud = { loaded:false, authoritative:false, pending:false, noticed:false, failed:false };
 let ui = { tab:'today', sel:null, vioSel:new Set(), weekRef:'', cls:'all',
   rcls:0, q:'', show:'in', pick:new Set(), lvFilter:'all', editNote:null, noteDraft:null, dutyEdit:null };
 
@@ -913,12 +915,27 @@ const API = {
   async load(){
     if(!API.reachable()){ return { ok:false }; }
     const json = await API.call({ action:'loadAll' });
+    cloud.loaded = true;
+    cloud.failed = false;
     return { ok:true, state: json.state };
   },
-  async save(){
+  /* 存檔：本機一律存；雲端只在這次確認過雲端版本之後才寫，避免用預設資料蓋掉試算表 */
+  async save(force){
     localStorage.setItem(CONFIG.STORE_KEY, JSON.stringify(state));
-    if(!API.reachable()) return;
-    await API.call({ action:'saveAll', state });
+    if(!API.reachable()) return { local:true };
+    if(!force && !cloud.authoritative){
+      cloud.pending = true;
+      try{ localStorage.setItem('nightstudy.pendingbak', JSON.stringify(state)); }catch(err){}
+      if(!cloud.noticed){
+        cloud.noticed = true;
+        toast('雲端資料還沒載入完成，這次先只存本機，不會覆蓋試算表；載入完成後會自動補存', 6000);
+      }
+      return { pending:true };
+    }
+    const r = await API.call({ action:'saveAll', state });
+    cloud.pending = false;
+    try{ localStorage.removeItem('nightstudy.pendingbak'); }catch(err){}
+    return r;
   },
   /* 範本優先讀專案內的 templates/ 相對路徑，讀不到才退回雲端範本 */
   async template(name){
@@ -1155,12 +1172,17 @@ function renderShell(){
   $('topMeta').textContent = iso + '（星期' + CONFIG.WEEKDAY[E.wd(iso)] + '）' + (E.calLabel(state,iso) ? '　'+E.calLabel(state,iso) : '');
   const shellOpts = E.optsOf(state);
   $('railSub').textContent = [shellOpts.school, shellOpts.term].filter(Boolean).join('　');
-  $('topRight').innerHTML = '<span class="pill '+(API.isCloud()?'ok':'')+'">'+(API.isCloud()?'雲端模式':'本機模式')+'</span>';
+  const pillText = !API.isCloud() ? '本機模式'
+    : (cloud.authoritative ? '雲端模式' : (cloud.failed ? '無法連上雲端' : (CONFIG.PASSWORD ? '雲端載入中…' : '雲端未連線')));
+  const pillCls = (API.isCloud() && cloud.authoritative) ? 'ok' : '';
+  $('topRight').innerHTML = '<span class="pill '+pillCls+'">'+pillText+'</span>';
   /* 尚未設定雲端或雲端沒有名冊時，在最上方提示 */
   const setupBar = $('setupBar');
   if(setupBar){
     let msg = '';
     if(!API.isCloud()) msg = '目前是本機模式（只在這台電腦）：資料不會同步到試算表。要接回雲端請到「設定與檢查」取消本機模式。';
+    else if(CONFIG.PASSWORD && cloud.failed) msg = '連不上雲端試算表，目前顯示這台裝置的資料：修改只會存在本機，不會覆蓋試算表。要以本機為準上傳，請按「設定與檢查」的「儲存設定」。';
+    else if(CONFIG.PASSWORD && !cloud.authoritative) msg = '正在讀取雲端試算表：這段時間的修改只會先存在這台裝置，載入完成才上傳，不會蓋掉試算表。';
     else if(!CONFIG.PASSWORD) msg = 'Apps Script 網址已內建，還缺通關密語：請到「設定與檢查」輸入密語，按「儲存設定」就會開始讀取試算表。';
     else if(!state.students.length) msg = '試算表目前沒有名冊資料：請先在「名單」工作表建立，或到「設定與檢查」按「從雲端重新載入」。';
     setupBar.hidden = !msg;
@@ -2162,7 +2184,22 @@ document.addEventListener('click', e=>{
   if(e.target.id==='expBackup'){ download(new Blob([JSON.stringify(state,null,1)],{type:'application/json'}), '夜自習備份_'+stamp()+'.json'); return; }
   // 設定
   if(e.target.id==='btnSaveCfg'){ saveCfg(); return; }
-  if(e.target.id==='btnReload'){ API.load().then(function(r){ if(r.ok && r.state){ state = r.state; dirty = false; normalize(); render(); toast('已重新載入雲端資料'); } else { toast('雲端沒有資料，或目前是本機模式'); } }).catch(err=>toast('載入失敗：'+err.message)); return; }
+  if(e.target.id==='btnReload'){
+    API.load().then(function(r){
+      if(r.ok && r.state && r.state.students && r.state.students.length){
+        state = r.state; dirty = false; normalize(); syncToday(); render();
+        cloud.authoritative = true; cloud.pending = false;
+        try{ localStorage.removeItem('nightstudy.pendingbak'); }catch(err){}
+        localStorage.setItem(CONFIG.STORE_KEY, JSON.stringify(state));
+        toast('已重新載入雲端資料');
+      }else if(r.ok){
+        toast('雲端目前沒有名冊，本機資料保留不動', 5200);
+      }else{
+        toast('雲端沒有資料，或目前是本機模式');
+      }
+    }).catch(err=>toast('載入失敗：'+err.message));
+    return;
+  }
   if(e.target.id==='btnForgetPwd'){
     GATE.forget();
     CONFIG.PASSWORD = '';
@@ -2942,7 +2979,8 @@ function saveCfg(){
       state.meta = state.meta || {};
       state.meta.school = state.opts.school || '';
       state.meta.term = state.opts.term || '';
-      await API.save();
+      cloud.authoritative = true;
+      await API.save(true);
       render();
       toast(state.students && state.students.length ? '設定已儲存' : '設定已儲存（試算表還沒名冊資料）', 4200);
     }catch(err){
@@ -3091,19 +3129,29 @@ async function boot(){
     const r = await API.load();
     if(r.ok && r.state && r.state.students && r.state.students.length){
       if(dirty){
-        toast('雲端有資料，但你在載入期間已經改過，這次不覆蓋；要改用雲端版本請到「設定與檢查」按「從雲端重新載入」', 6500);
+        /* 載入期間已經改過：畫面保留本機修改，但不回寫雲端，避免把試算表蓋掉 */
+        toast('雲端有資料，但你剛才的修改只在本機、還沒上傳。要用雲端版本請按「從雲端重新載入」；要以本機為準請按「儲存設定」', 9000);
+        render();
         return;
       }
       state = r.state;
       normalize();
       syncToday();
+      cloud.authoritative = true;
       render();
+      if(cloud.pending){ cloud.pending = false; await API.save(); toast('剛才的修改已補存到雲端', 3600); }
     }else if(r.ok){
+      /* 雲端還沒有名冊：以本機為準 */
+      cloud.authoritative = true;
       await API.save();
       toast('雲端試算表還沒有資料，請先在「名單」工作表建立名冊，或到「設定與檢查」匯入備份檔', 7000);
     }
+    render();
   }catch(err){
-    toast('雲端連線失敗，目前使用本機資料', 4200);
+    cloud.authoritative = false;
+    cloud.failed = true;
+    render();
+    toast('雲端連線失敗，目前使用本機資料，這次不會覆蓋試算表', 5200);
   }
 }
 
