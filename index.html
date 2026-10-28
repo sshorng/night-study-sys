@@ -453,7 +453,7 @@ body.gated .sheet{opacity:.28;pointer-events:none;user-select:none}
     <input id="gatePwd" type="password" autocomplete="current-password" placeholder="通關密語" aria-label="通關密語">
     <button class="go" id="gateGo">進　入</button>
     <p class="msg" id="gateMsg"></p>
-    <p class="foot">密語不會寫進程式或雲端資料，只用來向試算表後端確認身分；每次開這個網頁都要重新輸入一次。</p>
+    <p class="foot">密語不會寫進程式或雲端資料，只用來向試算表後端確認身分；通過後會記在這台裝置，下次開網頁直接進入（可在「設定與檢查」清除）。</p>
   </div>
 </div>
 <div class="sheet">
@@ -550,7 +550,7 @@ body.gated .sheet{opacity:.28;pointer-events:none;user-select:none}
             <label>Google Apps Script 網址（已內建，通常不必改）</label>
             <input id="cfgGas" placeholder="https://script.google.com/macros/s/..../exec">
           </div>
-          <p class="hint" style="margin:0 0 10px">開網頁時會先要求輸入通關密語。這裡的密語只記在這台裝置的瀏覽器，不會上傳；要換新密語，請先改試算表「設定」工作表的 password 那一列，再回來這裡填一樣的。</p>
+          <p class="hint" style="margin:0 0 10px">開網頁時會先確認這台裝置記住的密語，還有效就直接進入，不必每次輸入。密語只存在這台裝置的瀏覽器，不會上傳；要換新密語，請先改試算表「設定」工作表的 password 那一列，再回來這裡填一樣的。</p>
           <div class="field" style="margin-bottom:10px">
             <label>通關密語</label>
             <input id="cfgPwd" type="password">
@@ -559,6 +559,7 @@ body.gated .sheet{opacity:.28;pointer-events:none;user-select:none}
           <div class="tools">
             <button class="btn primary" id="btnSaveCfg">儲存設定</button>
             <button class="btn" id="btnReload">從雲端重新載入</button>
+            <button class="btn" id="btnForgetPwd">清除這台裝置記住的密語</button>
           </div>
         </div>
         <div>
@@ -591,7 +592,7 @@ body.gated .sheet{opacity:.28;pointer-events:none;user-select:none}
    1. CONFIG
    ===================================================================== */
 const CONFIG = {
-  VERSION: '2.1.0',
+  VERSION: '2.1.1',
   /* 已內建的 Apps Script 部署網址：第一次使用只要在設定頁填通關密語，會記在這台裝置的瀏覽器 */
   GAS_URL: 'https://script.google.com/macros/s/AKfycbxBk3fJaCrPfyojhPVgT6xNE110x3ENSGquQLVWLBz8jdNH2FgX6QMNBQKr1lHLZ8ePtw/exec',
   PASSWORD: '',
@@ -1013,15 +1014,67 @@ const GATE = {
       if(savedHash && (await GATE.hash(pwd)) === savedHash) return { ok:true, offline:true };
       return { ok:false, msg:'連不上雲端，現在無法確認密語：' + (m || '請確認網路後再試一次') };
     }
+  },
+  /* 這台裝置記住的密語還能不能用：能用就直接進站，不必再輸入 */
+  async silent(){
+    const pwd = localStorage.getItem(GATE.KEY_PWD) || '';
+    if(!pwd) return { ok:false };
+    const savedHash = localStorage.getItem(GATE.KEY_HASH) || '';
+    const hashOk = async function(){ return savedHash ? (await GATE.hash(pwd)) === savedHash : false; };
+    if(!API.isCloud()){
+      if(!savedHash) return { ok:true, local:true };
+      return (await hashOk()) ? { ok:true, local:true } : { ok:false, stale:true };
+    }
+    const prev = CONFIG.PASSWORD;
+    CONFIG.PASSWORD = pwd;
+    let r;
+    try{
+      r = await GATE.withTimeout(API.call({ action:'ping' }), 4000);
+    }catch(err){
+      CONFIG.PASSWORD = prev;
+      const m = String((err && err.message) || '');
+      if(m.indexOf('通關密語不正確') >= 0) return { ok:false, stale:true };
+      if(await hashOk()) return { ok:true, offline:true };
+      return { ok:false, msg:m };
+    }
+    /* 後端回應太慢：這台裝置先前驗證過就先用本機資料開站，不讓老師在關卡前乾等 */
+    if(r && r.timedOut){
+      CONFIG.PASSWORD = pwd;
+      if(await hashOk()) return { ok:true, offline:true };
+      CONFIG.PASSWORD = prev;
+      return { ok:false, msg:'後端回應太慢' };
+    }
+    if(!savedHash){ try{ localStorage.setItem(GATE.KEY_HASH, await GATE.hash(pwd)); }catch(err){} }
+    return { ok:true };
+  },
+  withTimeout(p, ms){
+    return new Promise(function(resolve, reject){
+      const t = setTimeout(function(){ resolve({ timedOut:true }); }, ms);
+      p.then(function(v){ clearTimeout(t); resolve(v); },
+        function(e){ clearTimeout(t); reject(e); });
+    });
+  },
+  /* 清除這台裝置記住的密語，下次開網頁會重新要求輸入 */
+  forget(){
+    localStorage.removeItem(GATE.KEY_PWD);
+    localStorage.removeItem(GATE.KEY_HASH);
   }
 };
 
-function showGate(){
+/* 關卡收尾：把關卡收起來、解除整頁鎖定（靜默通過與手動輸入通過都走這裡） */
+function unlockUI(){
+  const gate = $('gate');
+  if(gate) gate.hidden = true;
+  document.body.classList.remove('gated');
+}
+
+function showGate(note){
   return new Promise(function(resolve){
     const gate = $('gate'), inp = $('gatePwd'), go = $('gateGo'), msg = $('gateMsg');
     document.body.classList.add('gated');
     gate.hidden = false;
     inp.value = '';
+    msg.className = 'msg'; msg.textContent = note || '';
     setTimeout(function(){ try{ inp.focus(); }catch(err){} }, 60);
     let busy = false;
     async function submit(){
@@ -1043,8 +1096,7 @@ function showGate(){
       try{ localStorage.setItem(GATE.KEY_HASH, await GATE.hash(pwd)); }catch(err){}
       if($('cfgPwd')) $('cfgPwd').value = pwd;
       msg.className = 'msg ok'; msg.textContent = '密語正確，進入中…';
-      gate.hidden = true;
-      document.body.classList.remove('gated');
+      unlockUI();
       if(r.offline) toast('現在連不上雲端，先用這台裝置上次同步的資料', 5200);
       else if(r.local) toast('本機模式：資料只存在這台裝置', 4200);
       resolve();
@@ -2099,6 +2151,13 @@ document.addEventListener('click', e=>{
   // 設定
   if(e.target.id==='btnSaveCfg'){ saveCfg(); return; }
   if(e.target.id==='btnReload'){ API.load().then(function(r){ if(r.ok && r.state){ state = r.state; dirty = false; normalize(); render(); toast('已重新載入雲端資料'); } else { toast('雲端沒有資料，或目前是本機模式'); } }).catch(err=>toast('載入失敗：'+err.message)); return; }
+  if(e.target.id==='btnForgetPwd'){
+    GATE.forget();
+    CONFIG.PASSWORD = '';
+    if($('cfgPwd')) $('cfgPwd').value = '';
+    toast('已清除這台裝置記住的密語，下次開網頁要重新輸入', 4600);
+    return;
+  }
   if(e.target.id==='btnTest'){ selfTest(); return; }
   if(e.target.id==='btnImport'){ $('backupPicker').click(); return; }
 });
@@ -2886,8 +2945,21 @@ async function boot(){
   $('cfgGas').value = CONFIG.GAS_URL;
   $('cfgPwd').value = CONFIG.PASSWORD;
 
-  /* 一進網頁先過通關密語，通過才進站；測試可用 window.__NS_NOGATE 跳過 */
-  if(!window.__NS_NOGATE) await showGate();
+  /* 一進網頁先確認身分：這台裝置記住的密語還有用就直接進站，失效或第一次才跳關卡；測試可用 window.__NS_NOGATE 跳過 */
+  if(!window.__NS_NOGATE){
+    if($('gateMsg')) $('gateMsg').textContent = '正在確認這台裝置記住的密語…';
+    const memo = await GATE.silent();
+    if(memo.ok){
+      /* 記住的密語還有用：直接撤掉關卡，不必輸入 */
+      unlockUI();
+      if(memo.offline) toast('現在連不上雲端，先用這台裝置上次同步的資料', 5200);
+    }else{
+      const note = memo.stale
+        ? '這台裝置記住的密語已經不能用（試算表「設定」工作表的 password 可能改過），請輸入新的密語。'
+        : (memo.msg ? '一時連不上雲端，也無法用這台裝置的紀錄確認，請重新輸入密語：' + memo.msg : '');
+      await showGate(note);
+    }
+  }
 
   /* 先用手上的資料畫出來，不等網路 */
   let local = null;
