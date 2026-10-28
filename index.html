@@ -650,7 +650,7 @@ const LIB = {
    1. CONFIG
    ===================================================================== */
 const CONFIG = {
-  VERSION: '2.15.4',
+  VERSION: '2.15.5',
   /* 已內建的 Apps Script 部署網址：第一次使用只要在設定頁填通關密語，會記在這台裝置的瀏覽器 */
   GAS_URL: 'https://script.google.com/macros/s/AKfycbxBk3fJaCrPfyojhPVgT6xNE110x3ENSGquQLVWLBz8jdNH2FgX6QMNBQKr1lHLZ8ePtw/exec',
   PASSWORD: '',
@@ -2187,35 +2187,25 @@ function openLeaveNew(){
   const opts = E.active(state).sort((a,b)=> a.cls-b.cls || a.seat.localeCompare(b.seat))
     .map(function(s){ return '<option value="'+s.key+'">'+s.cls+'-'+s.seat+' '+esc(s.name)+'</option>'; }).join('');
   const body = '<div class="field"><label>學生</label><select id="lvKey">'+opts+'</select></div>'
-    + '<div class="grid2">'
-    + '<div class="field"><label>起日</label><input type="date" id="lvFrom" value="'+ref()+'"></div>'
-    + '<div class="field"><label>迄日</label><input type="date" id="lvTo" value="'+ref()+'"></div>'
-    + '</div>'
+    + '<div class="field"><label>日期</label><input type="date" id="lvDate" value="'+ref()+'"></div>'
     + '<div class="field"><label>事由</label><input id="lvWhy" list="lvWhyDL" placeholder="例如：家長請假、身體不適">'+dlOptions('lvWhyDL', E.optList(state,'leaveReasons'))+'</div>'
-    + '<p class="hint">只在夜自習上課日建立紀錄，週末與放假自動略過；同一天已有紀錄會跳過；當天若已點「到」會一併取消。</p>';
+    + '<p class="hint">一次建立一天；週末與放假不會建立；同一天已有紀錄會提示；當天若已點「到」會一併取消。</p>';
   const m = modal('新增請假', body, '<button class="btn" data-close>取消</button><button class="btn primary" id="lvSave">建立</button>');
   m.querySelector('[data-close]').addEventListener('click', closeModal);
   m.querySelector('#lvSave').addEventListener('click', function(){
     const key = m.querySelector('#lvKey').value;
-    const from = m.querySelector('#lvFrom').value;
-    const to = m.querySelector('#lvTo').value || from;
+    const date = m.querySelector('#lvDate').value;
     const why = m.querySelector('#lvWhy').value.trim() || '請假';
-    if(!key || !from){ toast('請選擇學生與日期'); return; }
-    if(to < from){ toast('迄日不能早於起日'); return; }
-    let made = 0, skip = 0;
-    const end = E.parse(to);
-    for(let cur = E.parse(from); cur <= end; cur.setDate(cur.getDate()+1)){
-      const iso = E.iso(cur);
-      if(!E.isSchoolDay(state, iso)) continue;
-      if((state.leaves||[]).some(function(l){ return l.key===key && l.date===iso; })){ skip++; continue; }
-      state.leaves.push({ id:newId('l'), key:key, date:iso, reason:why });
-      state.checkins = (state.checkins||[]).filter(function(c){ return !(c.key===key && c.date===iso); });
-      made++;
+    if(!key || !date){ toast('請選擇學生與日期'); return; }
+    if(!E.isSchoolDay(state, date)){ toast('這一天不是夜自習上課日，請換一天', 3600); return; }
+    if((state.leaves||[]).some(function(l){ return l.key===key && l.date===date; })){
+      toast('這一天已經有請假紀錄了', 3600); return;
     }
+    state.leaves.push({ id:newId('l'), key:key, date:date, reason:why });
+    state.checkins = (state.checkins||[]).filter(function(c){ return !(c.key===key && c.date===date); });
     closeModal();
-    if(!made){ toast('沒有新增（'+(skip ? '同一天已有紀錄' : '期間內沒有上課日')+'）', 3600); return; }
     commit();
-    toast('已建立 '+made+' 筆請假'+(skip ? '，'+skip+' 筆重複略過' : ''), 3200);
+    toast('已建立請假：'+why, 2600);
   });
 }
 
