@@ -505,17 +505,16 @@ body.gated .sheet{opacity:.28;pointer-events:none;user-select:none}
    跟紙本與印章的調性一致，不用彩色貼圖 */
 .ico{width:16px;height:16px;display:block;flex:0 0 auto;fill:none;stroke:currentColor;
   stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
-.sheetdock{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:0 0 16px;
-  padding:12px 14px;border:1px solid var(--rule);border-radius:8px;background:var(--sheet-2)}
-.sheetdock[hidden]{display:none}
-.sheetdock a.sheetopen{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:8px 16px;
-  border:1px solid var(--seal);border-radius:6px;background:var(--seal);color:#FBF1EC;text-decoration:none;
-  font-family:var(--serif);font-size:13px;letter-spacing:.16em;white-space:nowrap}
-.sheetdock a.sheetopen:hover{background:#8B2413;border-color:#8B2413}
-.sheetdock a.sheetopen:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
-.sheetdock a.sheetopen .ico{width:18px;height:18px}
-.sheetdock .sheetmeta{flex:1 1 260px;min-width:200px;font-size:12px;line-height:1.8;color:var(--ink-3)}
-.sheetdock .sheetname{font-family:var(--serif);color:var(--ink-2);letter-spacing:.06em}
+.cfgbar{display:flex;align-items:center;gap:8px;margin:0 0 2px}
+.sheetcue{display:inline-flex;align-items:center}
+.sheetcue[hidden]{display:none}
+.sheetcue a.sheetopen{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:4px 10px;
+  border:1px solid var(--rule);border-radius:5px;background:var(--card);color:var(--ink-2);text-decoration:none;
+  font-family:var(--serif);font-size:12px;letter-spacing:.08em;white-space:nowrap}
+.sheetcue a.sheetopen:hover{border-color:var(--seal);color:var(--seal);background:#FFF9EA}
+.sheetcue a.sheetopen:focus-visible{outline:2px solid var(--seal);outline-offset:1px}
+.sheetcue a.sheetopen .ico{width:14px;height:14px}
+.sheetcue .sheetmeta{font-size:12px;line-height:1.6;color:var(--ink-3)}
 </style>
 </head>
 <body class="gated">
@@ -618,9 +617,8 @@ body.gated .sheet{opacity:.28;pointer-events:none;user-select:none}
     </section>
 
     <section class="page" id="page-config">
-      <!-- 這份資料放在哪一份試算表：連上雲端時這裡會出現圖示，點了另開分頁（內容由 renderSheetLink 產生） -->
-      <div class="sheetdock" id="cfgSheetBox" hidden></div>
       <div class="cfgwrap">
+        <div class="cfgbar"><span class="sheetcue" id="cfgSheetBox" hidden></span></div>
 
         <div class="cfgcard">
           <h3>密語與身分</h3>
@@ -735,7 +733,7 @@ const LIB = {
    1. CONFIG
    ===================================================================== */
 const CONFIG = {
-  VERSION: '2.16.8',
+  VERSION: '2.16.9',
   GAS_URL: 'https://script.google.com/macros/s/AKfycbxBk3fJaCrPfyojhPVgT6xNE110x3ENSGquQLVWLBz8jdNH2FgX6QMNBQKr1lHLZ8ePtw/exec',
   PASSWORD: '',
   ROLE_KEY: 'nightstudy.role',
@@ -1586,27 +1584,24 @@ function sheetBook(){
 }
 
 
-/* 設定與檢查頁最上面那一條：說清楚資料放在哪一份試算表，並給一顆按鈕另開分頁 */
+/* 連線區裡的一顆小按鈕：另開分頁到這份試算表（後端回報網址才出現） */
 function renderSheetLink(){
   const box = $('cfgSheetBox');
   if(!box) return;
   const book = sheetBook();
-  if(!API.isCloud() || isTeacher()){
-    box.hidden = true; box.innerHTML = ''; return;
-  }
-  box.hidden = false;
-  if(!book){
-    box.innerHTML = '<span class="sheetmeta">'
-      + (CONFIG.PASSWORD
-        ? '還沒拿到試算表網址：後端沒有回報，請確認 Apps Script 已重新部署（Code.gs 1.3.1 以上）。'
-        : '還沒連上雲端：連上之後這裡會出現一個圖示，點了直接另開分頁到試算表。')
-      + '</span>';
+  if(!API.isCloud() || isTeacher() || !book){
+    if(API.isCloud() && !isTeacher() && CONFIG.PASSWORD){
+      box.hidden = false;
+      box.innerHTML = '<span class="sheetmeta">後端未回報試算表網址，請重新部署 Code.gs</span>';
+    }else{
+      box.hidden = true; box.innerHTML = '';
+    }
     return;
   }
-  box.innerHTML = '<a class="sheetopen" href="' + esc(book.url) + '" target="_blank" rel="noopener noreferrer">'
-    + ICON_SHEET + '開啟雲端試算表</a>'
-    + '<span class="sheetmeta">這份資料存在 <span class="sheetname">' + esc(book.name || 'Google 試算表') + '</span>，'
-    + '點左邊按鈕會另開分頁。要改參數或名冊，直接在試算表改完，回來按「從雲端重新載入」就生效。</span>';
+  box.hidden = false;
+  box.innerHTML = '<a class="sheetopen" href="' + esc(book.url) + '" target="_blank" rel="noopener noreferrer"'
+    + ' title="另開分頁到 ' + esc(book.name || '雲端試算表') + '">'
+    + ICON_SHEET + '開啟試算表</a>';
 }
 
 function renderCloudPill(){
