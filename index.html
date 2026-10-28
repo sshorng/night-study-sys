@@ -652,7 +652,7 @@ const LIB = {
    ===================================================================== */
 const CONFIG = {
   VERSION: '2.15.5',
-  VERSION: '2.16.1',
+  VERSION: '2.16.2',
   GAS_URL: 'https://script.google.com/macros/s/AKfycbxBk3fJaCrPfyojhPVgT6xNE110x3ENSGquQLVWLBz8jdNH2FgX6QMNBQKr1lHLZ8ePtw/exec',
   PASSWORD: '',
   TEACHER_KEY: 'nightstudy.tpwdhash',
@@ -1582,10 +1582,13 @@ function renderToday(){
     + '</div>'
     + '<div class="lv"><i>請假名單（'+leaveList.length+' 人）</i>'
     + (leaveList.length
-        ? leaveList.map(function(s){ return '<span>'+s.cls+s.seat+'　'+esc(s.name)+'</span>'; }).join('')
+        ? leaveList.map(function(s){
+            const rec = (state.leaves||[]).find(function(l){ return l.key===s.key && l.date===iso; }) || {};
+            const why = String(rec.reason||'').trim();
+            return '<span>'+s.cls+s.seat+'　'+esc(s.name)+(why ? '（'+esc(why)+'）' : '')+'</span>';
+          }).join('')
         : '<span class="none">今日無人請假</span>')
     + '</div>';
-
   const rows = [];
   E.classes(state).forEach(cls=>{
     const list = E.active(state).filter(s=>s.cls===cls).sort((a,b)=>a.seat.localeCompare(b.seat));
