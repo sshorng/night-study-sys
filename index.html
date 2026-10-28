@@ -2499,6 +2499,7 @@ function dayCard(r){
     +   '<div class="dv-act">'
     +   (isToday || isTeacher() ? '' : '<button class="btn small" data-editday="'+r.date+'">'+(editing ? '完成' : '編輯這天')+'</button>')
     + '</div>'
+    + '</div>'
     + '<div class="dv-body">'
     +   (notes.length
           ? notes.map(function(n){ return noteRow(n, editing); }).join('')
