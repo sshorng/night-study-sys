@@ -593,7 +593,7 @@ body.gated .sheet{opacity:.28;pointer-events:none;user-select:none}
    1. CONFIG
    ===================================================================== */
 const CONFIG = {
-  VERSION: '2.6.0',
+  VERSION: '2.7.0',
   /* 已內建的 Apps Script 部署網址：第一次使用只要在設定頁填通關密語，會記在這台裝置的瀏覽器 */
   GAS_URL: 'https://script.google.com/macros/s/AKfycbxBk3fJaCrPfyojhPVgT6xNE110x3ENSGquQLVWLBz8jdNH2FgX6QMNBQKr1lHLZ8ePtw/exec',
   PASSWORD: '',
@@ -2830,9 +2830,10 @@ async function exportXlsx(){
     const iso = ref();
     const mat = E.matrix(state, iso);
 
-    /* 範本裡那張空白的「參加天數及電話」手寫表與自動產生的名單重複，直接拿掉 */
-    const blank = wb.getWorksheet('參加天數及電話 ') || wb.getWorksheet('參加天數及電話');
-    if(blank) wb.removeWorksheet(blank.id);
+    /* 匯出只留總表與名單兩張：範本裡的手寫表與舊名單全部移除 */
+    const wsT0 = wb.getWorksheet('總表');
+    if(!wsT0) throw new Error('範本缺少「總表」工作表');
+    wb.worksheets.slice().forEach(function(w){ if(w !== wsT0) wb.removeWorksheet(w.id); });
 
     /* 名單（自動產生）：每次重新產生，內容乾淨、可直接列印 */
     const SHEET = '名單（自動產生）';
@@ -2861,7 +2862,12 @@ async function exportXlsx(){
       c.border = borderAll();
     });
     wsP.getRow(2).height = 22;
+    /* 不同班級用交錯底色分隔，一眼看出班級界線 */
+    const bandFill = { type:'pattern', pattern:'solid', fgColor:{ argb:'FFF3EEE1' } };
+    let bandOrder = -1, bandCls = null;
     rows.forEach(function(r,i){
+      if(r.cls !== bandCls){ bandOrder++; bandCls = r.cls; }
+      const banded = (bandOrder % 2) === 1;
       const s = E.byKey(state,r.key)||{};
       const row = i+first;
       const days = r.days.reduce(function(a,b){ return a+b; },0);
@@ -2873,6 +2879,7 @@ async function exportXlsx(){
         c.font = { name:'標楷體', size:11 };
         c.alignment = { horizontal:(ci===3||ci===10||ci===13)?'left':'center', vertical:'middle' };
         c.border = borderAll();
+        if(banded) c.fill = bandFill;
       });
       /* 天數用加總公式，改勾選就自己重算 */
       wsP.getCell(row,10).value = { formula:'SUM(E'+row+':I'+row+')', result:days };
