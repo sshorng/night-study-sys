@@ -233,14 +233,15 @@ input[type=checkbox]{accent-color:var(--seal)}
 .nt{border:1px solid var(--rule-soft);border-radius:6px;background:var(--sheet);padding:8px 10px;
   display:grid;grid-template-columns:132px minmax(0,1fr) 124px;gap:10px;align-items:start;
   grid-template-areas:"time main acts"}
-.nt-edit{background:var(--card)}
+.nt-edit{background:var(--card);grid-template-columns:200px minmax(0,1fr) 124px}
 .nt-ro{grid-template-columns:132px minmax(0,1fr);grid-template-areas:"time main"}
 .nt-edit .nt-text{min-height:130px}
 .nt-time{grid-area:time}
 .nt-timecol{grid-area:time;display:flex;flex-direction:column;gap:6px;min-width:0}
-.nt-timechips{display:flex;flex-direction:column;gap:4px}
+.nt-timechips{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px}
 .nt-timechips .tchip{font-size:11px;line-height:1.6;padding:3px 6px;border:1px solid var(--rule);
-  border-radius:4px;background:var(--card);color:var(--ink-2);cursor:pointer;text-align:left;
+  border-radius:4px;background:var(--card);color:var(--ink-2);cursor:pointer;text-align:center;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   font-family:var(--serif);letter-spacing:.02em}
 .nt-timechips .tchip:hover{border-color:var(--seal);color:var(--seal);background:#FFF9EA}
 .nt-timechips .tchip:focus-visible{outline:2px solid var(--seal);outline-offset:1px}
@@ -405,8 +406,8 @@ body.role-teacher .stu-tag:hover{background:var(--seal-soft)}
   .dv-head{gap:8px}
   .dv-act{margin-left:0;width:100%}
   .nt-edit .nt-text{min-height:110px}
-  .nt{grid-template-columns:minmax(0,1fr) 48px;grid-template-areas:"time del" "main main"}
-  .nt input[type=time]{width:100%;max-width:200px}
+  .nt-edit{grid-template-columns:minmax(0,1fr) 48px}
+  .nt .nt-time{width:100%;max-width:200px}
   .grid2{grid-template-columns:1fr}
 }
 /* 列印：只印 #printArea 裡的內容 */
@@ -669,12 +670,11 @@ const CONFIG = {
   ROLE_KEY: 'nightstudy.role',
   /* 夜自習作息：起始時間，記事編輯時可一鍵帶入（按鈕文字＝名稱＋起始時間） */
   RUN_SLOTS: [
-    { time:'17:00', label:'晚餐' },
-    { time:'17:40', label:'專心讀書' },
-    { time:'18:00', label:'晚休' },
-    { time:'18:30', label:'專心讀書' },
-    { time:'19:50', label:'休息一下' },
-    { time:'20:00', label:'專心讀書' }
+    { time:'5:40', label:'點名' },
+    { time:'6:00', label:'晚休' },
+    { time:'6:30', label:'讀書' },
+    { time:'7:50', label:'下課' },
+    { time:'8:00', label:'讀書' }
   ],
   LOCAL_ONLY: false,
   DAY_LABELS: ['一','二','三','四','五'],
@@ -2479,6 +2479,17 @@ function richHtml(text){
     return '<span class="stu-tag" data-tag="'+a+'-'+b+'">'+esc(s.cls+'-'+s.seat+' '+s.name)+'</span>';
   });
 }
+/* 時間一律用十二小時制：19:50 顯示成 7:50、06:00 顯示成 6:00，已經是 7:50 就原樣 */
+function twelveHour(t){
+  const s = String(t==null ? '' : t).trim();
+  const m = s.match(/^(\d{1,2}):(\d{2})$/);
+  if(!m) return s;
+  let h = Number(m[1]);
+  if(!isFinite(h)) return s;
+  if(h > 12) h -= 12;
+  if(h === 0) h = 12;
+  return h + ':' + m[2];
+}
 function noteRow(n, editable){
   if(editable && ui.editNote === n.id){
     const timeChips = (CONFIG.RUN_SLOTS || []).map(function(s){
@@ -2486,7 +2497,9 @@ function noteRow(n, editable){
     }).join('');
     return '<div class="nt nt-edit" data-nid="'+n.id+'">'
       + '<div class="nt-timecol">'
-      +   '<input class="nt-time" type="time" data-ntime="'+n.id+'" value="'+esc(n.time||'')+'" aria-label="記事時間">'
+      +   '<input class="nt-time" type="text" inputmode="numeric" placeholder="6:40" data-ntime="'+n.id+'" value="'+esc(twelveHour(n.time||''))+'">'
+      +   '<div class="nt-timechips">'+timeChips+'</div>'
+      + '</div>'
       +   '<div class="nt-timechips">'+timeChips+'</div>'
       + '</div>'
       + '<div class="nt-main">'
@@ -2505,7 +2518,7 @@ function noteRow(n, editable){
       + '</div>'
     : '';
   return '<div class="nt nt-view'+(editable ? '' : ' nt-ro')+'" data-nid="'+n.id+'">'
-    + '<div class="nt-time-v">'+(n.time ? esc(n.time) : '未記時間')+'</div>'
+    + '<div class="nt-time-v">'+(n.time ? esc(twelveHour(n.time)) : '未記時間')+'</div>'
     + '<div class="nt-text-v">'+(n.text ? richHtml(n.text) : '<span class="nt-empty">空白記事</span>')+'</div>'
     + acts + '</div>';
 }
