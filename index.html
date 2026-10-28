@@ -633,7 +633,7 @@ const LIB = {
    1. CONFIG
    ===================================================================== */
 const CONFIG = {
-  VERSION: '2.14.0',
+  VERSION: '2.14.1',
   /* 已內建的 Apps Script 部署網址：第一次使用只要在設定頁填通關密語，會記在這台裝置的瀏覽器 */
   GAS_URL: 'https://script.google.com/macros/s/AKfycbxBk3fJaCrPfyojhPVgT6xNE110x3ENSGquQLVWLBz8jdNH2FgX6QMNBQKr1lHLZ8ePtw/exec',
   PASSWORD: '',
@@ -1377,6 +1377,15 @@ function modal(title, bodyHTML, footHTML, wide){
 }
 function closeModal(){ $('modalRoot').innerHTML=''; }
 
+/* 站內確認視窗：取代瀏覽器原生 confirm，手機也看得清楚 */
+function confirmModal(title, messageHTML, onOk, okLabel){
+  const m = modal(title,
+    '<p class="hint" style="margin:0;line-height:1.9">'+String(messageHTML||'').replace(/\n/g,'<br>')+'</p>',
+    '<button class="btn" data-close>取消</button><button class="btn seal" data-ok>'+esc(okLabel||'確定')+'</button>');
+  m.querySelector('[data-close]').addEventListener('click', closeModal);
+  m.querySelector('[data-ok]').addEventListener('click', function(){ closeModal(); onOk(); });
+}
+
 const TABS = [
   ['today','今夜點名'], ['list','學生清單'], ['seat','座位編排'], ['log','異動日誌'],
   ['leave','請假紀錄'], ['vio','違規紀錄'], ['duty','輪值日誌'], ['export','匯出表單'], ['config','設定與檢查']
@@ -2033,9 +2042,13 @@ function deleteEnroll(id){
   if(!e0) return;
   const s = E.byKey(state,e0.key);
   const who = s ? (s.cls+'-'+E.seatOf(e0.key)+' '+s.name) : e0.key;
-  if(!confirm('刪除這筆異動？\n\n'+e0.date+'　'+who+'　'+E.label(e0.days)+'\n刪除後，該生會回到上一筆設定的狀態。')) return;
-  state.enrollments = state.enrollments.filter(function(x){ return x.id!==id; });
-  commit(); toast('已刪除異動紀錄');
+  confirmModal('刪除異動紀錄',
+    esc(e0.date+'　'+who+'　'+E.label(e0.days))+'\n刪除後，該生會回到上一筆設定的狀態。',
+    function(){
+      state.enrollments = state.enrollments.filter(function(x){ return x.id!==id; });
+      commit();
+      toast('已刪除異動紀錄');
+    }, '刪除');
 }
 
 /* ---------- 違規 ---------- */
@@ -2143,9 +2156,15 @@ function openLeaveNew(){
 function deleteLeave(id){
   const l = (state.leaves||[]).find(function(x){ return x.id===id; });
   if(!l) return;
-  if(!confirm('刪除 '+l.date+' 的請假紀錄？')) return;
-  state.leaves = state.leaves.filter(function(x){ return x.id!==id; });
-  commit(); toast('已刪除請假紀錄');
+  const s = E.byKey(state, l.key) || { cls:'', seat:'', name:l.key };
+  const who = s.cls+'-'+s.seat+'　'+s.name;
+  confirmModal('刪除請假紀錄',
+    esc(l.date+'（'+CONFIG.WEEKDAY[E.wd(l.date)]+'）　'+who+(l.reason ? '　'+l.reason : '')),
+    function(){
+      state.leaves = state.leaves.filter(function(x){ return x.id!==id; });
+      commit();
+      toast('已刪除請假紀錄');
+    }, '刪除');
 }
 
 /* 編輯既有請假紀錄：日期、事由、是否已繳紙本 */
