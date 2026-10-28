@@ -664,7 +664,6 @@ body.gated .sheet{opacity:.28;pointer-events:none;user-select:none}
         <div class="cfgcard">
           <h3>儲存與重新載入</h3>
           <p class="lead">上面的密語與參數改完，按「儲存設定」一次寫回雲端試算表。</p>
-          <p class="hint" id="cfgClsTotal"></p>
           <div class="cfgfoot">
             <button class="btn primary" id="btnSaveCfg">儲存設定</button>
             <button class="btn" id="btnReload">從雲端重新載入</button>
@@ -736,7 +735,7 @@ const LIB = {
    1. CONFIG
    ===================================================================== */
 const CONFIG = {
-  VERSION: '2.16.7',
+  VERSION: '2.16.8',
   GAS_URL: 'https://script.google.com/macros/s/AKfycbxBk3fJaCrPfyojhPVgT6xNE110x3ENSGquQLVWLBz8jdNH2FgX6QMNBQKr1lHLZ8ePtw/exec',
   PASSWORD: '',
   ROLE_KEY: 'nightstudy.role',
@@ -3960,11 +3959,6 @@ function normalize(){
     state.config.totals = t;
   }
   ui.weekRef = ui.weekRef || state.config.refDate;
-  const byCls = {};
-  state.students.forEach(function(s){ byCls[s.cls] = (byCls[s.cls]||0)+1; });
-  const clsBox = $('cfgClsTotal');
-  if(clsBox) clsBox.textContent = '各班學生數（由九年級名冊自動計算）：'
-    + Object.keys(byCls).sort().map(function(k){ return k+' 班 '+byCls[k]+' 人'; }).join('　');
 }
 
 function emptyState(){
