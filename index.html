@@ -533,6 +533,7 @@ body.gated .sheet{opacity:.28;pointer-events:none;user-select:none}
             <button class="btn primary" id="expSeat">下載座位表（.docx）</button>
             <button class="btn" id="expVio">下載違規通知單（.docx）</button>
             <button class="btn" id="expPrintList">列印名單（A4）</button>
+            <button class="btn" id="expLinePng">下載名單圖檔（LINE 公告用 PNG）</button>
             <button class="btn" id="expBackup">備份全部資料（.json）</button>
           </div>
         </div>
@@ -629,7 +630,7 @@ const LIB = {
    1. CONFIG
    ===================================================================== */
 const CONFIG = {
-  VERSION: '2.11.0',
+  VERSION: '2.12.0',
   /* 已內建的 Apps Script 部署網址：第一次使用只要在設定頁填通關密語，會記在這台裝置的瀏覽器 */
   GAS_URL: 'https://script.google.com/macros/s/AKfycbxBk3fJaCrPfyojhPVgT6xNE110x3ENSGquQLVWLBz8jdNH2FgX6QMNBQKr1lHLZ8ePtw/exec',
   PASSWORD: '',
@@ -2433,6 +2434,7 @@ document.addEventListener('click', e=>{
   if(e.target.id==='expSeat'){ exportSeat(); return; }
   if(e.target.id==='btnPrintSeat'){ printSeat(); return; }
   if(e.target.id==='expPrintList'){ printList(); return; }
+  if(e.target.id==='expLinePng'){ exportRosterPng(); return; }
   if(e.target.id==='expVio'){ exportVio((state.violations||[]).map(v=>v.id)); return; }
   if(e.target.id==='expBackup'){ download(new Blob([JSON.stringify(state,null,1)],{type:'application/json'}), '夜自習備份_'+stamp()+'.json'); return; }
   // 設定
@@ -2963,7 +2965,7 @@ function printSeat(){
   toast('已送往列印（A3 橫式，版面同 Word 範本）');
 }
 
-/* 名單：A4 直式，比照電話表欄位 */
+/* 名單：A4 直式，比照電話表欄位（已移除家長輪值） */
 function printList(){
   const rows = E.seatRows(state);
   const sum = [0,0,0,0,0];
@@ -2972,25 +2974,125 @@ function printList(){
   html += '<table class="wt"><colgroup>'
     + '<col style="width:.38in"><col style="width:.42in"><col style="width:.62in">'
     + '<col style="width:.3in"><col style="width:.3in"><col style="width:.3in"><col style="width:.3in"><col style="width:.3in">'
-    + '<col style="width:.42in"><col style="width:1in"><col style="width:.4in"><col style="width:.5in"><col>'
+    + '<col style="width:.42in"><col style="width:1in"><col style="width:.5in"><col>'
     + '</colgroup>';
   html += '<tr class="vh"><td>班級</td><td>座號</td><td>姓名</td>'
     + CONFIG.DAY_LABELS.map(function(l){ return '<td>'+l+'</td>'; }).join('')
-    + '<td>天數</td><td>電話</td><td>輪值</td><td>便當</td><td>備註</td></tr>';
+    + '<td>天數</td><td>電話</td><td>便當</td><td>備註</td></tr>';
   rows.forEach(function(r){
     const s = E.byKey(state,r.key) || {};
     html += '<tr><td>'+r.cls+'</td><td>'+r.seat+'</td><td class="vl">'+esc(r.name)+'</td>'
       + r.days.map(function(v){ return '<td>'+(v?'■':'□')+'</td>'; }).join('')
       + '<td>'+r.days.reduce(function(a,b){ return a+b; },0)+'</td>'
-      + '<td>'+esc(s.phone||'')+'</td><td>'+(s.parentDuty?'V':'')+'</td>'
+      + '<td>'+esc(s.phone||'')+'</td>'
       + '<td>'+esc(s.lunch||'')+'</td><td class="vl">'+esc(s.note||'')+'</td></tr>';
   });
   html += '<tr class="vh"><td colspan="3">每日合計</td>'
     + sum.map(function(v){ return '<td>'+v+'</td>'; }).join('')
-    + '<td colspan="5"></td></tr>';
+    + '<td colspan="4"></td></tr>';
   html += '</table>';
   doPrint(html, 'A4 portrait', '10mm');
   toast('已送往列印（A4）');
+}
+
+/* LINE 公告圖：名單 PNG，班級底色交錯，欄位只有班級、座號、姓名、五天、天數、備註 */
+function exportRosterPng(){
+  const iso = state.config.refDate || E.today();
+  const rows = E.seatRows(state);
+  if(!rows.length){ toast('目前沒有名單可以輸出圖檔'); return; }
+
+  const RATIO = 2;
+  const COLS = [
+    { t:'班級', w:96 }, { t:'座號', w:84 }, { t:'姓名', w:180 },
+    { t:'一', w:52 }, { t:'二', w:52 }, { t:'三', w:52 }, { t:'四', w:52 }, { t:'五', w:52 },
+    { t:'天數', w:80 }, { t:'備註', w:380 }
+  ];
+  const W = COLS.reduce(function(a,c){ return a + c.w; }, 0);
+  const TITLE_H = 128, HEAD_H = 58, ROW_H = 46, PAD = 26;
+  const H = TITLE_H + HEAD_H + rows.length * ROW_H + PAD;
+
+  const cv = document.createElement('canvas');
+  cv.width = W * RATIO; cv.height = H * RATIO;
+  const g = cv.getContext('2d');
+  g.scale(RATIO, RATIO);
+  const FONT = '"Noto Sans TC","Microsoft JhengHei","PingFang TC",sans-serif';
+
+  g.fillStyle = '#FAF4E6';
+  g.fillRect(0, 0, W, H);
+
+  const term = E.opt(state, 'term') || '';
+  const school = E.opt(state, 'school') || '';
+  g.textAlign = 'left'; g.textBaseline = 'alphabetic';
+  g.fillStyle = '#1F1B15';
+  g.font = '600 34px ' + FONT;
+  g.fillText((school ? school + '　' : '') + '夜自習名單', 28, 62);
+  g.fillStyle = '#4A4237';
+  g.font = '20px ' + FONT;
+  g.fillText((term ? term + '　' : '') + '基準日 ' + iso + '　共 ' + rows.length + ' 人', 28, 100);
+
+  /* 表頭 */
+  g.fillStyle = '#9E2B18';
+  g.fillRect(0, TITLE_H, W, HEAD_H);
+  g.fillStyle = '#FBF1EC';
+  g.font = '600 23px ' + FONT;
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  let hx = 0;
+  COLS.forEach(function(c){ g.fillText(c.t, hx + c.w / 2, TITLE_H + HEAD_H / 2 + 1); hx += c.w; });
+
+  /* 資料列：班級交錯底色 */
+  let bandOrder = -1, bandCls = null;
+  const classLineY = [];
+  rows.forEach(function(r, i){
+    if(r.cls !== bandCls){ bandOrder++; bandCls = r.cls; classLineY.push(TITLE_H + HEAD_H + i * ROW_H); }
+    const y = TITLE_H + HEAD_H + i * ROW_H;
+    if(bandOrder % 2 === 1){ g.fillStyle = '#F0E6D2'; g.fillRect(0, y, W, ROW_H); }
+    const days = r.days.reduce(function(a,b){ return a+b; },0);
+    const note = String((E.byKey(state, r.key) || {}).note || '');
+    const cells = [String(r.cls), String(r.seat), r.name]
+      .concat(r.days.map(function(v){ return v ? '■' : '□'; }))
+      .concat([String(days), note]);
+    g.fillStyle = '#1F1B15';
+    g.font = '22px ' + FONT;
+    let cx = 0;
+    cells.forEach(function(v, ci){
+      const c = COLS[ci];
+      const left = (ci === 2 || ci === 9);
+      g.textAlign = left ? 'left' : 'center';
+      let text = String(v == null ? '' : v);
+      const maxW = c.w - 22;
+      if(g.measureText(text).width > maxW){
+        while(text.length > 1 && g.measureText(text + '…').width > maxW) text = text.slice(0, -1);
+        text += '…';
+      }
+      g.fillText(text, left ? cx + 11 : cx + c.w / 2, y + ROW_H / 2 + 1);
+      cx += c.w;
+    });
+  });
+
+  /* 格線 */
+  const top = TITLE_H, bottom = TITLE_H + HEAD_H + rows.length * ROW_H;
+  g.strokeStyle = '#C3B394'; g.lineWidth = 1;
+  g.beginPath();
+  for(let i = 0; i <= rows.length; i++){
+    const y = top + HEAD_H + i * ROW_H + 0.5;
+    g.moveTo(0, y); g.lineTo(W, y);
+  }
+  let x = 0;
+  COLS.forEach(function(c){ x += c.w; g.moveTo(x + 0.5, top); g.lineTo(x + 0.5, bottom); });
+  g.moveTo(0.5, top); g.lineTo(0.5, bottom);
+  g.stroke();
+  /* 班級界線畫粗一點 */
+  g.strokeStyle = '#8C7A5B'; g.lineWidth = 2;
+  classLineY.forEach(function(y){
+    g.beginPath(); g.moveTo(0, y + 0.5); g.lineTo(W, y + 0.5); g.stroke();
+  });
+  g.strokeStyle = '#9E2B18'; g.lineWidth = 3;
+  g.strokeRect(1.5, top + 1.5, W - 3, HEAD_H + rows.length * ROW_H - 3);
+
+  cv.toBlob(function(blob){
+    download(blob, (E.opt(state,'exportPrefix')||'夜自習') + '_名單_' + stamp() + '.png');
+    toast('已下載名單圖檔（PNG，可直接貼到 LINE）');
+  }, 'image/png');
 }
 
 /* ---------- 匯出 ---------- */
@@ -3083,8 +3185,8 @@ async function exportXlsx(){
     const oldSheet = wb.getWorksheet(SHEET);
     if(oldSheet) wb.removeWorksheet(oldSheet.id);
     const wsP = wb.addWorksheet(SHEET, { views:[{state:'frozen',ySplit:2}] });
-    const head = ['序號','班級','座號','姓名','一','二','三','四','五','天數','電話','家長輪值','便當','備註'];
-    [6,8,7,12,6,6,6,6,6,7,15,10,8,28].forEach(function(w,i){ wsP.getColumn(i+1).width = w; });
+    const head = ['序號','班級','座號','姓名','一','二','三','四','五','天數','電話','便當','備註'];
+    [6,8,7,12,6,6,6,6,6,7,15,8,28].forEach(function(w,i){ wsP.getColumn(i+1).width = w; });
     /* 名單用「基準日當天生效」的參加設定，和總表、點名頁同一套算法 */
     const rows = E.active(state).map(function(s){
       return { key:s.key, cls:s.cls, seat:s.seat, name:s.name, days:E.daysAt(state, s.key, iso) };
@@ -3115,12 +3217,12 @@ async function exportXlsx(){
       const row = i+first;
       const days = r.days.reduce(function(a,b){ return a+b; },0);
       const vals = [i+1, r.cls, r.seat, r.name].concat(r.days)
-        .concat([null, s.phone||'', s.parentDuty?'V':'', s.lunch||'', s.note||'']);
+        .concat([null, s.phone||'', s.lunch||'', s.note||'']);
       vals.forEach(function(v,ci){
         const c = wsP.getCell(row, ci+1);
         c.value = v;
         c.font = { name:'標楷體', size:11 };
-        c.alignment = { horizontal:(ci===3||ci===10||ci===13)?'left':'center', vertical:'middle' };
+        c.alignment = { horizontal:(ci===3||ci===10||ci===12)?'left':'center', vertical:'middle' };
         c.border = borderAll();
         if(banded) c.fill = bandFill;
       });
