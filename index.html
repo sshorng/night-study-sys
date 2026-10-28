@@ -670,11 +670,11 @@ const CONFIG = {
   ROLE_KEY: 'nightstudy.role',
   /* 夜自習作息：起始時間，記事編輯時可一鍵帶入（按鈕文字＝名稱＋起始時間） */
   RUN_SLOTS: [
-    { time:'5:40', label:'點名' },
-    { time:'6:00', label:'晚休' },
-    { time:'6:30', label:'讀書' },
-    { time:'7:50', label:'下課' },
-    { time:'8:00', label:'讀書' }
+    { time:'17:40', label:'點名' },
+    { time:'18:00', label:'晚休' },
+    { time:'18:30', label:'讀書' },
+    { time:'19:50', label:'下課' },
+    { time:'20:00', label:'讀書' }
   ],
   LOCAL_ONLY: false,
   DAY_LABELS: ['一','二','三','四','五'],
@@ -2479,16 +2479,16 @@ function richHtml(text){
     return '<span class="stu-tag" data-tag="'+a+'-'+b+'">'+esc(s.cls+'-'+s.seat+' '+s.name)+'</span>';
   });
 }
-/* 時間一律用十二小時制：19:50 顯示成 7:50、06:00 顯示成 6:00，已經是 7:50 就原樣 */
-function twelveHour(t){
+/* 時間統一二十四小時制：7:50 視為 19:50、19:50 原樣、12:00 保持 12:00 */
+function twentyFour(t){
   const s = String(t==null ? '' : t).trim();
   const m = s.match(/^(\d{1,2}):(\d{2})$/);
   if(!m) return s;
   let h = Number(m[1]);
   if(!isFinite(h)) return s;
-  if(h > 12) h -= 12;
-  if(h === 0) h = 12;
-  return h + ':' + m[2];
+  if(h < 12) h += 12;
+  if(h > 23) h = 23;
+  return (h < 10 ? '0' + h : String(h)) + ':' + m[2];
 }
 function noteRow(n, editable){
   if(editable && ui.editNote === n.id){
@@ -2497,9 +2497,7 @@ function noteRow(n, editable){
     }).join('');
     return '<div class="nt nt-edit" data-nid="'+n.id+'">'
       + '<div class="nt-timecol">'
-      +   '<input class="nt-time" type="text" inputmode="numeric" placeholder="6:40" data-ntime="'+n.id+'" value="'+esc(twelveHour(n.time||''))+'">'
-      +   '<div class="nt-timechips">'+timeChips+'</div>'
-      + '</div>'
+      +   '<input class="nt-time" type="text" inputmode="numeric" placeholder="18:40" data-ntime="'+n.id+'" value="'+esc(twentyFour(n.time||''))+'" aria-label="記事時間">'
       +   '<div class="nt-timechips">'+timeChips+'</div>'
       + '</div>'
       + '<div class="nt-main">'
@@ -2518,7 +2516,7 @@ function noteRow(n, editable){
       + '</div>'
     : '';
   return '<div class="nt nt-view'+(editable ? '' : ' nt-ro')+'" data-nid="'+n.id+'">'
-    + '<div class="nt-time-v">'+(n.time ? esc(twelveHour(n.time)) : '未記時間')+'</div>'
+    + '<div class="nt-time-v">'+(n.time ? esc(twentyFour(n.time)) : '未記時間')+'</div>'
     + '<div class="nt-text-v">'+(n.text ? richHtml(n.text) : '<span class="nt-empty">空白記事</span>')+'</div>'
     + acts + '</div>';
 }
