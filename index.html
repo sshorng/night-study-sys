@@ -592,7 +592,7 @@ body.gated .sheet{opacity:.28;pointer-events:none;user-select:none}
    1. CONFIG
    ===================================================================== */
 const CONFIG = {
-  VERSION: '2.1.1',
+  VERSION: '2.2.0',
   /* 已內建的 Apps Script 部署網址：第一次使用只要在設定頁填通關密語，會記在這台裝置的瀏覽器 */
   GAS_URL: 'https://script.google.com/macros/s/AKfycbxBk3fJaCrPfyojhPVgT6xNE110x3ENSGquQLVWLBz8jdNH2FgX6QMNBQKr1lHLZ8ePtw/exec',
   PASSWORD: '',
@@ -2747,32 +2747,81 @@ async function exportVio(ids){
   }catch(err){ toast('匯出失敗：'+err.message, 5000); }
 }
 
+/* 範本轉存成 Excel 檔後，Excel 會挑剔兩件事：ExcelJS 轉不出規則時留下的空 <conditionalFormatting/>，
+   以及空的定義名稱。前者直接從 zip 裡拿掉，檔案才打得開。 */
+async function cleanXlsxParts(buf){
+  try{
+    const PizZip = window.PizZip;
+    if(!PizZip) return buf;
+    const zip = new PizZip(buf);
+    let hits = 0;
+    Object.keys(zip.files).forEach(function(name){
+      if(!/^xl\/worksheets\/sheet\d+\.xml$/.test(name)) return;
+      const f = zip.file(name);
+      if(!f) return;
+      const xml = f.asText();
+      const cleaned = xml
+        .replace(/<conditionalFormatting\b[^>]*\/>/g, function(){ hits++; return ''; })
+        .replace(/<conditionalFormatting\b[^>]*>\s*<\/conditionalFormatting>/g, function(){ hits++; return ''; });
+      if(cleaned !== xml) zip.file(name, cleaned);
+    });
+    if(!hits) return buf;
+    return zip.generate({ type:'uint8array', compression:'DEFLATE' });
+  }catch(err){ return buf; }
+}
+
 async function exportXlsx(){
   try{
-    const buf = await API.template('roster');
     const ExcelJS = window.ExcelJS;
     const wb = new ExcelJS.Workbook();
-    await wb.xlsx.load(buf);
     const iso = ref();
     const mat = E.matrix(state, iso);
 
-    const wsT = wb.getWorksheet('總表');
-    if(wsT){
-      mat.rows.forEach(r=>{
-        for(let row=2; row<=12; row++){
-          if(Number(wsT.getCell(row,1).value)===Number(r.cls)){
-            wsT.getCell(row,2).value = r.total;
-            for(let i=0;i<5;i++) wsT.getCell(row,3+i).value = r.per[i];
-            wsT.getCell(row,8).value = r.joined;
-            wsT.getCell(row,9).value = r.notJoined;
-            break;
-          }
-        }
+    /* 總表：各班五天人數（整份自己產生，不再轉存範本檔，避免 Excel 判定檔案損毀） */
+    const wsT = wb.addWorksheet('總表', { views:[{state:'frozen',ySplit:2}] });
+    const tHead = ['班級','總數','一','二','三','四','五','參加人數','不參加人數'];
+    [10,8,7,7,7,7,7,11,12].forEach((w,i)=>{ wsT.getColumn(i+1).width=w; });
+    wsT.mergeCells(1,1,1,tHead.length);
+    wsT.getCell(1,1).value = (state.meta.term||'')+'　夜自習各班參加人數（'+iso+' 基準）';
+    wsT.getCell(1,1).font = { name:'標楷體', size:14, bold:true };
+    wsT.getCell(1,1).alignment = { horizontal:'center', vertical:'middle' };
+    wsT.getRow(1).height = 26;
+    tHead.forEach((h,i)=>{
+      const c = wsT.getCell(2,i+1);
+      c.value=h; c.font={name:'標楷體',size:12,bold:true};
+      c.alignment={horizontal:'center',vertical:'middle'};
+      c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFEFEDE6'}};
+      c.border=borderAll();
+    });
+    const dayTotals = [0,0,0,0,0];
+    mat.rows.forEach((r,i)=>{
+      for(let d=0; d<5; d++) dayTotals[d] += r.per[d];
+      const vals = [r.cls, r.total, r.per[0], r.per[1], r.per[2], r.per[3], r.per[4], r.joined, r.notJoined];
+      vals.forEach((v,ci)=>{
+        const c = wsT.getCell(i+3, ci+1);
+        c.value=v; c.font={name:'標楷體',size:12};
+        c.alignment={horizontal:'center',vertical:'middle'};
+        c.border=borderAll();
       });
+    });
+    const tSum = mat.rows.length+3;
+    wsT.getCell(tSum,1).value='合計';
+    wsT.mergeCells(tSum,1,tSum,2);
+    const sumVals = [mat.total, dayTotals[0], dayTotals[1], dayTotals[2], dayTotals[3], dayTotals[4], mat.joined, mat.notJoined];
+    for(let ci=0; ci<sumVals.length; ci++){
+      const c = wsT.getCell(tSum, ci+3);
+      c.value = sumVals[ci];
+      c.alignment={horizontal:'center',vertical:'middle'};
     }
+    for(let c=1; c<=tHead.length; c++){
+      const cell = wsT.getCell(tSum,c);
+      cell.font={name:'標楷體',size:12,bold:true};
+      cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFF6F1E4'}};
+      cell.border=borderAll();
+    }
+    wsT.pageSetup = { paperSize:9, orientation:'landscape', fitToPage:true, fitToWidth:1, fitToHeight:0 };
 
-    const oldPhone = wb.getWorksheet('參加天數及電話') || wb.getWorksheet('參加天數及電話 ');
-    if(oldPhone) wb.removeWorksheet(oldPhone.id);
+    /* 參加天數及電話：全班名單、五天勾選、電話與便當 */
     const wsP = wb.addWorksheet('參加天數及電話', { views:[{state:'frozen',ySplit:2}] });
     const head = ['序號','班級','座號','姓名','一','二','三','四','五','天數','電話','家長輪值','便當','備註'];
     [6,8,7,10,5,5,5,5,5,7,15,10,8,26].forEach((w,i)=>{ wsP.getColumn(i+1).width=w; });
@@ -2808,9 +2857,11 @@ async function exportXlsx(){
       c.alignment={horizontal:'center'}; c.font={name:'標楷體',size:12,bold:true};
     }
     for(let c=1;c<=head.length;c++) wsP.getCell(sumRow,c).border=borderAll();
+    wsP.pageSetup = { paperSize:9, orientation:'landscape', fitToPage:true, fitToWidth:1, fitToHeight:0 };
 
     wb.calcProperties = { fullCalcOnLoad:true };
-    const out = await wb.xlsx.writeBuffer();
+    const raw = await wb.xlsx.writeBuffer();
+    const out = await cleanXlsxParts(raw);
     download(new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}), (E.opt(state,'exportPrefix')||'夜自習')+'_名單_'+stamp()+'.xlsx');
     toast('已下載 Excel');
   }catch(err){ toast('匯出失敗：'+err.message, 5000); }
