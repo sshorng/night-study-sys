@@ -651,7 +651,7 @@ const LIB = {
    1. CONFIG
    ===================================================================== */
 const CONFIG = {
-  VERSION: '2.16.4',
+  VERSION: '2.16.5',
   GAS_URL: 'https://script.google.com/macros/s/AKfycbxBk3fJaCrPfyojhPVgT6xNE110x3ENSGquQLVWLBz8jdNH2FgX6QMNBQKr1lHLZ8ePtw/exec',
   PASSWORD: '',
   ROLE_KEY: 'nightstudy.role',
@@ -1428,6 +1428,18 @@ function modal(title, bodyHTML, footHTML, wide){
   return $('modalRoot').firstElementChild;
 }
 function closeModal(){ $('modalRoot').innerHTML=''; }
+
+/* 點彈窗外面的空白處就關閉：按下與放開都在遮罩上才算，拖曳選字或滑動不會誤關 */
+let overlayDown = false;
+document.addEventListener('pointerdown', function(e){
+  overlayDown = !!(e.target && e.target.classList && e.target.classList.contains('overlay'));
+});
+document.addEventListener('click', function(e){
+  const onOverlay = !!(e.target && e.target.classList && e.target.classList.contains('overlay'));
+  const wasDown = overlayDown;
+  overlayDown = false;
+  if(onOverlay && wasDown) closeModal();
+});
 
 /* 站內確認視窗：取代瀏覽器原生 confirm，手機也看得清楚 */
 function confirmModal(title, messageHTML, onOk, okLabel){
