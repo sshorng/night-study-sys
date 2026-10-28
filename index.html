@@ -642,7 +642,7 @@ const LIB = {
    1. CONFIG
    ===================================================================== */
 const CONFIG = {
-  VERSION: '2.15.0',
+  VERSION: '2.15.1',
   /* 已內建的 Apps Script 部署網址：第一次使用只要在設定頁填通關密語，會記在這台裝置的瀏覽器 */
   GAS_URL: 'https://script.google.com/macros/s/AKfycbxBk3fJaCrPfyojhPVgT6xNE110x3ENSGquQLVWLBz8jdNH2FgX6QMNBQKr1lHLZ8ePtw/exec',
   PASSWORD: '',
@@ -3099,14 +3099,16 @@ function exportRosterPng(){
   const rows = E.seatRows(state);
   if(!rows.length){ toast('目前沒有名單可以輸出圖檔'); return; }
 
-  const RATIO = 2;
+  /* 出圖尺寸：版面座標固定 1080 寬，實際像素再乘 RATIO。
+     覺得圖太大就把 RATIO 調小（1.2 約 1296 像素寬），覺得模糊就調大。 */
+  const RATIO = 1.4;
   const COLS = [
     { t:'班級', w:96 }, { t:'座號', w:84 }, { t:'姓名', w:180 },
     { t:'一', w:52 }, { t:'二', w:52 }, { t:'三', w:52 }, { t:'四', w:52 }, { t:'五', w:52 },
     { t:'天數', w:80 }, { t:'備註', w:380 }
   ];
   const W = COLS.reduce(function(a,c){ return a + c.w; }, 0);
-  const TITLE_H = 128, HEAD_H = 58, ROW_H = 46, PAD = 26;
+  const TITLE_H = 118, HEAD_H = 54, ROW_H = 42, PAD = 22;
   const H = TITLE_H + HEAD_H + rows.length * ROW_H + PAD;
 
   const cv = document.createElement('canvas');
@@ -3122,17 +3124,17 @@ function exportRosterPng(){
   const school = E.opt(state, 'school') || '';
   g.textAlign = 'left'; g.textBaseline = 'alphabetic';
   g.fillStyle = '#1F1B15';
-  g.font = '600 34px ' + FONT;
-  g.fillText((school ? school + '　' : '') + '夜自習名單', 28, 62);
+  g.font = '600 30px ' + FONT;
+  g.fillText((school ? school + '　' : '') + '夜自習名單', 24, 56);
   g.fillStyle = '#4A4237';
-  g.font = '20px ' + FONT;
-  g.fillText((term ? term + '　' : '') + '基準日 ' + iso + '　共 ' + rows.length + ' 人', 28, 100);
+  g.font = '18px ' + FONT;
+  g.fillText((term ? term + '　' : '') + '基準日 ' + iso + '　共 ' + rows.length + ' 人', 24, 92);
 
   /* 表頭 */
   g.fillStyle = '#9E2B18';
   g.fillRect(0, TITLE_H, W, HEAD_H);
   g.fillStyle = '#FBF1EC';
-  g.font = '600 23px ' + FONT;
+  g.font = '600 20px ' + FONT;
   g.textAlign = 'center'; g.textBaseline = 'middle';
   let hx = 0;
   COLS.forEach(function(c){ g.fillText(c.t, hx + c.w / 2, TITLE_H + HEAD_H / 2 + 1); hx += c.w; });
@@ -3150,19 +3152,19 @@ function exportRosterPng(){
       .concat(r.days.map(function(v){ return v ? '■' : '□'; }))
       .concat([String(days), note]);
     g.fillStyle = '#1F1B15';
-    g.font = '22px ' + FONT;
+    g.font = '19px ' + FONT;
     let cx = 0;
     cells.forEach(function(v, ci){
       const c = COLS[ci];
       const left = (ci === 2 || ci === 9);
       g.textAlign = left ? 'left' : 'center';
       let text = String(v == null ? '' : v);
-      const maxW = c.w - 22;
+      const maxW = c.w - 20;
       if(g.measureText(text).width > maxW){
         while(text.length > 1 && g.measureText(text + '…').width > maxW) text = text.slice(0, -1);
         text += '…';
       }
-      g.fillText(text, left ? cx + 11 : cx + c.w / 2, y + ROW_H / 2 + 1);
+      g.fillText(text, left ? cx + 10 : cx + c.w / 2, y + ROW_H / 2 + 1);
       cx += c.w;
     });
   });
