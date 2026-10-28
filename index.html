@@ -421,9 +421,41 @@ input[type=checkbox]{accent-color:var(--seal)}
   #printArea .pagebreak{break-after:page;page-break-after:always}
   #printArea .pagebreak:last-child{break-after:auto;page-break-after:auto}
 }
+/* ---------- 進站關卡：通關密語 ---------- */
+body.gated{overflow:hidden}
+body.gated .sheet{opacity:.28;pointer-events:none;user-select:none}
+.gate{position:fixed;inset:0;z-index:9998;display:grid;place-items:center;padding:22px;
+  background:radial-gradient(circle at 50% 18%, rgba(158,43,24,.10), rgba(158,43,24,0) 62%), var(--paper)}
+.gate[hidden]{display:none}
+.gate .box{width:min(400px,100%);background:var(--card);border:1px solid var(--rule);border-radius:12px;
+  padding:26px 24px 22px;text-align:center;box-shadow:0 18px 44px rgba(31,27,21,.16)}
+.gate .crest{margin:0 auto 12px}
+.gate h2{margin:0 0 4px;font-family:var(--serif);font-size:18px;font-weight:600;letter-spacing:.18em}
+.gate .lead{margin:0 0 18px;font-size:12px;color:var(--ink-3);letter-spacing:.08em}
+.gate input{width:100%;padding:12px 14px;border:1px solid var(--rule);border-radius:6px;background:#FFFDF7;
+  font-size:16px;letter-spacing:.14em;text-align:center;color:var(--ink)}
+.gate input:focus{outline:2px solid var(--seal);outline-offset:1px}
+.gate .go{width:100%;margin-top:12px;padding:12px 10px;min-height:48px;border:0;border-radius:6px;
+  background:var(--seal);color:#FBF3E4;font-size:15px;letter-spacing:.24em;cursor:pointer}
+.gate .go:disabled{opacity:.55;cursor:progress}
+.gate .msg{min-height:20px;margin:10px 0 0;font-size:12px;line-height:1.7}
+.gate .msg.ng{color:var(--seal)}
+.gate .msg.ok{color:var(--ok)}
+.gate .foot{margin:14px 0 0;font-size:11px;color:var(--ink-3);line-height:1.7}
 </style>
 </head>
-<body>
+<body class="gated">
+<div class="gate" id="gate">
+  <div class="box" role="dialog" aria-modal="true" aria-labelledby="gateTitle">
+    <span class="crest" aria-label="建成國中印"><span>建</span><span>成</span><span>國</span><span>中</span></span>
+    <h2 id="gateTitle">夜自習點名簿</h2>
+    <p class="lead">請輸入通關密語才能進入</p>
+    <input id="gatePwd" type="password" autocomplete="current-password" placeholder="通關密語" aria-label="通關密語">
+    <button class="go" id="gateGo">進　入</button>
+    <p class="msg" id="gateMsg"></p>
+    <p class="foot">密語不會寫進程式或雲端資料，只用來向試算表後端確認身分；每次開這個網頁都要重新輸入一次。</p>
+  </div>
+</div>
 <div class="sheet">
 
   <aside class="stats" id="stats"></aside>
@@ -518,7 +550,7 @@ input[type=checkbox]{accent-color:var(--seal)}
             <label>Google Apps Script 網址（已內建，通常不必改）</label>
             <input id="cfgGas" placeholder="https://script.google.com/macros/s/..../exec">
           </div>
-          <p class="hint" style="margin:0 0 10px">程式裡已寫好你的部署網址，第一次使用只要填下面的通關密語；密語只記在這台裝置的瀏覽器，不會上傳。</p>
+          <p class="hint" style="margin:0 0 10px">開網頁時會先要求輸入通關密語。這裡的密語只記在這台裝置的瀏覽器，不會上傳；要換新密語，請先改試算表「設定」工作表的 password 那一列，再回來這裡填一樣的。</p>
           <div class="field" style="margin-bottom:10px">
             <label>通關密語</label>
             <input id="cfgPwd" type="password">
@@ -559,7 +591,7 @@ input[type=checkbox]{accent-color:var(--seal)}
    1. CONFIG
    ===================================================================== */
 const CONFIG = {
-  VERSION: '2.0.0',
+  VERSION: '2.1.0',
   /* 已內建的 Apps Script 部署網址：第一次使用只要在設定頁填通關密語，會記在這台裝置的瀏覽器 */
   GAS_URL: 'https://script.google.com/macros/s/AKfycbxBk3fJaCrPfyojhPVgT6xNE110x3ENSGquQLVWLBz8jdNH2FgX6QMNBQKr1lHLZ8ePtw/exec',
   PASSWORD: '',
@@ -934,6 +966,95 @@ function dlOptions(id, arr){
   return '<datalist id="'+id+'">'+arr.map(function(v){ return '<option value="'+esc(v)+'"></option>'; }).join('')+'</datalist>';
 }
 const ref = () => state.config.refDate || E.today();
+
+/* 點名單預設日期：每次開網頁都回到今天，不沿用上次看的日期 */
+function syncToday(){
+  state.config = state.config || {};
+  state.config.refDate = E.today();
+  ui.weekRef = state.config.refDate;
+}
+
+/* ---------- 進站關卡：一進網頁先輸入通關密語 ---------- */
+const GATE = {
+  KEY_PWD: 'nightstudy.pwd',
+  KEY_HASH: 'nightstudy.pwdhash',
+  /* 只用來當離線時的比對依據，不是密語本體 */
+  async hash(s){
+    const txt = 'nightstudy:' + String(s==null ? '' : s);
+    if(window.crypto && crypto.subtle && crypto.subtle.digest && window.TextEncoder){
+      try{
+        const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(txt));
+        return Array.prototype.map.call(new Uint8Array(buf), function(b){ return ('0'+b.toString(16)).slice(-2); }).join('');
+      }catch(err){ /* 非安全來源（file://）時退回下面的簡單雜湊 */ }
+    }
+    let h = 5381;
+    for(let i=0;i<txt.length;i++) h = ((h*33) ^ txt.charCodeAt(i)) >>> 0;
+    return 'djb2-' + h.toString(16);
+  },
+  /* 密語能不能過：連得上後端就向後端 ping 驗證；連不上才用這台裝置上次驗證成功的雜湊比對 */
+  async verify(raw){
+    const pwd = String(raw==null ? '' : raw);
+    if(!pwd.trim()) return { ok:false, msg:'請先輸入通關密語' };
+    const savedHash = localStorage.getItem(GATE.KEY_HASH) || '';
+    if(!API.isCloud()){
+      if(!savedHash) return { ok:true, local:true };
+      return (await GATE.hash(pwd)) === savedHash ? { ok:true, local:true } : { ok:false, msg:'通關密語不正確' };
+    }
+    const prev = CONFIG.PASSWORD;
+    CONFIG.PASSWORD = pwd;
+    try{
+      await API.call({ action:'ping' });
+      return { ok:true };
+    }catch(err){
+      CONFIG.PASSWORD = prev;
+      const m = String((err && err.message) || '');
+      if(m.indexOf('通關密語不正確') >= 0) return { ok:false, msg:'通關密語不正確，請再試一次' };
+      if(m.indexOf('後端還沒設定通關密語') >= 0) return { ok:false, msg:m };
+      if(savedHash && (await GATE.hash(pwd)) === savedHash) return { ok:true, offline:true };
+      return { ok:false, msg:'連不上雲端，現在無法確認密語：' + (m || '請確認網路後再試一次') };
+    }
+  }
+};
+
+function showGate(){
+  return new Promise(function(resolve){
+    const gate = $('gate'), inp = $('gatePwd'), go = $('gateGo'), msg = $('gateMsg');
+    document.body.classList.add('gated');
+    gate.hidden = false;
+    inp.value = '';
+    setTimeout(function(){ try{ inp.focus(); }catch(err){} }, 60);
+    let busy = false;
+    async function submit(){
+      if(busy) return;
+      const pwd = inp.value;
+      busy = true; go.disabled = true;
+      msg.className = 'msg'; msg.textContent = '正在確認密語…';
+      let r;
+      try{ r = await GATE.verify(pwd); }
+      catch(err){ r = { ok:false, msg:'確認失敗：' + err.message }; }
+      busy = false; go.disabled = false;
+      if(!r.ok){
+        msg.className = 'msg ng'; msg.textContent = r.msg || '通關密語不正確';
+        try{ inp.select(); }catch(err){}
+        return;
+      }
+      CONFIG.PASSWORD = pwd;
+      localStorage.setItem(GATE.KEY_PWD, pwd);
+      try{ localStorage.setItem(GATE.KEY_HASH, await GATE.hash(pwd)); }catch(err){}
+      if($('cfgPwd')) $('cfgPwd').value = pwd;
+      msg.className = 'msg ok'; msg.textContent = '密語正確，進入中…';
+      gate.hidden = true;
+      document.body.classList.remove('gated');
+      if(r.offline) toast('現在連不上雲端，先用這台裝置上次同步的資料', 5200);
+      else if(r.local) toast('本機模式：資料只存在這台裝置', 4200);
+      resolve();
+    }
+    go.addEventListener('click', submit);
+    inp.addEventListener('keydown', function(e){
+      if(e.key === 'Enter'){ e.preventDefault(); submit(); }
+    });
+  });
+}
 
 function toast(msg, ms){
   const el = document.createElement('div');
@@ -2765,6 +2886,9 @@ async function boot(){
   $('cfgGas').value = CONFIG.GAS_URL;
   $('cfgPwd').value = CONFIG.PASSWORD;
 
+  /* 一進網頁先過通關密語，通過才進站；測試可用 window.__NS_NOGATE 跳過 */
+  if(!window.__NS_NOGATE) await showGate();
+
   /* 先用手上的資料畫出來，不等網路 */
   let local = null;
   try{
@@ -2774,6 +2898,8 @@ async function boot(){
   /* 本機有存檔就用本機，沒有就用空狀態；window.SEED 只保留給測試與匯入用，正式檔為 null */
   state = local || (window.SEED ? JSON.parse(JSON.stringify(window.SEED)) : emptyState());
   normalize();
+  /* 點名單預設日期自動移到今天 */
+  syncToday();
   render();
   /* 背景先把 templates 資料夾裡的範本讀進記憶體，第一次匯出就不必等 */
   API.warmTemplates().then(function(){
@@ -2793,6 +2919,7 @@ async function boot(){
       }
       state = r.state;
       normalize();
+      syncToday();
       render();
     }else if(r.ok){
       await API.save();
