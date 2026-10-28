@@ -253,6 +253,11 @@ input[type=checkbox]{accent-color:var(--seal)}
 .stu-tag{background:var(--seal-soft);border:1px solid #DCB6AA;border-radius:4px;
   padding:0 5px;color:#7E2415;font-family:var(--serif);cursor:pointer;white-space:nowrap}
 .stu-tag:hover{background:#F2C9BE}
+/* 輪值教師：不能操作的東西就不要看起來可以點，也不要跳一堆提示 */
+body.role-teacher [data-stu],body.role-teacher [data-slot],body.role-teacher [data-un],
+body.role-teacher [data-day][data-key],body.role-teacher .stu-tag,
+body.role-teacher [data-editday],body.role-teacher [data-toggle]{cursor:default}
+body.role-teacher .stu-tag:hover{background:var(--seal-soft)}
 /* 圖示按鈕：儲存打勾、編輯鉛筆、刪除叉叉 */
 .icobtn{width:44px;height:44px;display:inline-flex;align-items:center;justify-content:center;
   border:1px solid var(--rule);border-radius:6px;background:var(--card);color:var(--ink-2);
@@ -2464,7 +2469,7 @@ function noteRow(n, editable){
       + '<input class="nt-time" type="time" data-ntime="'+n.id+'" value="'+esc(n.time||'')+'" aria-label="記事時間">'
       + '<div class="nt-main">'
       +   '<div class="nt-text" contenteditable="true" spellcheck="false" data-ntext="'+n.id+'" data-ph="記事內容，輸入 90101 會變成學生標記">'+richHtml(n.text||'')+'</div>'
-      +   '<div class="nt-hint">輸入 90101 或 901-01 會變成學生標記；儲存後點標記可直接建立違規單。</div>'
+      +   '<div class="nt-hint">輸入 90101 或 901-01 會變成學生標記' + (isTeacher() ? '。' : '；儲存後點標記可直接建立違規單。') + '</div>'
       + '</div>'
       + '<div class="nt-acts">'
       +   '<button class="icobtn seal" data-savenote="'+n.id+'" title="儲存" aria-label="儲存">'+ICO.check+'</button>'
@@ -2603,7 +2608,7 @@ document.addEventListener('click', e=>{
   /* 輪值教師：只開放點名與今天的日誌，其餘一律擋下 */
   if(isTeacher()){
     const blocked = e.target.closest('[data-toggle],[data-batch],[data-pickall],[data-day][data-key],[data-slot],[data-un],#btnAutoSeat,#btnClearSeat,#btnSeatOut,#btnSeatOutBot');
-    if(blocked){ toast('輪值教師模式：只能處理點名，不能改參加日期'); return; }
+    if(blocked) return;
   }
   // 切換身分（只出現在輪值教師）
   if(e.target.id==='btnSwitchRole'){
@@ -2818,7 +2823,7 @@ document.addEventListener('click', e=>{
   if(dayBtn){
     const d = dayBtn.dataset.editday;
     /* 輪值教師只能改今天的日誌，其他日子只看得到 */
-    if(isTeacher() && d !== ref()){ toast('輪值教師只能編輯今天的日誌，其他日子只能查看'); return; }
+    if(isTeacher() && d !== ref()) return;
     if(ui.editNote) cancelNote(ui.editNote);
     ui.dutyEdit = (ui.dutyEdit === d) ? null : d;
     render();
@@ -2841,6 +2846,7 @@ document.addEventListener('click', e=>{
   /* 點內文中的學生標記，直接建立違規單 */
   const tag = e.target.closest('.stu-tag');
   if(tag && !e.target.closest('[contenteditable="true"]')){
+    if(isTeacher()){ return; }
     const wrap = tag.closest('[data-nid]');
     const n = wrap ? noteById(wrap.dataset.nid) : null;
     openVioForm(null, { key:tag.dataset.tag, date:(n ? n.date : ref()), reason:(n ? n.text : '') });
@@ -2987,8 +2993,8 @@ function autoSeat(){
 
 /* ---------- 對話框：學生資料 ---------- */
 function openStudent(key){
-  /* 輪值教師本來就不能改，乾脆不開窗，一句話說明就好 */
-  if(isTeacher()){ toast('輪值教師只能查看名單，學生資料不開放編輯', 3600); return; }
+  /* 輪值教師本來就不能改，點了也不開窗、不跳提示 */
+  if(isTeacher()) return;
   const s = E.byKey(state,key);
   if(!s) return;
   const hist = E.historyOf(state,key);
