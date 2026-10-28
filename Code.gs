@@ -12,6 +12,8 @@ const PWD_KEY = 'password';
 /** 「設定」工作表裡這幾列是系統用的，其餘每一列都是可調參數（前端「設定與檢查」頁也會寫回這裡）。
  *  參數以「項目／值」兩欄呈現，直接在試算表改完，前端按「從雲端重新載入」就生效。 */
 const CFG_SYS_KEYS = { password: 1, meta: 1, config: 1, conflicts: 1, updatedAt: 1 };
+/* 輪值教師被允許寫入的項目：點名、輪值日誌、以及畫面用的 config（基準日等） */
+const TEACHER_PARTS = ['checkins', 'duty', 'dutyNotes', 'config'];
 
 /** 範本檔名（上傳到雲端硬碟後，用檔名尋找） */
 const TPL_NAMES = ['座位表-範本.docx', '違規單-範本.docx', '名單範本.xlsx'];
@@ -126,7 +128,7 @@ function doGet(e) {
   return json_({
     ok: true,
     service: '夜自習管理系統後端',
-    version: '1.2.0',
+    version: '1.3.0',
     sheets: Object.keys(SHEET_DEF).map(function (k) { return SHEET_DEF[k].name; }),
     templates: templates,
     message: '請用 POST 呼叫，或直接開啟 index.html 使用。',
@@ -141,21 +143,22 @@ function doPost(e) {
   } catch (err) {
     return json_({ ok: false, error: '請求格式錯誤（不是合法 JSON）' });
   }
-  const expectPwd = password_();
-  if (!expectPwd) {
+  const role = roleOf_(req.password);
+  if (!passwordList_().length) {
     return json_({
       ok: false,
       error: '後端還沒設定通關密語：請在試算表「設定」工作表新增一列（A 欄 password、B 欄你的密語），'
         + '或在 Apps Script「專案設定 → 指令碼屬性」新增 PASSWORD',
     });
   }
-  if (String(req.password || '') !== expectPwd) {
+  if (!role) {
     return json_({ ok: false, error: '通關密語不正確' });
   }
   try {
     switch (req.action) {
       case 'ping':
-        return json_({ ok: true, pong: new Date().toISOString(), generation: generation_() });
+        return json_({ ok: true, role: role, hasTeacher: passwordList_().length > 1,
+          pong: new Date().toISOString(), generation: generation_() });
       case 'loadAll': {
         const loadT0 = Date.now();
         const gen = generation_();
@@ -178,17 +181,40 @@ function doPost(e) {
       }
       case 'saveAll': {
         const saveT0 = Date.now();
+        /* 輪值教師只能寫點名與輪值日誌，後端也要擋一層，不只靠前端隱藏按鈕 */
+        if (role === 'teacher') {
+          const bad = (req.parts || []).filter(function (p) { return TEACHER_PARTS.indexOf(p) < 0; });
+          if (bad.length) {
+            return json_({ ok: false, role: role,
+              error: '輪值教師只能更新點名與輪值日誌（這次含：' + bad.join('、') + '）' });
+          }
+        }
         const before = generation_();
         const result = saveState_(req);
         const gen = bumpGeneration_();
         removeCacheChunked_(cacheKeyFor_(before));
         return json_({
-          ok: true, savedAt: new Date().toISOString(), generation: gen,
+          ok: true, role: role, savedAt: new Date().toISOString(), generation: gen,
           wrote: result.wrote, serverMs: Date.now() - saveT0,
         });
       }
       case 'getTemplate':
-        return json_({ ok: true, name: req.name, base64: getTemplateBase64_(req.name) });
+        return json_({ ok: true, role: role, name: req.name, base64: getTemplateBase64_(req.name) });
+      case 'setPasswords': {
+        /* 只給管理員：把管理密語與教師密語（中間用半形逗號）寫回設定工作表 password 那一列 */
+        if (role !== 'admin') return json_({ ok: false, role: role, error: '只有管理員可以改密語' });
+        const admin = String(req.admin || '').trim();
+        const teacher = String(req.teacher || '').trim();
+        if (!admin) return json_({ ok: false, role: role, error: '管理密語不能空白' });
+        if (teacher && teacher === admin) {
+          return json_({ ok: false, role: role, error: '教師密語不能跟管理密語相同' });
+        }
+        if (/,|，|、|;|；|\n/.test(admin) || /,|，|、|;|；|\n/.test(teacher)) {
+          return json_({ ok: false, role: role, error: '密語不能包含逗號、頓號、分號或換行' });
+        }
+        writePassword_(teacher ? (admin + ',' + teacher) : admin);
+        return json_({ ok: true, role: role, hasTeacher: !!teacher });
+      }
       default:
         return json_({ ok: false, error: '未知的動作：' + req.action });
     }
@@ -664,6 +690,37 @@ function password_() {
   if (!pwd) pwd = PropertiesService.getScriptProperties().getProperty('PASSWORD') || '';
   MEMO.pwd = pwd;
   return pwd;
+}
+
+/** 設定工作表的 password 列可以放多組密語，用逗號、頓號、分號或換行分隔：
+ *  第一組是管理員，其餘每一組都是輪值教師。 */
+function passwordList_() {
+  return String(password_() || '')
+    .split(/[\x2c\uFF0C\u3001\x3b\uFF1B\n\r]+/)
+    .map(function (s) { return String(s).trim(); })
+    .filter(function (s) { return !!s; });
+}
+
+/** 這個密語是哪一種身分：admin（第一組）、teacher（其餘）、空字串（不對） */
+function roleOf_(pwd) {
+  const list = passwordList_();
+  const i = list.indexOf(String(pwd === null || pwd === undefined ? '' : pwd).trim());
+  if (i < 0) return '';
+  return i === 0 ? 'admin' : 'teacher';
+}
+
+/** 把 password 那一列改成指定內容（管理員與教師密語用逗號接起來） */
+function writePassword_(value) {
+  const rows = readRows_('config')
+    .filter(function (r) { return String(r[0] || '').trim(); })
+    .map(function (r) { return [String(r[0]).trim(), r[1]]; });
+  let found = false;
+  for (let i = 0; i < rows.length; i++) {
+    if (rows[i][0] === PWD_KEY) { rows[i][1] = value; found = true; break; }
+  }
+  if (!found) rows.push([PWD_KEY, value]);
+  writeRows_('config', rows);
+  MEMO.pwd = undefined;
 }
 
 function pad2_(v) {
