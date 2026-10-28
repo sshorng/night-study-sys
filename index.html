@@ -120,6 +120,8 @@ input,select,textarea{font-family:inherit;font-size:14px}
   cursor:help;vertical-align:middle}
 .ledger .wkmk{display:none}
 .pill{display:inline-block;font-size:11px;padding:1px 8px;border-radius:999px;border:1px solid var(--rule);color:var(--ink-3);background:var(--card)}
+/* 身分標記：hidden 要真的藏起來（.pill 自己設了 display，會蓋掉 hidden） */
+#roleTag[hidden]{display:none}
 .pill.seal{background:var(--seal-soft);border-color:#DCB6AA;color:#7E2415}
 .pill.ok{background:var(--ok-soft);border-color:#B9CDB4;color:#2F5340}
 .pill.bad{background:#F6DCD5;border-color:#DCB6AA;color:#8C2415}
