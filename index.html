@@ -547,13 +547,6 @@ body.gated .sheet{opacity:.28;pointer-events:none;user-select:none}
             <button class="btn" id="expVio">下載違規通知單（.docx）</button>
             <button class="btn" id="expPrintList">列印名單（A4）</button>
             <button class="btn" id="expLinePng">下載名單圖檔（LINE 公告用 PNG）</button>
-            <label class="hint" style="display:flex;align-items:center;gap:6px;margin:2px 0 0">圖檔尺寸
-              <select id="pngSize" style="padding:4px 6px">
-                <option value="sm">小（720 寬）</option>
-                <option value="md">中（900 寬）</option>
-                <option value="lg">大（1080 寬）</option>
-              </select>
-            </label>
             <button class="btn" id="expBackup">備份全部資料（.json）</button>
           </div>
         </div>
@@ -657,7 +650,7 @@ const CONFIG = {
   LOCAL_ONLY: false,
   DAY_LABELS: ['一','二','三','四','五'],
   WEEKDAY: ['日','一','二','三','四','五','六'],
-  /* 原檔座位欄標籤：一A、一C…七C（A 上列、C 下列，段號接在後面） */
+  VERSION: '2.15.6',
   SEAT_GROUPS: ['一A','一C','二A','二C','三A','三C','四A','四C','五A','五C','六A','六C','七A','七C'],
   STORE_KEY: 'nightstudy.state.v2',
   TPL_NAMES: { seat:'座位表-範本.docx', violation:'違規單-範本.docx', roster:'名單範本.xlsx' },
@@ -718,7 +711,7 @@ const cloud = { loaded:false, authoritative:false, pending:false, noticed:false,
 /* 背景上傳中：true 時右上角顯示「儲存中…」 */
 let saving = false;
 let ui = { tab:'today', sel:null, vioSel:new Set(), weekRef:'', cls:'all',
-  rcls:0, q:'', show:'in', pick:new Set(), lvFilter:'all', editNote:null, noteDraft:null, dutyEdit:null, pngSize:'sm' };
+  rcls:0, q:'', show:'in', pick:new Set(), lvFilter:'all', editNote:null, noteDraft:null, dutyEdit:null };
 
 /* 存檔時只送有變動的項目：改一位學生不必把整份資料再傳一次 */
 const SYNC_PARTS = ['students','enrollments','calendar','leaves','violations','checkins',
@@ -2013,11 +2006,6 @@ function renderLog(){
   $('logTools').innerHTML = '<button class="btn primary" id="btnNewEnroll">新增異動</button>'
     + '<button class="btn" id="btnCopyLog">複製文字</button>'
     + '<button class="btn" id="btnLogLinePng">下載名單圖檔（LINE 公告用 PNG）</button>'
-    + '<select id="pngSize" style="padding:4px 6px">'
-    + [['sm','小（720 寬）'],['md','中（900 寬）'],['lg','大（1080 寬）']].map(function(o){
-        return '<option value="' + o[0] + '"' + (ui.pngSize === o[0] ? ' selected' : '') + '>' + o[1] + '</option>';
-      }).join('')
-    + '</select>'
     + '<span class="hint">共 '+list.length+' 筆，記錄生效日之前的狀態不受影響</span>';
   $('logList').innerHTML = list.length ? list.map(e=>{
     const s = E.byKey(state,e.key) || { name:'（已刪除）', cls:'' };
@@ -2490,9 +2478,6 @@ function refreshOptPreviews(){
 
 function render(){
   renderShell();
-  /* 匯出頁的尺寸選單是靜態 HTML，每次重畫都跟目前的設定對齊 */
-  const pngSel = document.querySelector('#page-export select#pngSize');
-  if(pngSel) pngSel.value = ui.pngSize;
   renderTabs();
   if(ui.tab==='today') renderToday();
   if(ui.tab==='list') renderList();
@@ -2633,11 +2618,6 @@ document.addEventListener('change', e=>{
       if(c.checked) ui.vioSel.add(c.dataset.vio); else ui.vioSel.delete(c.dataset.vio);
     });
     renderVio();
-  }
-  if(e.target.id==='pngSize'){
-    ui.pngSize = e.target.value;
-    const nm = { sm:'小（720 寬）', md:'中（900 寬）', lg:'大（1080 寬）' };
-    toast('名單圖檔尺寸改為' + (nm[ui.pngSize] || '小（720 寬）'));
   }
   if(e.target.id==='tplPicker'){ /* handled below */ }
 });
@@ -3156,16 +3136,14 @@ function exportRosterPng(){
   const rows = E.seatRows(state);
   if(!rows.length){ toast('目前沒有名單可以輸出圖檔'); return; }
 
-  /* 出圖尺寸：版面座標固定 1080 寬，實際像素再乘 RATIO。
-     按鈕旁可選：小 720、中 900、大 1080 像素寬（預設小，貼 LINE 最省版面）。 */
-  const TARGET_W = { sm:720, md:900, lg:1080 }[ui.pngSize] || 720;
+  /* 出圖寬度固定 1080 像素（LINE 剛好），版面座標也是 1080 寬，所以比例是 1。 */
   const COLS = [
     { t:'班級', w:96 }, { t:'座號', w:84 }, { t:'姓名', w:180 },
     { t:'一', w:52 }, { t:'二', w:52 }, { t:'三', w:52 }, { t:'四', w:52 }, { t:'五', w:52 },
     { t:'天數', w:80 }, { t:'備註', w:380 }
   ];
   const W = COLS.reduce(function(a,c){ return a + c.w; }, 0);
-  const RATIO = TARGET_W / W;
+  const RATIO = 1080 / W;
   const TITLE_H = 104, HEAD_H = 48, ROW_H = 38, PAD = 18;
   const H = TITLE_H + HEAD_H + rows.length * ROW_H + PAD;
 
@@ -3249,7 +3227,7 @@ function exportRosterPng(){
 
   cv.toBlob(function(blob){
     download(blob, (E.opt(state,'exportPrefix')||'夜自習') + '_名單_' + stamp() + '.png');
-    toast('已下載名單圖檔（PNG，寬 ' + Math.round(W * RATIO) + ' 像素，可直接貼到 LINE）');
+    toast('已下載名單圖檔（PNG，寬 1080 像素，可直接貼到 LINE）');
   }, 'image/png');
 }
 
