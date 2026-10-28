@@ -505,7 +505,6 @@ body.gated .sheet{opacity:.28;pointer-events:none;user-select:none}
           <p class="meta" id="railSub">建成國中　115 學年度第 1 學期</p>
         </div>
         <div class="when">
-          <button class="btn tiny" id="btnSwitchRole" hidden style="margin-right:8px">切換身分</button>
           <span class="pill seal" id="roleTag" hidden style="margin-right:8px">輪值教師</span>
           <span class="meta" id="topMeta"></span>
         </div>
@@ -1367,8 +1366,6 @@ function applyRole(){
   if(allowedTabs().indexOf(ui.tab) < 0) ui.tab = 'today';
   const tag = $('roleTag');
   if(tag) tag.hidden = !isTeacher();
-  const sw = $('btnSwitchRole');
-  if(sw) sw.hidden = !isTeacher();
 }
 
 /* 設定頁顯示這台裝置記住密語的狀態，一眼看出有沒有記住 */
@@ -2671,16 +2668,6 @@ document.addEventListener('click', e=>{
   if(isTeacher()){
     const blocked = e.target.closest('[data-toggle],[data-batch],[data-pickall],[data-day][data-key],[data-slot],[data-un],#btnAutoSeat,#btnClearSeat,#btnSeatOut,#btnSeatOutBot');
     if(blocked) return;
-  }
-  // 切換身分（只出現在輪值教師）
-  if(e.target.id==='btnSwitchRole'){
-    ROLE = 'admin';
-    localStorage.removeItem(CONFIG.ROLE_KEY);
-    CONFIG.PASSWORD = '';
-    if($('cfgPwd')) $('cfgPwd').value = '';
-    applyRole(); renderMemoState();
-    showGate('請輸入管理密語切換回管理員，或輸入教師密語繼續以教師身分使用。');
-    return;
   }
   // 今夜點名
   if(e.target.id==='dayPrev' || e.target.id==='dayNext'){
