@@ -1647,7 +1647,7 @@ function listRows(){
   }).sort((a,b)=> a.cls-b.cls || a.seat.localeCompare(b.seat));
 }
 
-/* 搜尋：姓名、學號、座號、班級，或「班級＋座號」連寫（90129 就找 901 班 29 號） */
+/* 搜尋：姓名、學號、座號、班級，或「班級＋座號」連寫（90101 就找 901 班 01 號） */
 function listHit(s, q){
   const name = String(s.name||'').toLowerCase();
   if(name.indexOf(q) >= 0) return true;
@@ -1769,7 +1769,7 @@ function renderList(){
         return '<button class="chip'+(ui.rcls===c?' sel':'')+'" data-rcls="'+c+'">'+c+'　'+a+'／'+t.length+'</button>';
       }).join('')
     + '</div>'
-    + '<input class="btn" id="rosterQ" style="min-width:260px" placeholder="搜尋姓名、座號或 90129" value="'+esc(ui.q||'')+'">'
+    + '<input class="btn" id="rosterQ" style="min-width:260px" placeholder="搜尋姓名、座號或 90101" value="'+esc(ui.q||'')+'">'
     + [['all','全部'],['in','參加'],['out','不參加']].map(([k,l])=>
         '<button class="chip'+(ui.show===k?' sel':'')+'" data-show="'+k+'">'+l+'</button>').join('')
     + '</div>';
@@ -2463,8 +2463,8 @@ function noteRow(n, editable){
     return '<div class="nt nt-edit" data-nid="'+n.id+'">'
       + '<input class="nt-time" type="time" data-ntime="'+n.id+'" value="'+esc(n.time||'')+'" aria-label="記事時間">'
       + '<div class="nt-main">'
-      +   '<div class="nt-text" contenteditable="true" spellcheck="false" data-ntext="'+n.id+'" data-ph="記事內容，輸入 90129 會變成學生標記">'+richHtml(n.text||'')+'</div>'
-      +   '<div class="nt-hint">輸入 90129 或 901-29 會變成學生標記；儲存後點標記可直接建立違規單。</div>'
+      +   '<div class="nt-text" contenteditable="true" spellcheck="false" data-ntext="'+n.id+'" data-ph="記事內容，輸入 90101 會變成學生標記">'+richHtml(n.text||'')+'</div>'
+      +   '<div class="nt-hint">輸入 90101 或 901-01 會變成學生標記；儲存後點標記可直接建立違規單。</div>'
       + '</div>'
       + '<div class="nt-acts">'
       +   '<button class="icobtn seal" data-savenote="'+n.id+'" title="儲存" aria-label="儲存">'+ICO.check+'</button>'
