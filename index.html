@@ -731,7 +731,7 @@ const LIB = {
    1. CONFIG
    ===================================================================== */
 const CONFIG = {
-  VERSION: '2.16.12',
+  VERSION: '2.16.13',
   GAS_URL: 'https://script.google.com/macros/s/AKfycbxBk3fJaCrPfyojhPVgT6xNE110x3ENSGquQLVWLBz8jdNH2FgX6QMNBQKr1lHLZ8ePtw/exec',
   PASSWORD: '',
   ROLE_KEY: 'nightstudy.role',
@@ -917,6 +917,22 @@ const E = {
     if(w<1||w>5) return false;
     if(!E.isSchoolDay(st,iso)) return false;
     return E.daysAt(st,key,iso)[w-1]===1;
+  },
+  /* 這一天有沒有排夜自習：要是上課日，而且至少一位學生排了這天 */
+  hasSchedule(st,iso){
+    if(!E.isSchoolDay(st,iso)) return false;
+    return E.active(st).some(function(s){ return E.present(st, s.key, iso); });
+  },
+  /* 往前或往後找最近一個有排夜自習的日期；找不到回空字串 */
+  stepScheduled(st,from,dir,maxDays){
+    const limit = maxDays || 120;
+    for(let i=1; i<=limit; i++){
+      const d = E.parse(from);
+      d.setDate(d.getDate() + dir*i);
+      const iso = E.iso(d);
+      if(E.hasSchedule(st, iso)) return iso;
+    }
+    return '';
   },
   onLeave(st,key,iso){ return (st.leaves||[]).some(l=>l.key===key&&l.date===iso); },
   checkin(st,key,iso){ const c=(st.checkins||[]).find(x=>x.key===key&&x.date===iso); return c?c.status:''; },
@@ -1695,9 +1711,9 @@ function renderToday(){
   const wdIdx = (function(){ const w = E.wd(iso); return (w>=1 && w<=5) ? w-1 : -1; })();
   $('todayTools').innerHTML = ''
     + '<div class="daynav">'
-    + '<button class="btn nav" id="dayPrev" title="前一天" aria-label="前一天">‹</button>'
+    + '<button class="btn nav" id="dayPrev" title="前一個夜自習日" aria-label="前一個夜自習日">‹</button>'
     + '<input type="date" id="refDate" class="btn" value="'+iso+'" style="min-height:44px">'
-    + '<button class="btn nav" id="dayNext" title="後一天" aria-label="後一天">›</button>'
+    + '<button class="btn nav" id="dayNext" title="後一個夜自習日" aria-label="後一個夜自習日">›</button>'
     + '</div>'
     + '<button class="btn seal" id="btnAllIn">今夜全到</button>'
     + '<button class="btn" id="btnAllClear">清除點名</button>'
@@ -2783,10 +2799,15 @@ document.addEventListener('click', e=>{
     return;
   }
   if(e.target.id==='dayPrev' || e.target.id==='dayNext'){
-    const d = E.parse(ref());
-    d.setDate(d.getDate() + (e.target.id==='dayPrev' ? -1 : 1));
-    state.config.refDate = E.iso(d);
-    ui.weekRef = state.config.refDate;
+    /* 前後日直接跳到最近一個有排夜自習的日期，週末、放假、沒排人的日子都跳過 */
+    const dir = e.target.id==='dayPrev' ? -1 : 1;
+    const next = E.stepScheduled(state, ref(), dir, 120);
+    if(!next){
+      toast(dir < 0 ? '往前已經沒有排定的夜自習日' : '往後已經沒有排定的夜自習日', 3600);
+      return;
+    }
+    state.config.refDate = next;
+    ui.weekRef = next;
     commit();
     return;
   }
