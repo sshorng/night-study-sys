@@ -428,6 +428,7 @@ body.role-teacher .stu-tag:hover{background:var(--seal-soft)}
   .ledger td.d:nth-of-type(9){grid-column:6;padding-bottom:0}
   .ledger td.d:nth-of-type(4)::before{content:'一'}
   .ledger td.d:nth-of-type(5)::before{content:'二'}
+  .ledger td.d:nth-of-type(9) .ckbtn{min-height:38px}
   .ledger td.d:nth-of-type(6)::before{content:'三'}
   .ledger td.d:nth-of-type(7)::before{content:'四'}
   .ledger td.d:nth-of-type(8)::before{content:'五'}
@@ -442,7 +443,7 @@ body.role-teacher .stu-tag:hover{background:var(--seal-soft)}
   .ledger tr.band td{display:block;margin-bottom:2px;padding:12px 0 6px;font-size:12px;
     letter-spacing:.14em;background:transparent;border-top:2px solid var(--rule)}
   .ledger tbody:first-of-type tr.band td{border-top:0;padding-top:2px}
-  .mkbtn{width:100%;max-width:52px;height:44px;border:1px solid var(--rule);border-radius:6px;font-size:17px}
+  .mkbtn{width:38px;height:38px;max-width:none;border:1px solid var(--rule);border-radius:6px;font-size:14px}
   .ledger td.d .wkmk{position:absolute;left:0;right:0;bottom:0;display:block;text-align:center;
     font-size:10px;line-height:1;color:var(--seal);letter-spacing:0;font-style:normal}
   /* 沒有電話與備註的學生不必留空白列，手機版更省空間 */
@@ -759,7 +760,7 @@ const LIB = {
    1. CONFIG
    ===================================================================== */
 const CONFIG = {
-  VERSION: '2.16.14',
+  VERSION: '2.16.15',
   GAS_URL: 'https://script.google.com/macros/s/AKfycbxBk3fJaCrPfyojhPVgT6xNE110x3ENSGquQLVWLBz8jdNH2FgX6QMNBQKr1lHLZ8ePtw/exec',
   PASSWORD: '',
   ROLE_KEY: 'nightstudy.role',
