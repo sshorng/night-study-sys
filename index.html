@@ -407,29 +407,53 @@ body.role-teacher .stu-tag:hover{background:var(--seal-soft)}
   /* 學生清單：窄螢幕改卡片，表格收起來 */
   #listTableWrap,#leaveTableWrap,#vioTableWrap{display:none}
   #listCards,#leaveCards,#vioCards{display:flex;flex-direction:column;gap:10px}
-  /* 手機版點名列：座號姓名一行、五個方塊加今夜一行、備註一行 */
+  /* 手機版點名列：座號＋姓名一行、五個方塊獨佔一行、備註一行 */
   .ledger thead{display:none}
   .ledger tbody tr.person{display:grid;
-    grid-template-columns:repeat(5,44px) 58px minmax(0,1fr);
-    gap:6px 4px;align-items:center;padding:12px 0;border-bottom:1px solid var(--rule-soft)}
+    grid-template-columns:repeat(5,minmax(0,1fr)) minmax(58px,auto);
+    gap:8px 6px;align-items:center;padding:12px 2px;border-bottom:1px solid var(--rule-soft)}
   .ledger tbody tr.person td{border:0;padding:0}
   .ledger .c{display:none}
-  .ledger .s{grid-row:1;grid-column:1;font-size:12px;color:var(--ink-3)}
-  .ledger .nm{grid-row:1;grid-column:2 / -1;font-size:17px;letter-spacing:.04em}
-  .ledger td.d{grid-row:2;position:relative;display:flex;justify-content:center;align-items:flex-start;
-    padding-bottom:14px;background:transparent}
+  .ledger .s{grid-row:1;grid-column:1;font-size:12px;color:var(--ink-3);letter-spacing:.06em}
+  .ledger .nm{grid-row:1;grid-column:2 / -1;font-size:17px;line-height:1.4;letter-spacing:.06em}
+  /* 表頭在手機版收起來，改成每個方塊上方標星期，才知道哪一格是哪一天 */
+  .ledger td.d{grid-row:2;position:relative;width:auto;padding:0 0 12px;background:transparent;
+    display:flex;flex-direction:column;justify-content:center;align-items:center;gap:2px}
+  .ledger td.d::before{font-size:10px;line-height:1.2;letter-spacing:0;color:var(--ink-3)}
   .ledger td.d:nth-of-type(4){grid-column:1}
   .ledger td.d:nth-of-type(5){grid-column:2}
   .ledger td.d:nth-of-type(6){grid-column:3}
   .ledger td.d:nth-of-type(7){grid-column:4}
   .ledger td.d:nth-of-type(8){grid-column:5}
-  .ledger td.d:nth-of-type(9){grid-column:6}
-  .ledger td.wk-hot{background:transparent}
-  .ledger td.note{grid-row:3;grid-column:1 / -1;font-size:12px;max-width:none;color:var(--ink-3)}
-  .ledger tr.band td{display:block;padding:8px 0;font-size:12px}
-  .mkbtn{width:44px;height:44px;border:1px solid var(--rule);border-radius:6px;font-size:17px}
+  .ledger td.d:nth-of-type(9){grid-column:6;padding-bottom:0}
+  .ledger td.d:nth-of-type(4)::before{content:'一'}
+  .ledger td.d:nth-of-type(5)::before{content:'二'}
+  .ledger td.d:nth-of-type(6)::before{content:'三'}
+  .ledger td.d:nth-of-type(7)::before{content:'四'}
+  .ledger td.d:nth-of-type(8)::before{content:'五'}
+  .ledger td.d:nth-of-type(9)::before{content:'今夜';color:var(--ink-3)}
+  .ledger td.wk-hot::before{color:var(--seal);font-weight:700}
+  .ledger td.d:nth-of-type(9) .ckbtn{min-width:0;padding:0 6px}
+  .ledger td.d:nth-of-type(9) .ckbtn i{display:none}
+  .tabs{scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  .tabs::-webkit-scrollbar{display:none}
+  .ledger td.note{grid-row:3;grid-column:1 / -1;font-size:12px;max-width:none;color:var(--ink-3);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ledger tr.band td{display:block;margin-bottom:2px;padding:12px 0 6px;font-size:12px;
+    letter-spacing:.14em;background:transparent;border-top:2px solid var(--rule)}
+  .ledger tbody:first-of-type tr.band td{border-top:0;padding-top:2px}
+  .mkbtn{width:100%;max-width:52px;height:44px;border:1px solid var(--rule);border-radius:6px;font-size:17px}
   .ledger td.d .wkmk{position:absolute;left:0;right:0;bottom:0;display:block;text-align:center;
     font-size:10px;line-height:1;color:var(--seal);letter-spacing:0;font-style:normal}
+  /* 沒有電話與備註的學生不必留空白列，手機版更省空間 */
+  .ledger td.note:empty{display:none}
+  /* 點名頁工具列：日期獨佔一行、兩顆動作鈕並排、說明文字自己一行，不再互相壓到 */
+  #todayTools{gap:8px;align-items:stretch}
+  #todayTools .daynav{flex:1 1 100%}
+  #todayTools .daynav #refDate{flex:1 1 auto;min-width:0;font-size:15px;letter-spacing:.04em}
+  #todayTools > .btn{flex:1 1 44%}
+  #todayTools > span.hint{flex:1 1 100%;order:9;margin:2px 0 0;font-size:12px;line-height:1.75}
+  /* 座位表：手機版縮小格子，保留橫向捲動 */
   .seatgrid{grid-template-columns:repeat(14,minmax(58px,1fr))}
   .seat{padding:14px 2px 3px}
   .seat .nm{font-size:12px;letter-spacing:0;white-space:nowrap}
@@ -440,9 +464,13 @@ body.role-teacher .stu-tag:hover{background:var(--seal-soft)}
   .dayv{padding:12px 14px}
   .dv-head{gap:8px}
   .dv-act{margin-left:0;width:100%}
-  .nt-edit .nt-text{min-height:110px}
-  .nt-edit{grid-template-columns:minmax(0,1fr) 48px}
-  .nt .nt-time{width:100%;max-width:200px}
+  /* 輪值記事編輯：手機改成上下堆疊，記事內容才有完整寬度 */
+  .nt-edit{grid-template-columns:minmax(0,1fr);grid-template-areas:"time" "main" "acts";gap:10px}
+  .nt-edit .nt-text{min-height:110px;font-size:15px;width:100%}
+  .nt-edit .nt-acts{justify-content:flex-start}
+  .nt-edit .nt-acts .icobtn{width:52px;height:44px}
+  .nt .nt-time{width:100%;max-width:none}
+  .nt-timechips{grid-template-columns:repeat(2,minmax(0,1fr))}
   .grid2{grid-template-columns:1fr}
 }
 /* 列印：只印 #printArea 裡的內容 */
@@ -731,7 +759,7 @@ const LIB = {
    1. CONFIG
    ===================================================================== */
 const CONFIG = {
-  VERSION: '2.16.13',
+  VERSION: '2.16.14',
   GAS_URL: 'https://script.google.com/macros/s/AKfycbxBk3fJaCrPfyojhPVgT6xNE110x3ENSGquQLVWLBz8jdNH2FgX6QMNBQKr1lHLZ8ePtw/exec',
   PASSWORD: '',
   ROLE_KEY: 'nightstudy.role',
