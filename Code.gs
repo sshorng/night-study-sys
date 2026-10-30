@@ -468,7 +468,9 @@ function loadState_() {
   Object.keys(cfg).forEach(function (k) {
     const key = String(k || '').trim();
     if (!key || CFG_SYS_KEYS[key]) return;
-    opts[key] = cfg[k] === null || cfg[k] === undefined ? '' : String(cfg[k]);
+    const raw = cfg[k];
+    opts[key] = raw === null || raw === undefined ? ''
+      : (Object.prototype.toString.call(raw) === '[object Date]' ? dateStr_(raw) : String(raw));
   });
 
   const students = readRows_('students').map(function (r) {

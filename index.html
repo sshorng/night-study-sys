@@ -828,7 +828,7 @@ const LIB = {
     if(this.waiting[key]) return this.waiting[key];
     const self = this;
     this.waiting[key] = new Promise(function(resolve, reject){
-  VERSION: '2.22.0',
+  VERSION: '2.22.1',
       s.src = self.URLS[key];
       s.async = true;
       s.onload = function(){ self.ready[key] = true; resolve(true); };
@@ -913,10 +913,10 @@ const OPTS = [
     hint:'例：10/1(四) 前；留空則自動寫「本月最後一個上課日 前」' },
   { key:'mealPayTo',    label:'便當費繳交對象',   def:'',      type:'text',
     hint:'例：註冊組 江貞儀老師；留空則寫「各班導師」' },
-  { key:'nsStart',      label:'夜自習起日',       def:'',      type:'text',
-    hint:'例：2026-09-28；留空表示不限，便當只算這一天之後' },
-  { key:'nsEnd',        label:'夜自習訖日',       def:'',      type:'text',
-    hint:'例：2027-01-15；留空表示不限，便當只算到這一天' }
+  { key:'nsStart',      label:'夜自習起日',       def:'',      type:'date',
+    hint:'便當只算這一天之後；留空表示不限' },
+  { key:'nsEnd',        label:'夜自習訖日',       def:'',      type:'date',
+    hint:'便當只算到這一天；留空表示不限' }
 ];
 
 /* 這三個參數是「常用清單」，設定頁會即時預覽會切成幾個按鈕 */
@@ -3301,7 +3301,9 @@ function renderConfig(){
     const val = esc(cur[d.key] || '');
     const input = d.type==='number'
       ? '<input type="number" data-opt="'+d.key+'" min="'+(d.min||1)+'" max="'+(d.max||999)+'" step="1" value="'+val+'">'
-      : '<input data-opt="'+d.key+'" value="'+val+'">';
+      : (d.type==='date'
+          ? '<input type="date" data-opt="'+d.key+'" value="'+esc(toIsoDate(cur[d.key]))+'">'
+          : '<input data-opt="'+d.key+'" value="'+val+'">');
     const prev = LIST_OPT_KEYS.indexOf(d.key) >= 0 ? '<div class="optprev" data-prev="'+d.key+'"></div>' : '';
     return '<div class="field" title="'+esc(d.hint)+'" style="margin-bottom:10px"><label>'+esc(d.label)+'</label>'+input
       + prev+'</div>';
@@ -3329,6 +3331,16 @@ function lunchText(v){
   const t = String(v == null ? '' : v).trim();
   if(!t) return '';
   return t === '不訂' ? '不訂' : '訂';
+}
+/* 試算表讀回來的日期可能是 Date 或長字串，一律收成 YYYY-MM-DD */
+function toIsoDate(v){
+  const s = String(v == null ? '' : v).trim();
+  if(!s) return '';
+  if(/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const d = new Date(s);
+  if(isNaN(d.getTime())) return '';
+  const p = function(n){ return String(n).padStart(2,'0'); };
+  return d.getFullYear() + '-' + p(d.getMonth()+1) + '-' + p(d.getDate());
 }
 function mealYm(){
   if(!ui.mealYm) ui.mealYm = E.meal.ym(ref());
@@ -5578,6 +5590,10 @@ function normalize(){
   /* 缺的參數就補上預設值，儲存時會一併寫回試算表「設定」工作表，方便直接在試算表調整 */
   const eff = E.optsOf(state);
   Object.keys(eff).forEach(function(k){ if(state.opts[k]===undefined) state.opts[k] = eff[k]; });
+  /* 起訖日一律收成 YYYY-MM-DD（試算表會把它自動變成日期，讀回來是一長串英文） */
+  ['nsStart','nsEnd'].forEach(function(k){
+    if(state.opts[k]) state.opts[k] = toIsoDate(state.opts[k]);
+  });
   state.meta.school = state.opts.school || '';
   state.meta.term = state.opts.term || '';
   state.config = state.config || {};
