@@ -870,7 +870,7 @@ const LIB = {
    1. CONFIG
    ===================================================================== */
 const CONFIG = {
-  VERSION: '2.23.0',
+  VERSION: '2.24.0',
   GAS_URL: 'https://script.google.com/macros/s/AKfycbxBk3fJaCrPfyojhPVgT6xNE110x3ENSGquQLVWLBz8jdNH2FgX6QMNBQKr1lHLZ8ePtw/exec',
   PASSWORD: '',
   ROLE_KEY: 'nightstudy.role',
@@ -3593,7 +3593,8 @@ function mealAdjustsHtml(ym){
 function renderMealPending(ym){
   const list = E.meal.pending(state, ym);
   const price = E.meal.price(state);
-  const open = ui.mealNoticeOpen !== false;
+  /* 預設收合；開合狀態存在這台裝置，下次進來照上次的樣子 */
+  const open = ui.mealNoticeOpen === true;
   /* 待處理退費放在統計表上方，做成可以收合的通知框，方便隨時追 */
   $('mealNotice').innerHTML = list.length
     ? '<div class="meal-notice">'
@@ -4183,7 +4184,8 @@ document.addEventListener('click', function(e){
   if(t.id === 'btnMealPayAll'){ mealPayAll(mealYm()); return; }
   const ntg = t.closest('[data-mealnotice]');
   if(ntg){
-    ui.mealNoticeOpen = (ui.mealNoticeOpen === false);
+    ui.mealNoticeOpen = !(ui.mealNoticeOpen === true);
+    try{ localStorage.setItem('nightstudy.mealnotice', ui.mealNoticeOpen ? '1' : '0'); }catch(err){}
     renderMealPending(mealYm());
     return;
   }
@@ -5624,6 +5626,9 @@ function normalize(){
   ['nsStart','nsEnd'].forEach(function(k){
     if(state.opts[k]) state.opts[k] = toIsoDate(state.opts[k]);
   });
+  /* 待處理退費通知框的開合狀態：記在這台裝置，下次開頁照上次的樣子 */
+  try{ ui.mealNoticeOpen = localStorage.getItem('nightstudy.mealnotice') === '1'; }
+  catch(err){ ui.mealNoticeOpen = false; }
   state.meta.school = state.opts.school || '';
   state.meta.term = state.opts.term || '';
   state.config = state.config || {};
