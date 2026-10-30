@@ -37,7 +37,9 @@ const SHEET_DEF = {
   /* 便當：只在有例外時才寫一筆（退費／帶走／加訂），其餘日次沿用排程判定 */
   meals: { name: '便當', cols: ['id', '日期', 'key', '類型', '狀態', '已退日', '備註'] },
   /* 便當名單：只放不是夜自習學生、但跟著訂便當的人（例如每週一數學班） */
-  mealMembers: { name: '便當名單', cols: ['key', '班級', '座號', '姓名', '便當', '備註'] },
+  mealMembers: { name: '便當名單', cols: ['key', '班級', '座號', '姓名', '便當', '開始日', '備註'] },
+  /* 便當調整：整體加收、整體退費、折抵下期都記在這裡 */
+  mealAdjusts: { name: '便當調整', cols: ['id', '期別', '對象', '日期', '名單', '金額', '事由', '結算', '建立時間'] },
   config: { name: '設定', cols: ['項目', '值'] },
 };
 /* ------------------------------------------------------------------ */
@@ -60,6 +62,7 @@ const PARTS_TO_SHEET = {
   students: 'students', enrollments: 'enrollments', calendar: 'calendar', leaves: 'leaves',
   violations: 'violations', checkins: 'checkins', seats: 'seats', seatPair: 'seats',
   duty: 'duty', dutyNotes: 'dutyNotes', meals: 'meals', mealMembers: 'mealMembers',
+  mealAdjusts: 'mealAdjusts',
   meta: 'config', opts: 'config', config: 'config', conflicts: 'config',
 };
 
@@ -132,7 +135,7 @@ function doGet(e) {
   return json_({
     ok: true,
     service: '夜自習管理系統後端',
-    version: '1.4.0',
+    version: '1.5.0',
     sheets: Object.keys(SHEET_DEF).map(function (k) { return SHEET_DEF[k].name; }),
     sheet: sheetInfo_(),
     templates: templates,
@@ -354,7 +357,7 @@ function sameRows_(a, b) {
 /* 每張表用哪一欄當主鍵；沒有主鍵的表（設定）就整表比對後重寫 */
 const ROW_KEY_COLS = {
   students: 0, enrollments: 0, calendar: 0, leaves: 0, violations: 0,
-  seats: 0, duty: 0, dutyNotes: 0, meals: 0, mealMembers: 0,
+  seats: 0, duty: 0, dutyNotes: 0, meals: 0, mealMembers: 0, mealAdjusts: 0,
 };
 
 function rowKeyOf_(key, row) {
@@ -542,7 +545,18 @@ function loadState_() {
   const mealMembers = readRows_('mealMembers').map(function (r) {
     return {
       key: String(r[0] || ''), cls: Number(r[1]) || 0, seat: pad2_(r[2]),
-      name: String(r[3] || ''), lunch: String(r[4] || ''), note: String(r[5] || ''),
+      name: String(r[3] || ''), lunch: String(r[4] || ''),
+      from: dateStr_(r[5]), note: String(r[6] || ''),
+    };
+  });
+
+  /* 便當調整：整體加收、整體退費、折抵下期 */
+  const mealAdjusts = readRows_('mealAdjusts').map(function (r) {
+    return {
+      id: String(r[0] || ''), ym: String(r[1] || ''), scope: String(r[2] || 'all'),
+      day: dateStr_(r[3]), keys: String(r[4] || '').split(',').filter(Boolean),
+      amount: Number(r[5] || 0), note: String(r[6] || ''),
+      settle: String(r[7] || 'cash'), createdAt: String(r[8] || ''),
     };
   });
 
@@ -562,6 +576,7 @@ function loadState_() {
     dutyNotes: dutyNotes,
     meals: meals,
     mealMembers: mealMembers,
+    mealAdjusts: mealAdjusts,
     conflicts: safeJson_(cfg.conflicts, []),
   };
 }
@@ -649,9 +664,17 @@ function saveState_(req) {
   }
   if (ready('mealMembers', ['mealMembers'])) {
     const rows = (st.mealMembers || []).map(function (s) {
-      return [s.key, s.cls || '', s.seat || '', s.name || '', s.lunch || '', s.note || ''];
+      return [s.key, s.cls || '', s.seat || '', s.name || '', s.lunch || '', s.from || '', s.note || ''];
     });
     if (writeRows_('mealMembers', rows)) wrote.push('mealMembers');
+  }
+  if (ready('mealAdjusts', ['mealAdjusts'])) {
+    const rows = (st.mealAdjusts || []).map(function (a) {
+      return [a.id, a.ym || '', a.scope || 'all', a.day || '',
+        (a.keys || []).join(','), Number(a.amount) || 0, a.note || '',
+        a.settle || 'cash', a.createdAt || ''];
+    });
+    if (writeRows_('mealAdjusts', rows)) wrote.push('mealAdjusts');
   }
   /* 設定工作表：保留不認識的列（例如 password），只改這次有送來的項目 */
   if (wantSheet('config')) {

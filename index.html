@@ -828,7 +828,7 @@ const LIB = {
    1. CONFIG
    ===================================================================== */
 const CONFIG = {
-  VERSION: '2.18.0',
+  VERSION: '2.19.0',
   GAS_URL: 'https://script.google.com/macros/s/AKfycbxBk3fJaCrPfyojhPVgT6xNE110x3ENSGquQLVWLBz8jdNH2FgX6QMNBQKr1lHLZ8ePtw/exec',
   PASSWORD: '',
   ROLE_KEY: 'nightstudy.role',
@@ -885,7 +885,11 @@ const OPTS = [
   { key:'mealPayDue',   label:'便當繳費截止說明', def:'',      type:'text',
     hint:'例：10/1(四) 前；留空則自動寫「本月最後一個上課日 前」' },
   { key:'mealPayTo',    label:'便當費繳交對象',   def:'',      type:'text',
-    hint:'例：註冊組 江貞儀老師；留空則寫「各班導師」' }
+    hint:'例：註冊組 江貞儀老師；留空則寫「各班導師」' },
+  { key:'nsStart',      label:'夜自習起日',       def:'',      type:'text',
+    hint:'例：2026-09-28；留空表示不限，便當只算這一天之後' },
+  { key:'nsEnd',        label:'夜自習訖日',       def:'',      type:'text',
+    hint:'例：2027-01-15；留空表示不限，便當只算到這一天' }
 ];
 
 /* 這三個參數是「常用清單」，設定頁會即時預覽會切成幾個按鈕 */
@@ -900,7 +904,7 @@ let state = {
   config:{ refDate:'', totals:{} },
   students:[], enrollments:[], calendar:[], leaves:[], violations:[], checkins:[],
   seats:{}, seatPair:{}, duty:[], conflicts:[],
-  meals:[], mealMembers:[]
+  meals:[], mealMembers:[], mealAdjusts:[]
 };
 let dirty = false;
 /* 目前身分：admin（管理員，全功能）或 teacher（輪值教師，受限） */
@@ -919,7 +923,7 @@ let ui = { tab:'today', sel:null, vioSel:new Set(), weekRef:'', cls:'all',
 
 /* 存檔時只送有變動的項目：改一位學生不必把整份資料再傳一次 */
 const SYNC_PARTS = ['students','enrollments','calendar','leaves','violations','checkins',
-  'seats','seatPair','duty','dutyNotes','meals','mealMembers','meta','opts','config','conflicts'];
+  'seats','seatPair','duty','dutyNotes','meals','mealMembers','mealAdjusts','meta','opts','config','conflicts'];
 /* 同一張工作表的項目要一起送，避免只送一半把表寫壞 */
 const SYNC_GROUPS = [['seats','seatPair'], ['meta','opts','config','conflicts']];
 /* 網址加 ?perf=1 時，每次雲端往返的耗時會印在 console，方便量測 */
@@ -1256,26 +1260,87 @@ E.meal = {
     return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
   },
 
-  /* 該月的每一天（一到五），依週分組；每週固定五格，不屬於這個月的補 null。
-     假日標 holiday（不供餐也不計費），label 是日曆上的說明。 */
-  month(st, ym){
+  /* 收費期：預設整個月；可以個別指定起訖日（例如 12 月從 11/30 起算）。
+     沒指定時，若上一期有指定結束日，就自動從隔天接下去，不會漏也不會重複。 */
+  period(st, ym){
+    const map = (st.config && st.config.mealPeriods) || {};
     const p = String(ym||'').split('-').map(Number);
     const y = p[0], m = p[1];
-    if(!y || !m) return { weeks:[], days:[], schoolDays:0 };
-    const last = new Date(y, m, 0).getDate();
+    if(!y || !m) return { ym:ym || '', from:'', to:'', custom:false };
+    const pad = function(n){ return String(n).padStart(2,'0'); };
+    const defFrom = y + '-' + pad(m) + '-01';
+    const defTo = y + '-' + pad(m) + '-' + pad(new Date(y, m, 0).getDate());
+    const rec = map[ym];
+    if(rec && rec.from && rec.to) return { ym:ym, from:rec.from, to:rec.to, custom:true };
+    let from = defFrom;
+    const prev = map[E.meal.shiftYm(ym, -1)];
+    if(prev && prev.to){
+      const d = E.parse(prev.to);
+      const next = E.iso(new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1));
+      if(next > from && next <= defTo) from = next;
+    }
+    /* 下一期已經指定起日時，這一期自動收到前一天，兩期不會重疊 */
+    let to = defTo;
+    const nx = map[E.meal.shiftYm(ym, 1)];
+    if(nx && nx.from){
+      const d2 = E.parse(nx.from);
+      const before = E.iso(new Date(d2.getFullYear(), d2.getMonth(), d2.getDate() - 1));
+      if(before < to && before >= from) to = before;
+    }
+    return { ym:ym, from:from, to:to, custom:false };
+  },
+  setPeriod(st, ym, from, to){
+    st.config = st.config || {};
+    st.config.mealPeriods = st.config.mealPeriods || {};
+    if(!from && !to){ delete st.config.mealPeriods[ym]; return; }
+    st.config.mealPeriods[ym] = { from:from || '', to:to || '' };
+  },
+  /* 這一天算在哪一期 */
+  ownerYm(st, iso){
+    const ym = E.meal.ym(iso);
+    const per = E.meal.period(st, ym);
+    if(iso >= per.from && iso <= per.to) return ym;
+    const nx = E.meal.shiftYm(ym, 1), np = E.meal.period(st, nx);
+    if(iso >= np.from && iso <= np.to) return nx;
+    const pv = E.meal.shiftYm(ym, -1), pp = E.meal.period(st, pv);
+    if(iso >= pp.from && iso <= pp.to) return pv;
+    return ym;
+  },
+  /* 夜自習起訖日：設了就只算這段期間，沒設就不限 */
+  inTerm(st, iso){
+    const a = String(E.opt(st,'nsStart')||'').trim();
+    const b = String(E.opt(st,'nsEnd')||'').trim();
+    if(a && iso < a) return false;
+    if(b && iso > b) return false;
+    return true;
+  },
+  /* 收費期的第一天（可能落在上一個月，例如 12 月從 11/30 起算） */
+  periodStart(st, ym){
+    return E.meal.period(st, ym).from || (String(ym||'') + '-01');
+  },
+
+  /* 該收費期的所有上課日，依週分組；每週固定五格，跨到隔壁月的日子也會列進來。
+     假日與夜自習起訖日以外的日子標 holiday（不供餐也不計費）。 */
+  month(st, ym){
+    const per = E.meal.period(st, ym);
+    if(!per.from || !per.to) return { ym:ym || '', weeks:[], days:[], schoolDays:0, period:per };
     const weeks = [], at = {};
-    for(let d=1; d<=last; d++){
-      const iso = y + '-' + String(m).padStart(2,'0') + '-' + String(d).padStart(2,'0');
-      const w = E.wd(iso);
-      if(w < 1 || w > 5) continue;
-      const mon = E.iso(new Date(y, m-1, d - (w-1)));
-      if(!at[mon]){ at[mon] = { mon:mon, slots:[null,null,null,null,null] }; weeks.push(at[mon]); }
-      at[mon].slots[w-1] = { iso:iso, day:d, wd:w, holiday:!E.isSchoolDay(st, iso), label:E.calLabel(st, iso) };
+    let d = E.parse(per.from), guard = 0;
+    while(E.iso(d) <= per.to && guard++ < 400){
+      const iso = E.iso(d), w = E.wd(iso);
+      if(w >= 1 && w <= 5){
+        const mon = E.iso(new Date(d.getFullYear(), d.getMonth(), d.getDate() - (w - 1)));
+        if(!at[mon]){ at[mon] = { mon:mon, slots:[null,null,null,null,null] }; weeks.push(at[mon]); }
+        at[mon].slots[w-1] = { iso:iso, day:d.getDate(), wd:w,
+          holiday:(!E.isSchoolDay(st, iso) || !E.meal.inTerm(st, iso)),
+          label:E.calLabel(st, iso) };
+      }
+      d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1);
     }
     const days = [];
     weeks.forEach(function(wk){ wk.slots.forEach(function(sl){ if(sl) days.push(sl); }); });
-    return { ym:(y + '-' + String(m).padStart(2,'0')), weeks:weeks, days:days,
-      schoolDays: days.filter(function(d){ return !d.holiday; }).length };
+    return { ym:ym, weeks:weeks, days:days, period:per,
+      schoolDays: days.filter(function(x){ return !x.holiday; }).length };
   },
 
   /* 該生第一次「加入夜自習」的日期；沒有加入紀錄就當作本來就在 */
@@ -1286,9 +1351,9 @@ E.meal = {
   },
   /* 該生「月初當時」的參加設定：月中退出或改時間，原本排過的日子還算得出來 */
   baseDays(st, key, ym){
-    const day1 = String(ym||'') + '-01';
+    const day1 = E.meal.periodStart(st, ym);
     const first = E.meal.startIso(st, key);
-    if(first && first > day1) return [0,0,0,0,0];   /* 這個月才加入，月初還沒有他 */
+    if(first && first > day1) return [0,0,0,0,0];   /* 這個收費月才加入，月初還沒有他 */
     return E.daysAt(st, key, day1);
   },
   /* 該月有沒有排定過（含月中被減掉的日子）：決定名單留不留 */
@@ -1326,7 +1391,8 @@ E.meal = {
       if(seen[s.key]) return;
       seen[s.key] = 1;
       out.push({ key:s.key, cls:Number(s.cls)||0, seat:s.seat||'', name:s.name||'',
-        lunch:lunchText(s.lunch) || '訂', group:'數學班', note:s.note || '', active:true });
+        lunch:lunchText(s.lunch) || '訂', group:'數學班', note:s.note || '', active:true,
+        from:String(s.from||'').trim() });
     });
     return out.sort(function(a,b){
       return (a.cls - b.cls) || String(a.seat).localeCompare(String(b.seat)) || a.key.localeCompare(b.key);
@@ -1343,22 +1409,27 @@ E.meal = {
     const w = E.wd(iso);
     if(w < 1 || w > 5) return false;
     if(!E.isSchoolDay(st, iso)) return false;
-    if(member.group === '數學班') return w === 1;
+    if(!E.meal.inTerm(st, iso)) return false;
+    if(member.group === '數學班'){
+      if(member.from && iso < member.from) return false;
+      return w === 1;
+    }
     if(member.lunch === '不訂') return false;   /* 不訂的人只有加訂那一天才算 */
     const first = E.meal.startIso(st, member.key);
     if(first && iso < first) return false;   /* 他還沒加入，不能算他的 */
     if(E.daysAt(st, member.key, iso)[w-1] === 1) return true;
-    return E.meal.baseDays(st, member.key, E.meal.ym(iso))[w-1] === 1;
+    return E.meal.baseDays(st, member.key, E.meal.ownerYm(st, iso))[w-1] === 1;
   },
   dropped(st, member, iso){
     if(!member || member.group === '數學班') return false;
     const w = E.wd(iso);
     if(w < 1 || w > 5) return false;
     if(!E.isSchoolDay(st, iso)) return false;
+    if(!E.meal.inTerm(st, iso)) return false;
     const first = E.meal.startIso(st, member.key);
     if(first && iso < first) return false;
     if(E.daysAt(st, member.key, iso)[w-1] === 1) return false;
-    return E.meal.baseDays(st, member.key, E.meal.ym(iso))[w-1] === 1;
+    return E.meal.baseDays(st, member.key, E.meal.ownerYm(st, iso))[w-1] === 1;
   },
   rec(st, key, iso){
     return (st.meals||[]).find(function(m){ return m.key === key && m.date === iso; }) || null;
@@ -1385,6 +1456,37 @@ E.meal = {
   },
 
   /* 一位訂餐者在某個收費期的結算 */
+  /* 調整：整體加收、整體退費、折抵下期 */
+  adjusts(st, ym){
+    return (st.mealAdjusts||[]).filter(function(a){ return a.ym === ym; });
+  },
+  adjustHit(st, adj, member){
+    if(adj.scope === 'keys') return (adj.keys||[]).indexOf(member.key) >= 0;
+    if(adj.scope === 'day'){
+      if(!adj.day) return false;
+      return E.meal.day(st, member, adj.day).charge === 1;
+    }
+    return true;   /* all：這期有訂餐的人 */
+  },
+  /* 這一期真的算進帳單的調整（折抵的留到下期） */
+  adjustOf(st, member, ym){
+    let n = 0;
+    E.meal.adjusts(st, ym).forEach(function(a){
+      if(a.settle === 'carry') return;
+      if(E.meal.adjustHit(st, a, member)) n += Number(a.amount) || 0;
+    });
+    return n;
+  },
+  /* 上一期標成折抵的調整，這一期扣回來（負數代表少收） */
+  carryOf(st, member, ym){
+    let n = 0;
+    E.meal.adjusts(st, E.meal.shiftYm(ym, -1)).forEach(function(a){
+      if(a.settle !== 'carry') return;
+      if(E.meal.adjustHit(st, a, member)) n += Number(a.amount) || 0;
+    });
+    return n;
+  },
+
   bill(st, member, ym){
     const mo = E.meal.month(st, ym), price = E.meal.price(st);
     let planned = 0, refundN = 0, refundPaidN = 0, take = 0, add = 0, dropN = 0;
@@ -1409,12 +1511,16 @@ E.meal = {
     const dueRefund = refundN * price;
     const paid = refundPaidN * price;
     const extra = add * price;
+    const adjust = E.meal.adjustOf(st, member, ym);
+    const carry = E.meal.carryOf(st, member, ym);
     return {
       key:member.key, cls:member.cls, seat:member.seat, name:member.name,
       group:member.group, lunch:member.lunch, active:member.active !== false,
       planned:planned, refundN:refundN, refundPaidN:refundPaidN, take:take, add:add, dropN:dropN,
       served:served, price:price, pre:pre, dueRefund:dueRefund, paid:paid, extra:extra,
-      net:pre - paid + extra, waitN:refundN - refundPaidN, charge:served * price
+      adjust:adjust, carry:carry,
+      net:pre - paid + extra + adjust + carry, waitN:refundN - refundPaidN,
+      charge:served * price + adjust + carry
     };
   },
 
@@ -1422,7 +1528,7 @@ E.meal = {
   summary(st, ym){
     const rows = E.meal.roster(st, ym).map(function(m){ return E.meal.bill(st, m, ym); });
     const sum = { kids:0, mKids:0, days:0, served:0, pre:0, dueRefund:0, paid:0, extra:0,
-      net:0, waitN:0, waitMoney:0, dropN:0 };
+      net:0, waitN:0, waitMoney:0, dropN:0, adjust:0, carry:0 };
     rows.forEach(function(b){
       if(!b.planned && !b.add) return;
       sum.kids++;
@@ -1432,6 +1538,8 @@ E.meal = {
       sum.dueRefund += b.dueRefund;
       sum.paid += b.paid;
       sum.extra += b.extra;
+      sum.adjust += b.adjust || 0;
+      sum.carry += b.carry || 0;
       sum.net += b.net;
       sum.waitN += b.waitN;
       sum.dropN += b.dropN;
@@ -3218,6 +3326,7 @@ function mealCellText(d){
   return '不供餐';
 }
 
+function perText(iso){ const d = E.parse(iso); return (d.getMonth()+1) + '/' + d.getDate(); }
 function renderMeal(){
   if(isTeacher()) return;
   const st = state, ym = mealYm();
@@ -3225,6 +3334,7 @@ function renderMeal(){
   const pack = E.meal.summary(st, ym);
   const price = E.meal.price(st);
   const view = ui.mealView === 'bill' ? 'bill' : 'grid';
+  const per = mo.period || E.meal.period(st, ym);
 
   $('mealTools').innerHTML = ''
     + '<div class="daynav">'
@@ -3240,9 +3350,13 @@ function renderMeal(){
         }).join('')
     + '</div>'
     + '<button class="btn" id="btnMealMember">訂餐名單</button>'
+    + '<button class="btn" id="btnMealAdjust">整體加退</button>'
     + '<button class="btn primary" id="btnMealExport">匯出便當收費</button>'
     + '<span class="hint">單價 ' + price + ' 元｜' + mo.schoolDays + ' 個上課日｜'
-    +   '點格子切換 1、V、空白；V 是請假但便當帶走，仍要收費</span>';
+    +   '點格子切換 1、V、空白；V 是請假但便當帶走，仍要收費</span>'
+    + '<button class="btn tiny" id="btnMealPeriod">收費期 '
+    +   (per.from && per.to ? (perText(per.from) + '～' + perText(per.to)) : '整月')
+    +   (per.custom ? '（已調整）' : '') + '</button>';
 
   const s = pack.sum;
   $('mealSum').innerHTML = ''
@@ -3251,7 +3365,9 @@ function renderMeal(){
     + '<div class="m' + (s.waitN ? ' warn' : '') + '"><b>' + s.waitN + '</b><i>待退筆數</i></div>'
     + '<div class="m' + (s.waitMoney ? ' warn' : '') + '"><b>' + money(s.waitMoney) + '</b><i>未退金額</i></div>'
     + '<div class="m"><b>' + s.mKids + '</b><i>數學班人數</i></div>'
-    + '<div class="m"><b>' + mo.schoolDays + '</b><i>本月上課日</i></div>';
+    + '<div class="m"><b>' + mo.schoolDays + '</b><i>上課日</i></div>'
+    + '<div class="m' + ((s.adjust || s.carry) ? ' warn' : '') + '"><b>'
+    +   money((s.adjust || 0) + (s.carry || 0)) + '</b><i>調整／折抵</i></div>';
 
   $('mealGridWrap').style.display = view === 'grid' ? '' : 'none';
   $('mealCards').style.display = view === 'grid' ? '' : 'none';
@@ -3343,20 +3459,48 @@ function renderMealBill(pack){
   $('mealBill').innerHTML = '<div class="tablewrap"><table class="data">'
     + '<thead><tr><th>班級</th><th>座號</th><th>姓名</th><th>身份</th>'
     + '<th>排定</th><th>退費</th><th>帶走</th><th>實供</th>'
-    + '<th>預收</th><th>應退</th><th>已退</th><th>實收</th><th>待退</th></tr></thead><tbody>'
+    + '<th>預收</th><th>應退</th><th>已退</th><th>調整</th><th>折抵</th>'
+    + '<th>實收</th><th>待退</th></tr></thead><tbody>'
     + (pack.rows.length ? pack.rows.filter(function(b){ return b.planned || b.add; }).map(function(b){
         return '<tr><td>' + b.cls + '</td><td>' + esc(b.seat) + '</td><td>' + esc(b.name) + '</td>'
           + '<td>' + mealWho({ group:b.group, active:b.active }, false) + '</td>'
           + '<td>' + b.planned + '</td><td>' + b.refundN + '</td><td>' + b.take + '</td><td>' + b.served + '</td>'
           + '<td>' + money(b.pre) + '</td><td>' + money(b.dueRefund) + '</td>'
-          + '<td>' + money(b.paid) + '</td><td>' + money(b.charge) + '</td>'
+          + '<td>' + money(b.paid) + '</td>'
+          + '<td>' + (b.adjust ? money(b.adjust) : '—') + '</td>'
+          + '<td>' + (b.carry ? money(b.carry) : '—') + '</td>'
+          + '<td>' + money(b.charge) + '</td>'
           + '<td>' + (b.waitN ? '<b style="color:var(--seal)">' + b.waitN + '</b>' : '—') + '</td></tr>';
-      }).join('') : '<tr><td colspan="13" class="hint">這個月沒有訂便當的紀錄</td></tr>')
+      }).join('') : '<tr><td colspan="15" class="hint">這個月沒有訂便當的紀錄</td></tr>')
     + '</tbody><tfoot><tr><th colspan="4">全月合計</th>'
     + '<th>' + pack.sum.served + '</th><th>' + pack.sum.waitN + '</th><th>—</th><th>' + pack.sum.served + '</th>'
     + '<th>' + money(pack.sum.pre) + '</th><th>' + money(pack.sum.dueRefund) + '</th>'
-    + '<th>' + money(pack.sum.paid) + '</th><th>' + money(pack.sum.net) + '</th>'
+    + '<th>' + money(pack.sum.paid) + '</th>'
+    + '<th>' + money(pack.sum.adjust || 0) + '</th><th>' + money(pack.sum.carry || 0) + '</th>'
+    + '<th>' + money(pack.sum.net) + '</th>'
     + '<th>' + pack.sum.waitN + '</th></tr></tfoot></table></div>';
+}
+
+/* 本期調整：整體加收、整體退費、折抵下期 */
+function mealAdjustsHtml(ym){
+  const list = E.meal.adjusts(state, ym);
+  const scopeText = function(a){
+    if(a.scope === 'day') return (a.day || '') + ' 有餐的人';
+    if(a.scope === 'keys') return (a.keys || []).length + ' 人';
+    return '這期所有人';
+  };
+  return '<div class="meal-h3"><h3>本期調整（' + list.length + ' 筆）</h3>'
+    + '<button class="btn tiny" id="btnMealAdjust">新增調整</button>'
+    + '<span class="hint">颱風假、臨時加菜、補收都用這裡；折抵的會出現在下期帳單</span></div>'
+    + (list.length ? list.map(function(a){
+        return '<div class="row">'
+          + '<span class="who">' + (a.amount > 0 ? '加收 ' : '退費 ') + Math.abs(a.amount) + ' 元</span>'
+          + '<span>' + esc(scopeText(a)) + '</span>'
+          + '<span class="why">' + esc(a.note || '') + '</span>'
+          + '<span>' + (a.settle === 'carry' ? '折抵下期' : '現金') + '</span>'
+          + '<span class="btns"><button class="btn tiny" data-mealdeladj="' + a.id + '">刪除</button></span>'
+          + '</div>';
+      }).join('') : '<p class="hint">這一期還沒有調整</p>');
 }
 
 function renderMealPending(ym){
@@ -3375,7 +3519,8 @@ function renderMealPending(ym){
           +   '<button class="btn tiny" data-mealtake="' + p.member.key + '|' + p.iso + '">帶走</button>'
           +   '<button class="btn tiny seal" data-mealpaid="' + p.member.key + '|' + p.iso + '">已退 ' + price + '</button>'
           + '</span></div>';
-      }).join('') : '<p class="hint">這個月沒有待處理的退費</p>');
+      }).join('') : '<p class="hint">這個月沒有待處理的退費</p>')
+    + mealAdjustsHtml(ym);
 }
 
 /* 點格子：1 → V → 空白 → 回到自動判定 */
@@ -3499,6 +3644,7 @@ function openMealMemberForm(key){
       + (rec.cls || '') + '"></div>'
     + '<div class="field"><label>座號</label><input id="mbrSeat" value="' + esc(rec.seat||'') + '"></div>'
     + '<div class="field"><label>姓名</label><input id="mbrName" value="' + esc(rec.name||'') + '"></div>'
+    + '<div class="field"><label>開始日（留空表示不限）</label><input type="date" id="mbrFrom" value="' + esc(rec.from||'') + '"></div>'
     + '<div class="field"><label>備註</label><input id="mbrNote" value="' + esc(rec.note||'') + '" placeholder="例如：每週一數學班"></div>'
     + '<p class="hint">供餐日固定每週一（遇放假自動不算）；這一筆不會出現在夜自習的點名、座位與統計。</p>';
   const m = modal(key ? '編輯訂餐者' : '新增訂餐者', body,
@@ -3509,19 +3655,100 @@ function openMealMemberForm(key){
     const seat = String(m.querySelector('#mbrSeat').value || '').trim();
     const name = m.querySelector('#mbrName').value.trim();
     const lunch = '訂';   /* 便當名單的人一定是訂 */
+    const from = m.querySelector('#mbrFrom').value;
     const note = m.querySelector('#mbrNote').value.trim();
     if(!cls || !seat || !name){ toast('班級、座號、姓名都要填'); return; }
     const newKey = key || mealMemberKey(cls, seat, key);
     if(key){
       const rec2 = (state.mealMembers||[]).find(function(x){ return x.key === key; });
       if(!rec2) return;
-      rec2.cls = cls; rec2.seat = seat; rec2.name = name; rec2.lunch = lunch; rec2.note = note;
+      rec2.cls = cls; rec2.seat = seat; rec2.name = name; rec2.lunch = lunch;
+      rec2.from = from; rec2.note = note;
     }else{
-      state.mealMembers.push({ key:newKey, cls:cls, seat:seat, name:name, lunch:lunch, note:note });
+      state.mealMembers.push({ key:newKey, cls:cls, seat:seat, name:name, lunch:lunch, from:from, note:note });
     }
     closeModal();
     commit();
     toast(key ? '已更新訂餐者' : '已新增訂餐者');
+  });
+}
+
+/* 收費期：這一期算哪幾天 */
+function openMealPeriod(){
+  const ym = mealYm(), per = E.meal.period(state, ym);
+  const body = '<div class="hint">' + esc(E.meal.ymLabel(ym)) + ' 這一期要算哪幾天。'
+    + '沒指定就是整個月，下一期會自動從這一期結束的隔天開始。</div>'
+    + '<div class="field"><label>起日</label><input type="date" id="mpFrom" value="' + per.from + '"></div>'
+    + '<div class="field"><label>迄日</label><input type="date" id="mpTo" value="' + per.to + '"></div>'
+    + '<p class="hint">例：12 月要含 11/30，把起日改成 11/30、迄日維持 12/31，11 月會自動收到 11/29。</p>';
+  const m = modal('收費期', body,
+    '<button class="btn" data-close>取消</button>'
+    + '<button class="btn" id="mpReset">還原整月</button>'
+    + '<button class="btn primary" id="mpSave">儲存</button>');
+  m.querySelector('[data-close]').addEventListener('click', closeModal);
+  m.querySelector('#mpReset').addEventListener('click', function(){
+    E.meal.setPeriod(state, ym, '', '');
+    closeModal(); commit(); toast('已還原成整月');
+  });
+  m.querySelector('#mpSave').addEventListener('click', function(){
+    const from = m.querySelector('#mpFrom').value, to = m.querySelector('#mpTo').value;
+    if(!from || !to){ toast('起日與迄日都要填'); return; }
+    if(from > to){ toast('起日不能晚於迄日'); return; }
+    E.meal.setPeriod(state, ym, from, to);
+    closeModal(); commit(); toast('收費期已更新');
+  });
+}
+
+/* 整體加收、整體退費、折抵下期 */
+function openMealAdjust(){
+  const ym = mealYm();
+  const roster = E.meal.roster(state, ym);
+  const body = '<div class="field"><label>算在哪一期</label><input id="maYm" type="month" value="' + ym + '"></div>'
+    + '<div class="field"><label>對象</label><select id="maScope">'
+    +   '<option value="all">這期有訂餐的人（全部）</option>'
+    +   '<option value="day">某一天有餐的人</option>'
+    +   '<option value="keys">指定幾個人</option>'
+    + '</select></div>'
+    + '<div class="field" id="maDayWrap" style="display:none"><label>哪一天</label>'
+    +   '<input type="date" id="maDay" value="' + ref() + '"></div>'
+    + '<div class="field" id="maKeysWrap" style="display:none"><label>名單（按住 Ctrl 可多選）</label>'
+    +   '<select id="maKeys" multiple size="6">' + roster.map(function(x){
+        return '<option value="' + x.key + '">' + x.cls + '-' + x.seat + ' ' + esc(x.name) + '</option>';
+      }).join('') + '</select></div>'
+    + '<div class="field"><label>金額（正數加收、負數退費）</label>'
+    +   '<input id="maAmount" type="number" step="1" value="-100"></div>'
+    + '<div class="field"><label>事由</label><input id="maNote" placeholder="例如：颱風假、臨時加菜"></div>'
+    + '<div class="field"><label>怎麼處理</label><select id="maSettle">'
+    +   '<option value="cash">現金退／收（算在這期）</option>'
+    +   '<option value="carry">折抵下期（下期自動少收）</option>'
+    + '</select></div>';
+  const m = modal('新增調整', body,
+    '<button class="btn" data-close>取消</button><button class="btn primary" id="maSave">建立</button>', true);
+  m.querySelector('[data-close]').addEventListener('click', closeModal);
+  m.querySelector('#maScope').addEventListener('change', function(){
+    const v = this.value;
+    m.querySelector('#maDayWrap').style.display = v === 'day' ? '' : 'none';
+    m.querySelector('#maKeysWrap').style.display = v === 'keys' ? '' : 'none';
+  });
+  m.querySelector('#maSave').addEventListener('click', function(){
+    const scope = m.querySelector('#maScope').value;
+    const amount = Number(m.querySelector('#maAmount').value);
+    const note = m.querySelector('#maNote').value.trim();
+    if(!amount){ toast('金額不能是 0'); return; }
+    const day = scope === 'day' ? m.querySelector('#maDay').value : '';
+    if(scope === 'day' && !day){ toast('請選一天'); return; }
+    const keys = scope === 'keys'
+      ? Array.prototype.filter.call(m.querySelector('#maKeys').options, function(o){ return o.selected; })
+          .map(function(o){ return o.value; })
+      : [];
+    if(scope === 'keys' && !keys.length){ toast('請至少選一個人'); return; }
+    state.mealAdjusts.push({
+      id:newId('adj'), ym:m.querySelector('#maYm').value || ym, scope:scope, day:day, keys:keys,
+      amount:amount, note:note, settle:m.querySelector('#maSettle').value,
+      createdAt:new Date().toISOString()
+    });
+    closeModal(); commit();
+    toast('已建立調整：' + (amount > 0 ? '加收 ' : '退費 ') + Math.abs(amount) + ' 元');
   });
 }
 
@@ -3746,6 +3973,14 @@ document.addEventListener('click', function(e){
   if(viewBtn){ ui.mealView = viewBtn.dataset.mealview; renderMeal(); return; }
   if(t.id === 'btnMealMember'){ openMealMembers(); return; }
   if(t.id === 'btnMealExport'){ openMealExport(); return; }
+  if(t.id === 'btnMealPeriod'){ openMealPeriod(); return; }
+  if(t.id === 'btnMealAdjust'){ openMealAdjust(); return; }
+  const delAdj = t.closest('[data-mealdeladj]');
+  if(delAdj){
+    state.mealAdjusts = (state.mealAdjusts||[]).filter(function(a){ return a.id !== delAdj.dataset.mealdeladj; });
+    commit(); toast('已刪除調整');
+    return;
+  }
   if(t.id === 'btnMealPayAll'){ mealPayAll(mealYm()); return; }
   const cell = t.closest('[data-mealcell]');
   if(cell){
@@ -4865,9 +5100,12 @@ async function exportMealXlsx(ym, classes, withTotal){
         });
         const subs = [];
         for(let wi = 0; wi < weeks; wi++) subs.push(colLetter(9 + wi*6) + r);
+        const bb = mem ? E.meal.bill(st, mem, ym) : null;
+        const bAdj = bb ? ((bb.adjust || 0) + (bb.carry || 0)) : 0;
         setMealCell(ws.getCell(r, totalCol), {
-          formula: 'IF(C' + r + '="","",(' + subs.join('+') + ')*' + priceRef + ')',
-          result: mem ? E.meal.bill(st, mem, ym).charge : ''
+          formula: 'IF(C' + r + '="","",(' + subs.join('+') + ')*' + priceRef
+            + (bAdj ? (bAdj > 0 ? '+' + bAdj : String(bAdj)) : '') + ')',
+          result: bb ? bb.charge : ''
         }, { size:10, bold:true, align:'center', border:thin, fill:MEAL_FILL.total, numfmt:'$#,##0;($#,##0);"-"' });
         setMealCell(ws.getCell(r, signCol), '', { size:10, align:'center', border:thin });
       }
@@ -4914,6 +5152,24 @@ async function exportMealXlsx(ym, classes, withTotal){
       }, { size:10, bold:true, align:'center', fill:MEAL_FILL.total, border:sumBorder, numfmt:'$#,##0;($#,##0);"-"' });
       setMealCell(ws.getCell(sumRow, signCol), '', { fill:MEAL_FILL.sum, border:sumBorder });
 
+      /* 本期調整與上期折抵寫在表格下面，金額才對得起來 */
+      const adjNote = [];
+      E.meal.adjusts(st, ym).forEach(function(a){
+        adjNote.push((a.amount > 0 ? '加收 ' : '退費 ') + Math.abs(a.amount) + ' 元（'
+          + (a.scope === 'day' ? a.day + ' 有餐的人' : (a.scope === 'keys' ? '指定人' : '全體'))
+          + '，' + (a.settle === 'carry' ? '折抵下期' : '現金') + '）' + (a.note ? ' ' + a.note : ''));
+      });
+      const prevCarry = E.meal.adjusts(st, E.meal.shiftYm(ym, -1)).filter(function(a){ return a.settle === 'carry'; })
+        .map(function(a){ return Math.abs(a.amount) + ' 元' + (a.note ? ' ' + a.note : ''); });
+      if(adjNote.length || prevCarry.length){
+        const noteRow = sumRow + 1;
+        ws.mergeCells(noteRow, 1, noteRow, lastCol);
+        setMealCell(ws.getCell(noteRow, 1),
+          '本期調整：' + (adjNote.length ? adjNote.join('；') : '無')
+          + (prevCarry.length ? '｜上期折抵：' + prevCarry.join('；') : ''),
+          { size:9, align:'left', border:thin });
+        ws.getRow(noteRow).height = 18;
+      }
       ws.pageSetup = { paperSize:9, orientation:'landscape', fitToPage:true, fitToWidth:1, fitToHeight:1,
         horizontalCentered:true,
         margins:{ left:0.35, right:0.35, top:0.35, bottom:0.35, header:0.15, footer:0.15 } };
@@ -5164,7 +5420,7 @@ function normalize(){
   state.config = state.config || {};
   if(!state.config.refDate) state.config.refDate = E.today();
   state.config.totals = state.config.totals || {};
-  ['enrollments','calendar','leaves','violations','checkins','duty','dutyNotes','meals','mealMembers','conflicts'].forEach(function(k){ state[k]=state[k]||[]; });
+  ['enrollments','calendar','leaves','violations','checkins','duty','dutyNotes','meals','mealMembers','mealAdjusts','conflicts'].forEach(function(k){ state[k]=state[k]||[]; });
   /* 便當選項改成只分訂、不訂：舊設定裡的葷、素自動換掉 */
   if(/葷|素/.test(String(state.opts.lunchOptions||''))) state.opts.lunchOptions = '訂、不訂';
   state.seats = state.seats || {};
