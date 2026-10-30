@@ -880,7 +880,7 @@ const LIB = {
    1. CONFIG
    ===================================================================== */
 const CONFIG = {
-  VERSION: '2.28.0',
+  VERSION: '2.29.0',
   GAS_URL: 'https://script.google.com/macros/s/AKfycbxBk3fJaCrPfyojhPVgT6xNE110x3ENSGquQLVWLBz8jdNH2FgX6QMNBQKr1lHLZ8ePtw/exec',
   PASSWORD: '',
   ROLE_KEY: 'nightstudy.role',
@@ -5029,13 +5029,19 @@ async function exportVio(ids){
     const zip = new window.PizZip(buf);
     const doc = new DocxT(zip, { paragraphLoop:true, linebreaks:true, nullGetter:()=>'' });
     doc.render(E.vioDoc(state, ids));
-    /* 範本上下只有 0.76 公分，印出來會貼紙邊；上下補到 1.5 公分，左右與三聯間距維持原樣 */
+    /* 列印對話框選「無邊界」時會把頁面邊界整個蓋掉，所以邊界要做進內容裡：
+       頁面上下邊界歸零，改用上下各 1.5 公分的空白段落撐開，左右與三聯間距維持原樣 */
     const z2 = doc.getZip();
     const docXml = z2.file('word/document.xml');
     if(docXml){
-      z2.file('word/document.xml', docXml.asText().replace(/<w:pgMar\b[^>]*\/>/g,
-        '<w:pgMar w:top="851" w:right="432" w:bottom="851" w:left="432"'
-        + ' w:header="425" w:footer="425" w:gutter="0"/>'));
+      const gap = '<w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line="851" w:lineRule="exact"/></w:pPr></w:p>';
+      let xml = docXml.asText()
+        .replace(/<w:pgMar\b[^>]*\/>/g,
+          '<w:pgMar w:top="0" w:right="432" w:bottom="0" w:left="432"'
+          + ' w:header="0" w:footer="0" w:gutter="0"/>')
+        .replace('<w:body>', '<w:body>' + gap);
+      xml = xml.replace(/<w:sectPr\b/, gap + '<w:sectPr');
+      z2.file('word/document.xml', xml);
     }
     const bytes = doc.getZip().generate({ type:'uint8array', compression:'DEFLATE' });
     download(new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}), (E.opt(state,'exportPrefix')||'夜自習')+'_違規通知單_'+stamp()+'.docx');
