@@ -479,7 +479,7 @@ body.role-teacher .stu-tag:hover{background:var(--seal-soft)}
 }
 /* 列印：只印 #printArea 裡的內容 */
 #printArea{display:none}
-#printArea .cut{border-top:.5pt solid #000;margin:3mm 0 0;height:8mm}
+#printArea .cut{border-top:.5pt solid #000;margin:0;height:0}
 #printArea .tit{font-family:var(--serif);font-size:12pt;text-align:center;margin:0 0 4mm;letter-spacing:.12em}
 #printArea table{border-collapse:collapse;width:100%}
 #printArea th,#printArea td{border:1px solid #333;padding:2px 3px;text-align:center;font-size:9pt;
@@ -506,7 +506,7 @@ body.role-teacher .stu-tag:hover{background:var(--seal-soft)}
 #printArea .wt .vh td{font-weight:700;background:#EDEDED}
 #printArea .vio{margin:0;width:5.21in}
 #printArea .duo{display:grid;grid-template-columns:5.22in 5.22in;column-gap:.24in;justify-content:center;align-items:start}
-#printArea .duo .side{min-width:0}
+#printArea .duo .side{min-width:0;display:flex;flex-direction:column;height:7.66in;justify-content:space-between}
 #printArea .seatmap td{font-size:12pt;line-height:1.15;padding:0}
 #printArea .seatmap .lbl{font-size:16pt;font-weight:700}
 @media print{
@@ -880,7 +880,7 @@ const LIB = {
    1. CONFIG
    ===================================================================== */
 const CONFIG = {
-  VERSION: '2.29.0',
+  VERSION: '2.30.0',
   GAS_URL: 'https://script.google.com/macros/s/AKfycbxBk3fJaCrPfyojhPVgT6xNE110x3ENSGquQLVWLBz8jdNH2FgX6QMNBQKr1lHLZ8ePtw/exec',
   PASSWORD: '',
   ROLE_KEY: 'nightstudy.role',
@@ -5030,17 +5030,58 @@ async function exportVio(ids){
     const doc = new DocxT(zip, { paragraphLoop:true, linebreaks:true, nullGetter:()=>'' });
     doc.render(E.vioDoc(state, ids));
     /* 列印對話框選「無邊界」時會把頁面邊界整個蓋掉，所以邊界要做進內容裡：
-       頁面上下邊界歸零，改用上下各 1.5 公分的空白段落撐開，左右與三聯間距維持原樣 */
+       頁面上下邊界歸零，改用上下各 1.5 公分的空白段落撐開；
+       三聯之間的空白依頁高平均分配，裁切線剛好落在兩段空白的正中央，頁尾不留空。
+       全部由檔案本身的頁高與列高算出來，換範本也成立。 */
     const z2 = doc.getZip();
     const docXml = z2.file('word/document.xml');
     if(docXml){
-      const gap = '<w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line="851" w:lineRule="exact"/></w:pPr></w:p>';
+      const PAD = 851;     /* 上下各留 1.5 公分 */
+      const FRAME = 136;   /* 每張單子實際渲染比列高多出來的框線 */
+      const TAILP = 20;    /* 表格後面那個空段落，壓成 2 點行高 */
+      const BRK = 20;     /* 分頁段落本身吃掉的高度，留一點給它 */
+      const SAFE = 40;     /* 保險值，避免整段被推到第二頁 */
+      const ADJ = 16;      /* Word 對 exact 行高的固定誤差，上下兩段相同 */
+      const padP = '<w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line="' + PAD
+        + '" w:lineRule="exact"/></w:pPr></w:p>';
+      const tiny = '<w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line="' + TAILP
+        + '" w:lineRule="exact"/></w:pPr><w:r><w:rPr><w:sz w:val="2"/></w:rPr></w:r></w:p>';
+      const gapP = '<w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line="';
       let xml = docXml.asText()
         .replace(/<w:pgMar\b[^>]*\/>/g,
           '<w:pgMar w:top="0" w:right="432" w:bottom="0" w:left="432"'
           + ' w:header="0" w:footer="0" w:gutter="0"/>')
-        .replace('<w:body>', '<w:body>' + gap);
-      xml = xml.replace(/<w:sectPr\b/, gap + '<w:sectPr');
+        .replace(/<\/w:tbl><w:p\s*\/>/g, '</w:tbl>' + tiny)
+        /* 分頁段落壓成 2 點行高、後面補一段 1.5 公分留白：第二頁以後也留得住上下邊界 */
+        .replace(/<w:p\b[^>]*><w:r\b[^>]*><w:br w:type="page"\/><\/w:r><\/w:p>/g,
+          '<w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line="' + TAILP + '" w:lineRule="exact"/></w:pPr>'
+          + '<w:r><w:br w:type="page"/></w:r></w:p>' + padP);
+      const iBdr = xml.indexOf('<w:pBdr>');
+      if(iBdr > 0){
+        /* 單子高度：第一條裁切線之前的列高總和＋框線 */
+        const rows = xml.slice(0, iBdr).match(/<w:trHeight\b[^>]*\bw:val="(\d+)"/g) || [];
+        const copyH = rows.reduce(function(a, s){ return a + Number(/(\d+)/.exec(s)[1]); }, 0) + FRAME;
+        const ph = /<w:pgSz\b[^>]*\bw:h="(\d+)"/.exec(xml);
+        const pageH = ph ? Number(ph[1]) : 11906;
+        /* 表格前後若殘留空段落（範本迴圈留下的），要一併從可用高度扣掉，否則會多出一頁 */
+        const bStart = xml.indexOf('<w:body>') + '<w:body>'.length;
+        const tFirst = xml.indexOf('<w:tbl>');
+        const tLast = xml.lastIndexOf('</w:tbl>') + '</w:tbl>'.length;
+        const iSect = xml.search(/<w:sectPr\b/);
+        const stray = ((tFirst > bStart ? xml.slice(bStart, tFirst) : '').match(/<w:p\b/g) || []).length
+          + (iSect > tLast ? (xml.slice(tLast, iSect).match(/<w:p\b/g) || []).length : 0);
+        const half = Math.max(160,
+          Math.floor((pageH - PAD * 2 - copyH * 3 - TAILP - BRK - SAFE - stray * 360) / 4)) - ADJ;
+        const line = gapP + half + '" w:lineRule="exact"/></w:pPr>'
+          + '<w:r><w:rPr><w:sz w:val="2"/></w:rPr></w:r></w:p>';
+        const cut = '<w:p><w:pPr><w:pBdr><w:bottom w:val="single" w:sz="6" w:space="0" w:color="auto"/></w:pBdr>'
+          + line.slice('<w:p><w:pPr>'.length);
+        xml = xml
+          .replace(/<w:p\b(?:(?!<\/w:p>)[\s\S])*?<w:pBdr>(?:(?!<\/w:p>)[\s\S])*?<\/w:p>/g, cut)
+          .replace(/<w:p\b(?:(?!<\/w:p>)[\s\S])*?<w:spacing w:before="0" w:after="160"\/(?:(?!<\/w:p>)[\s\S])*?<\/w:p>/g, line);
+      }
+      xml = xml.replace('<w:body>', '<w:body>' + padP);
+      xml = xml.replace(/<w:sectPr\b/, padP + '<w:sectPr');
       z2.file('word/document.xml', xml);
     }
     const bytes = doc.getZip().generate({ type:'uint8array', compression:'DEFLATE' });
