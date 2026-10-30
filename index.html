@@ -639,21 +639,43 @@ table.mealgrid tfoot td.sum.wait{color:var(--seal)}
 .meal-pend .row .why{flex:1 1 120px;color:var(--ink-3);font-size:12px}
 .meal-pend .row .btns{display:flex;gap:6px;margin-left:auto}
 /* ---------- 待處理退費通知框 ---------- */
-.meal-notice{border:1px solid #DCB6AA;border-radius:8px;background:var(--seal-soft);margin:0 0 14px}
-.meal-notice .mn-h{display:flex;align-items:center;gap:10px;padding:8px 12px;flex-wrap:wrap}
+/* 帳冊式：一列一筆，紅只留給「已退」，其餘（事由、日期）退成灰，眼睛才追得到金額 */
+.meal-notice{border:1px solid #DCB6AA;border-radius:8px;background:var(--card);margin:0 0 14px;overflow:hidden}
+.meal-notice .mn-h{display:flex;align-items:center;gap:10px;padding:9px 12px;flex-wrap:wrap;background:var(--seal-soft)}
 .meal-notice .mn-h b{font-family:var(--serif);font-size:14px;color:#7E2415;letter-spacing:.06em}
-.meal-notice .mn-money{font-size:12px;color:#8A3226}
+.meal-notice .mn-money{font-size:12px;color:#8A3226;font-variant-numeric:tabular-nums}
 .meal-notice .mn-h .spacer{flex:1 1 auto}
-.meal-notice .mn-b{border-top:1px solid #E3C4BA;padding:2px 12px 8px}
+.meal-notice .mn-b{border-top:1px solid #E3C4BA}
 .meal-notice .mn-tools{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
-  padding:6px 0 4px;border-bottom:1px solid #EBD3CA}
+  padding:7px 12px;background:var(--sheet);border-bottom:1px solid var(--rule-soft);font-size:13px}
 .meal-notice .pendpick{width:16px;height:16px;margin:0;flex:none;accent-color:var(--seal);cursor:pointer}
-.meal-notice .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
-  border-bottom:1px solid #EBD3CA;padding:6px 0;font-size:13px}
+.meal-notice .row{display:grid;grid-template-columns:18px 176px 124px minmax(70px,1fr) auto;
+  align-items:center;gap:10px;padding:0 12px;min-height:38px;
+  border-bottom:1px solid #EDE4D0;font-size:13.5px;color:var(--ink)}
 .meal-notice .row:last-child{border-bottom:0}
-.meal-notice .row .who{min-width:132px;font-family:var(--serif)}
-.meal-notice .row .why{flex:1 1 120px;color:#8A3226;font-size:12px}
-.meal-notice .row .btns{display:flex;gap:6px;margin-left:auto}
+.meal-notice .row:hover{background:#FFFCF2}
+.meal-notice .row.mn-head{min-height:0;padding-top:7px;padding-bottom:7px;background:var(--sheet);
+  border-bottom:1px solid var(--rule);font-size:12px;letter-spacing:.1em;color:var(--ink-3)}
+.meal-notice .row.mn-head:hover{background:var(--sheet)}
+.meal-notice .row .who{font-family:var(--serif);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.meal-notice .row .who i{font-style:normal;font-size:12px;color:var(--ink-3);margin-right:7px;
+  font-family:var(--sans);font-variant-numeric:tabular-nums}
+.meal-notice .row .date{color:var(--ink-3);font-size:12.5px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.meal-notice .row .why{color:var(--ink-3);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.meal-notice .row .btns{display:flex;gap:6px;justify-content:flex-end}
+.meal-notice .row .btns .btn{min-height:30px;padding:0 10px;font-size:12.5px;white-space:nowrap}
+.meal-notice .row .btns .btn.quiet{border-color:transparent;background:transparent;color:var(--ink-3)}
+.meal-notice .row .btns .btn.quiet:hover{border-color:var(--rule-soft);color:var(--seal)}
+@media (max-width:720px){
+  .meal-notice .row.mn-head{display:none}
+  .meal-notice .row{grid-template-columns:18px minmax(0,1fr) auto;
+    grid-template-areas:"pick who act" ". date act" ". why act";row-gap:2px;padding:8px 12px;align-items:start}
+  .meal-notice .row .pendpick{grid-area:pick;margin-top:3px}
+  .meal-notice .row .who{grid-area:who}
+  .meal-notice .row .date{grid-area:date}
+  .meal-notice .row .why{grid-area:why;white-space:normal}
+  .meal-notice .row .btns{grid-area:act;flex-direction:column}
+}
 @media (max-width:860px){
   #mealGridWrap{display:none}
   #mealCards{display:grid}
@@ -881,7 +903,7 @@ const LIB = {
    1. CONFIG
    ===================================================================== */
 const CONFIG = {
-  VERSION: '2.30.3',
+  VERSION: '2.31.0',
   GAS_URL: 'https://script.google.com/macros/s/AKfycbxBk3fJaCrPfyojhPVgT6xNE110x3ENSGquQLVWLBz8jdNH2FgX6QMNBQKr1lHLZ8ePtw/exec',
   PASSWORD: '',
   ROLE_KEY: 'nightstudy.role',
@@ -3641,16 +3663,20 @@ function renderMealPending(ym){
             +   '<button class="btn tiny seal" id="btnMealPayPick"' + (picked ? '' : ' disabled')
             +     '>退費勾選 ' + picked + ' 筆</button>'
             + '</div>'
+            + '<div class="row mn-head"><span></span><span>學生</span><span>日期</span><span>事由</span>'
+            +   '<span style="text-align:right">處理</span></div>'
             + list.map(function(p){
               const id = p.member.key + '|' + p.iso;
+              const when = Number(p.iso.slice(5,7)) + '/' + p.iso.slice(8,10)
+                + '（' + CONFIG.WEEKDAY[E.wd(p.iso)] + '）';
               return '<div class="row">'
                 + '<input type="checkbox" class="pendpick" data-pendpick="' + id + '"'
                 +   (ui.pendPick[id] ? ' checked' : '') + '>'
-                + '<span class="who">' + p.member.cls + '-' + esc(p.member.seat) + '　' + esc(p.member.name) + '</span>'
-                + '<span>' + p.iso + '（' + CONFIG.WEEKDAY[E.wd(p.iso)] + '）</span>'
-                + '<span class="why">' + esc(p.why) + '</span>'
+                + '<span class="who"><i>' + p.member.cls + '-' + esc(p.member.seat) + '</i>' + esc(p.member.name) + '</span>'
+                + '<span class="date">' + when + '</span>'
+                + '<span class="why" title="' + esc(p.why) + '">' + esc(p.why) + '</span>'
                 + '<span class="btns">'
-                +   '<button class="btn tiny" data-mealtake="' + id + '">帶走</button>'
+                +   '<button class="btn tiny quiet" data-mealtake="' + id + '">帶走</button>'
                 +   '<button class="btn tiny seal" data-mealpaid="' + id + '">已退 ' + price + '</button>'
                 + '</span></div>';
             }).join('')
