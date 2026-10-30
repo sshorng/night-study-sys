@@ -601,6 +601,19 @@ table.mealgrid td.wait b{color:var(--seal);cursor:pointer;text-decoration:underl
 .meal-pend .row .who{min-width:132px;font-family:var(--serif)}
 .meal-pend .row .why{flex:1 1 120px;color:var(--ink-3);font-size:12px}
 .meal-pend .row .btns{display:flex;gap:6px;margin-left:auto}
+/* ---------- 待處理退費通知框 ---------- */
+.meal-notice{border:1px solid #DCB6AA;border-radius:8px;background:var(--seal-soft);margin:0 0 14px}
+.meal-notice .mn-h{display:flex;align-items:center;gap:10px;padding:8px 12px;flex-wrap:wrap}
+.meal-notice .mn-h b{font-family:var(--serif);font-size:14px;color:#7E2415;letter-spacing:.06em}
+.meal-notice .mn-money{font-size:12px;color:#8A3226}
+.meal-notice .mn-h .spacer{flex:1 1 auto}
+.meal-notice .mn-b{border-top:1px solid #E3C4BA;padding:2px 12px 8px}
+.meal-notice .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  border-bottom:1px solid #EBD3CA;padding:6px 0;font-size:13px}
+.meal-notice .row:last-child{border-bottom:0}
+.meal-notice .row .who{min-width:132px;font-family:var(--serif)}
+.meal-notice .row .why{flex:1 1 120px;color:#8A3226;font-size:12px}
+.meal-notice .row .btns{display:flex;gap:6px;margin-left:auto}
 @media (max-width:860px){
   #mealGridWrap{display:none}
   #mealCards{display:grid}
@@ -690,6 +703,7 @@ table.mealgrid td.wait b{color:var(--seal);cursor:pointer;text-decoration:underl
     </section>
     <section class="page" id="page-meal">
       <div class="tools" id="mealTools"></div>
+      <div id="mealNotice"></div>
       <div class="meal-sum" id="mealSum"></div>
       <div class="tablewrap" id="mealGridWrap"><table class="data mealgrid" id="mealGrid"></table></div>
       <div class="cards" id="mealCards"></div>
@@ -814,7 +828,7 @@ const LIB = {
     for(let i=0;i<keys.length;i++) await this.load(keys[i]);
     return true;
   },
-  /* 雲端名冊讀完、畫面閒下來之後才在背景預抓，第一次匯出就不用等 */
+  VERSION: '2.21.0',
   warm(){
     const run = function(){ ['pizzip','docx','exceljs'].forEach(function(k){ LIB.load(k).catch(function(){}); }); };
     if(window.requestIdleCallback) requestIdleCallback(run, { timeout: 8000 });
@@ -3506,21 +3520,32 @@ function mealAdjustsHtml(ym){
 function renderMealPending(ym){
   const list = E.meal.pending(state, ym);
   const price = E.meal.price(state);
-  $('mealPending').innerHTML = ''
-    + '<div class="meal-h3"><h3>待處理退費（' + list.length + ' 筆）</h3>'
-    + (list.length ? '<button class="btn tiny seal" id="btnMealPayAll">全月標記已退</button>' : '')
-    + '<span class="hint">請假沒吃要退費；便當已經帶走就按「帶走」，不退費</span></div>'
-    + (list.length ? list.map(function(p){
-        return '<div class="row">'
-          + '<span class="who">' + p.member.cls + '-' + esc(p.member.seat) + '　' + esc(p.member.name) + '</span>'
-          + '<span>' + p.iso + '（' + CONFIG.WEEKDAY[E.wd(p.iso)] + '）</span>'
-          + '<span class="why">' + esc(p.why) + '</span>'
-          + '<span class="btns">'
-          +   '<button class="btn tiny" data-mealtake="' + p.member.key + '|' + p.iso + '">帶走</button>'
-          +   '<button class="btn tiny seal" data-mealpaid="' + p.member.key + '|' + p.iso + '">已退 ' + price + '</button>'
-          + '</span></div>';
-      }).join('') : '<p class="hint">這個月沒有待處理的退費</p>')
-    + mealAdjustsHtml(ym);
+  const open = ui.mealNoticeOpen !== false;
+  /* 待處理退費放在統計表上方，做成可以收合的通知框，方便隨時追 */
+  $('mealNotice').innerHTML = list.length
+    ? '<div class="meal-notice">'
+      + '<div class="mn-h">'
+      +   '<b>待處理退費 ' + list.length + ' 筆</b>'
+      +   '<span class="mn-money">共 ' + money(list.length * price) + ' 元</span>'
+      +   '<button class="btn tiny seal" id="btnMealPayAll">全月標記已退</button>'
+      +   '<span class="spacer"></span>'
+      +   '<button class="btn tiny" data-mealnotice="toggle">' + (open ? '收起' : '展開') + '</button>'
+      + '</div>'
+      + (open
+          ? '<div class="mn-b">' + list.map(function(p){
+              return '<div class="row">'
+                + '<span class="who">' + p.member.cls + '-' + esc(p.member.seat) + '　' + esc(p.member.name) + '</span>'
+                + '<span>' + p.iso + '（' + CONFIG.WEEKDAY[E.wd(p.iso)] + '）</span>'
+                + '<span class="why">' + esc(p.why) + '</span>'
+                + '<span class="btns">'
+                +   '<button class="btn tiny" data-mealtake="' + p.member.key + '|' + p.iso + '">帶走</button>'
+                +   '<button class="btn tiny seal" data-mealpaid="' + p.member.key + '|' + p.iso + '">已退 ' + price + '</button>'
+                + '</span></div>';
+            }).join('') + '</div>'
+          : '')
+      + '</div>'
+    : '';
+  $('mealPending').innerHTML = mealAdjustsHtml(ym);
 }
 
 /* 點格子：1 → V → 空白 → 回到自動判定 */
@@ -4083,6 +4108,12 @@ document.addEventListener('click', function(e){
     return;
   }
   if(t.id === 'btnMealPayAll'){ mealPayAll(mealYm()); return; }
+  const ntg = t.closest('[data-mealnotice]');
+  if(ntg){
+    ui.mealNoticeOpen = (ui.mealNoticeOpen === false);
+    renderMealPending(mealYm());
+    return;
+  }
   const cell = t.closest('[data-mealcell]');
   if(cell){
     const p = cell.dataset.mealcell.split('|');
