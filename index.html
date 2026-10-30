@@ -594,6 +594,19 @@ table.mealgrid td.total{background:#FEF9E7;font-weight:700;text-align:right;padd
   min-width:66px;font-family:var(--mono)}
 table.mealgrid td.wait{min-width:56px;font-size:11px;color:var(--ink-3)}
 table.mealgrid td.wait b{color:var(--seal);cursor:pointer;text-decoration:underline dotted}
+/* 表格自己捲，表頭與合計列才會固定 */
+#mealGridWrap{max-height:calc(100vh - 250px);overflow:auto}
+table.mealgrid thead th{position:sticky;top:0;z-index:3}
+table.mealgrid thead th.hl{background:#FADBD8}
+table.mealgrid thead th.sub{background:#EBF5FB}
+table.mealgrid thead th.total{background:#FEF9E7}
+table.mealgrid thead th.we{background:#F7F3E9}
+table.mealgrid tfoot th,table.mealgrid tfoot td{position:sticky;bottom:0;z-index:2;
+  background:#EAEDED;font-weight:700;border-top:2px solid var(--ink)}
+table.mealgrid tfoot td.sum{font-family:var(--mono);text-align:center}
+table.mealgrid tfoot td.sum.sub{background:#DFEEF8}
+table.mealgrid tfoot td.sum.total{background:#FBF0CC;text-align:right;padding:0 6px}
+table.mealgrid tfoot td.sum.wait{color:var(--seal)}
 .meal-h3{display:flex;align-items:center;gap:10px;margin:18px 0 8px}
 .meal-h3 h3{margin:0;font-family:var(--serif);font-size:14px;letter-spacing:.1em;color:var(--ink-2)}
 .meal-pend .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
@@ -815,7 +828,7 @@ const LIB = {
     if(this.waiting[key]) return this.waiting[key];
     const self = this;
     this.waiting[key] = new Promise(function(resolve, reject){
-      const s = document.createElement('script');
+  VERSION: '2.22.0',
       s.src = self.URLS[key];
       s.async = true;
       s.onload = function(){ self.ready[key] = true; resolve(true); };
@@ -3447,7 +3460,25 @@ function renderMealGrid(mo, pack){
       + '</tr>';
   });
   body += '</tbody>';
-  $('mealGrid').innerHTML = row1 + row2 + body;
+  /* 最後一列：每天的數量合計，跟表頭一樣固定 */
+  let foot = '<tfoot><tr><th colspan="4" style="text-align:left;padding:0 8px">每日合計</th>';
+  mo.weeks.forEach(function(wk){
+    let weekSum = 0;
+    wk.slots.forEach(function(sl){
+      let n = 0;
+      if(sl && !sl.holiday){
+        roster.forEach(function(m){
+          if(byKey[m.key] && E.meal.day(st, m, sl.iso).charge) n++;
+        });
+      }
+      weekSum += n;
+      foot += '<td class="sum">' + (sl ? (sl.holiday ? '—' : (n || '—')) : '') + '</td>';
+    });
+    foot += '<td class="sum sub">' + (weekSum || '—') + '</td>';
+  });
+  foot += '<td class="sum total">' + money(pack.sum.net) + '</td>'
+    + '<td class="sum wait">' + (pack.sum.waitN || '—') + '</td></tr></tfoot>';
+  $('mealGrid').innerHTML = row1 + row2 + body + foot;
 }
 
 function renderMealCards(pack, ym){
