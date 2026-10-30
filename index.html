@@ -828,7 +828,7 @@ const LIB = {
    1. CONFIG
    ===================================================================== */
 const CONFIG = {
-  VERSION: '2.17.3',
+  VERSION: '2.18.0',
   GAS_URL: 'https://script.google.com/macros/s/AKfycbxBk3fJaCrPfyojhPVgT6xNE110x3ENSGquQLVWLBz8jdNH2FgX6QMNBQKr1lHLZ8ePtw/exec',
   PASSWORD: '',
   ROLE_KEY: 'nightstudy.role',
@@ -876,8 +876,8 @@ const OPTS = [
     hint:'以分號分隔；句子裡的逗號不會被切開，新增違規時可一鍵填入' },
   { key:'leaveReasons', label:'請假事由常用清單', def:'事假、病假、家庭因素、公假、臨時就醫', type:'text',
     hint:'以頓號分隔；句子裡的逗號不會被切開，新增請假時可從清單挑' },
-  { key:'lunchOptions', label:'便當選項',         def:'葷、素、不訂', type:'text',
-    hint:'以頓號分隔，編輯學生時可從清單挑' },
+  { key:'lunchOptions', label:'便當選項',         def:'訂、不訂', type:'text',
+    hint:'便當只分訂與不訂；以頓號分隔，編輯學生時可從清單挑' },
   { key:'exportPrefix', label:'匯出檔名前綴',     def:'夜自習', type:'text',
     hint:'下載的檔案會是「前綴_座位表_日期.docx」' },
   { key:'mealPrice',    label:'便當單價',         def:'100',   type:'number', min:1, max:9999,
@@ -1302,26 +1302,31 @@ E.meal = {
     });
   },
 
-  /* 訂便當的人：夜自習在籍且便當不是「不訂」的，加上便當名單的額外訂餐者。
-     月中退出夜自習的人，這個月仍留在名單（錢已經繳了），下個月自動消失。 */
+  /* 訂便當的人：夜自習名單預設全部帶入，只有便當欄填「不訂」的才排除；
+     便當欄留空就當作要訂。月中退出夜自習的人，這個月仍留在名單，下個月自動消失。 */
   roster(st, ym){
     const out = [], seen = {};
     (st.students||[]).forEach(function(s){
       const lunch = String(s.lunch||'').trim();
-      const talked = (st.meals||[]).some(function(m){ return m.key === s.key; });
       const off = s.active === false;
-      if(!talked && (!lunch || lunch === '不訂')) return;
-      if(off && !(ym && E.meal.hadPlan(st, s.key, ym))) return;
+      const noOrder = (!lunch || lunch === '不訂');
+      /* 不訂的人只有真的加訂過才列進來，不然整月都會被算錢 */
+      const added = noOrder && (st.meals||[]).some(function(m){
+        return m.key === s.key && m.kind === '加訂' && (!ym || E.meal.ym(m.date) === ym);
+      });
+      if(noOrder && !added) return;
+      const plan = ym ? E.meal.hadPlan(st, s.key, ym) : !off;
+      if(!plan && !added) return;                         /* 這個月沒排夜自習就不列 */
       if(seen[s.key]) return;
       seen[s.key] = 1;
       out.push({ key:s.key, cls:Number(s.cls)||0, seat:s.seat||'', name:s.name||'',
-        lunch:lunch || '葷', group:'夜自習', note:s.note || '', active:!off });
+        lunch:lunchText(lunch) || '訂', group:'夜自習', note:s.note || '', active:!off });
     });
     (st.mealMembers||[]).forEach(function(s){
       if(seen[s.key]) return;
       seen[s.key] = 1;
       out.push({ key:s.key, cls:Number(s.cls)||0, seat:s.seat||'', name:s.name||'',
-        lunch:String(s.lunch||'').trim() || '葷', group:'數學班', note:s.note || '', active:true });
+        lunch:lunchText(s.lunch) || '訂', group:'數學班', note:s.note || '', active:true });
     });
     return out.sort(function(a,b){
       return (a.cls - b.cls) || String(a.seat).localeCompare(String(b.seat)) || a.key.localeCompare(b.key);
@@ -1339,6 +1344,7 @@ E.meal = {
     if(w < 1 || w > 5) return false;
     if(!E.isSchoolDay(st, iso)) return false;
     if(member.group === '數學班') return w === 1;
+    if(member.lunch === '不訂') return false;   /* 不訂的人只有加訂那一天才算 */
     const first = E.meal.startIso(st, member.key);
     if(first && iso < first) return false;   /* 他還沒加入，不能算他的 */
     if(E.daysAt(st, member.key, iso)[w-1] === 1) return true;
@@ -1685,6 +1691,8 @@ function dlOptions(id, arr){
   return '<datalist id="'+id+'">'+arr.map(function(v){ return '<option value="'+esc(v)+'"></option>'; }).join('')+'</datalist>';
 }
 const ref = () => state.config.refDate || E.today();
+/* 匯出表單頁可以自己指定基準日；沒指定就跟點名頁同一天 */
+const expRef = () => ui.expDate || ref();
 
 /* 點名單預設日期：每次開網頁都回到今天，不沿用上次看的日期 */
 function syncToday(){
@@ -2165,6 +2173,7 @@ function renderListBatch(){
       + '<button class="btn seal" data-batch="in">設為參加</button>'
       + '<button class="btn" data-batch="out">設為不參加</button>'
       + '<button class="btn" data-batch="days">設定參加日</button>'
+      + '<button class="btn" data-batch="lunch">設定便當</button>'
       + '<button class="btn" data-batch="clear">取消選取</button>'
     : '<span class="hint">勾選方格可批次設定參加與否，點名字可改電話等基本資料</span>')
     + '<button class="btn tiny" data-pickall="'+(allOn?'0':'1')+'">'+(allOn?'取消全選':'全選目前顯示')+'</button>';
@@ -2215,7 +2224,7 @@ function renderListBody(){
           + '<td class="nm">'+esc(s.name)+'</td>'
           + '<td class="d5"><span class="d5g">'+d.map(v=>'<i class="'+(v?'on':'off')+'">'+(v?'■':'□')+'</i>').join('')+'</span></td>'
           + '<td class="tel">'+esc(s.phone||'')+'</td>'
-          + '<td>'+esc(s.lunch||'')+'</td>'
+          + '<td>'+esc(lunchText(s.lunch))+'</td>'
           + cntCell(lvMap[s.key], true)
           + cntCell(viMap[s.key], false)
           + '<td>'+(joined ? (noDay?'<span class="pill seal">待設日</span>':'<span class="pill ok">參加</span>') : '<span class="pill">不參加</span>')+'</td>'
@@ -2242,7 +2251,7 @@ function renderListBody(){
       + '<span class="card-nums"><span>請假 <b>'+(lv||'—')+'</b></span><span>違規 <b>'+(vp||'—')+'</b></span></span></div>'
       + '<div class="card-foot">'
       +   '<span>'+esc(s.phone||'—')+'</span>'
-      +   '<span>便當 '+esc(s.lunch||'—')+'</span>'
+      +   '<span>便當 '+esc(lunchText(s.lunch)||'—')+'</span>'
       +   (RO ? '' : '<button class="btn tiny" data-toggle="'+s.key+'">'+(joined?'退出':'加入')+'</button>')
       + '</div></div>';
   }).join('');
@@ -2365,6 +2374,41 @@ function openExitBatch(keys){
     closeModal(); commit();
     if(doPrintExit) printExitNotice(keys, why, date);
     toast('已退出 '+n+' 人，並寫入異動日誌', 3200);
+  });
+}
+
+/* 批次設定便當：只有訂與不訂，只改便當欄，不動參加日與點名 */
+function batchLunch(){
+  const keys = [...ui.pick]; if(!keys.length) return;
+  const body = '<div class="hint">套用到已選的 ' + keys.length + ' 人。</div>'
+    + '<div class="field"><label>便當</label><div class="tools" id="bLunch">'
+    + ['訂','不訂'].map(function(v){
+        return '<button type="button" class="btn small" data-lv="' + v + '">' + v + '</button>';
+      }).join('')
+    + '</div></div>'
+    + '<p class="hint">選一個再按「套用」，只改便當欄，不動參加日與點名。</p>';
+  const m = modal('批次設定便當', body,
+    '<button class="btn" data-close>取消</button><button class="btn primary" id="bLunchSave">套用</button>');
+  let picked = '';
+  m.querySelector('#bLunch').addEventListener('click', function(ev){
+    const b = ev.target.closest('[data-lv]'); if(!b) return;
+    picked = b.dataset.lv;
+    Array.prototype.forEach.call(m.querySelectorAll('[data-lv]'), function(x){
+      x.classList.toggle('seal', x === b);
+    });
+  });
+  m.querySelector('[data-close]').addEventListener('click', closeModal);
+  m.querySelector('#bLunchSave').addEventListener('click', function(){
+    if(!picked){ toast('請先選「訂」或「不訂」'); return; }
+    let n = 0;
+    keys.forEach(function(k){
+      const s = E.byKey(state, k); if(!s) return;
+      s.lunch = picked; n++;
+    });
+    ui.pick.clear();
+    closeModal();
+    commit();
+    toast('已把 ' + n + ' 人的便當設成「' + picked + '」', 3200);
   });
 }
 
@@ -3090,10 +3134,13 @@ function renderDuty(){
 /* ---------- 匯出 / 設定 ---------- */
 function renderExport(){
   const mark = function(k){ return TPL[k] ? '已就緒' : '匯出時自動讀取'; };
-  $('expTools').innerHTML = '<span class="hint">範本來源：專案內的 templates 資料夾'
-    + '（座位表 '+mark('seat')+'、違規單 '+mark('violation')+'、名單 '+mark('roster')+'）；'
-    + '讀不到也可以自己按右邊選檔</span>'
-    + '<button class="btn" id="btnPickTpl">選擇範本檔</button>';
+  $('expTools').innerHTML = '<label class="hint" style="margin:0">基準日</label>'
+    + '<input type="date" id="expRefDate" class="btn" style="min-height:40px" value="' + expRef() + '">'
+    + '<button class="btn tiny" id="expRefToday">回今天</button>'
+    + '<span class="hint">匯出、列印與檔名都以這一天為準，座位、天數、名單都跟著變</span>'
+    + '<button class="btn" id="btnPickTpl">選擇範本檔</button>'
+    + '<span class="hint">範本來源：專案內的 templates 資料夾'
+    + '（座位表 ' + mark('seat') + '、違規單 ' + mark('violation') + '、名單 ' + mark('roster') + '）</span>';
   const cf = state.conflicts || [];
   $('conflictBox').innerHTML = cf.length
     ? cf.map(c=>'<div><b>'+c.cls+'-'+c.seat+' '+esc(c.name)+'</b><div class="hint">座位表 '+c.seatDoc+'　電話表 '+c.daysSheet+'</div></div>').join('')
@@ -3142,6 +3189,12 @@ function refreshOptPreviews(){
 
 /* ---------- 便當管理 ---------- */
 function money(n){ return Number(n||0).toLocaleString('en-US'); }
+/* 便當只分訂、不訂：舊資料的葷、素一律算「訂」 */
+function lunchText(v){
+  const t = String(v == null ? '' : v).trim();
+  if(!t) return '';
+  return t === '不訂' ? '不訂' : '訂';
+}
 function mealYm(){
   if(!ui.mealYm) ui.mealYm = E.meal.ym(ref());
   return ui.mealYm;
@@ -3232,7 +3285,7 @@ function renderMealGrid(mo, pack){
   let body = '<tbody>';
   if(!has){
     body += '<tr><td colspan="' + (4 + mo.weeks.length * 6 + 2) + '" class="hint" style="text-align:left;padding:8px">'
-      + '這個月還沒有人訂便當。請到「學生清單」把便當欄填成葷或素，或按「訂餐名單」新增數學班等額外訂餐者。</td></tr>';
+      + '這個月還沒有人訂便當。請到「學生清單」把便當欄設成訂，或按「訂餐名單」新增數學班等額外訂餐者。</td></tr>';
   }
   let band = -1, lastCls = null;
   roster.forEach(function(m){
@@ -3275,7 +3328,7 @@ function renderMealCards(pack, ym){
     const b = byKey[m.key];
     return '<div class="card">'
       + '<div class="card-h"><span class="card-who">' + m.cls + '-' + esc(m.seat) + '　' + esc(m.name) + '</span></div>'
-      + '<div class="card-reason">' + mealWho(m, true) + '｜便當 ' + esc(m.lunch) + '</div>'
+      + '<div class="card-reason">' + mealWho(m, true) + '</div>'
       + '<div class="card-nums"><span>實供 <b>' + b.served + '</b></span>'
       +   '<span>退費 <b>' + b.refundN + '</b></span>'
       +   '<span>金額 <b>' + money(b.charge) + '</b></span></div>'
@@ -3288,18 +3341,18 @@ function renderMealCards(pack, ym){
 
 function renderMealBill(pack){
   $('mealBill').innerHTML = '<div class="tablewrap"><table class="data">'
-    + '<thead><tr><th>班級</th><th>座號</th><th>姓名</th><th>身份</th><th>便當</th>'
+    + '<thead><tr><th>班級</th><th>座號</th><th>姓名</th><th>身份</th>'
     + '<th>排定</th><th>退費</th><th>帶走</th><th>實供</th>'
     + '<th>預收</th><th>應退</th><th>已退</th><th>實收</th><th>待退</th></tr></thead><tbody>'
     + (pack.rows.length ? pack.rows.filter(function(b){ return b.planned || b.add; }).map(function(b){
         return '<tr><td>' + b.cls + '</td><td>' + esc(b.seat) + '</td><td>' + esc(b.name) + '</td>'
-          + '<td>' + mealWho({ group:b.group, active:b.active }, false) + '</td><td>' + esc(b.lunch) + '</td>'
+          + '<td>' + mealWho({ group:b.group, active:b.active }, false) + '</td>'
           + '<td>' + b.planned + '</td><td>' + b.refundN + '</td><td>' + b.take + '</td><td>' + b.served + '</td>'
           + '<td>' + money(b.pre) + '</td><td>' + money(b.dueRefund) + '</td>'
           + '<td>' + money(b.paid) + '</td><td>' + money(b.charge) + '</td>'
           + '<td>' + (b.waitN ? '<b style="color:var(--seal)">' + b.waitN + '</b>' : '—') + '</td></tr>';
-      }).join('') : '<tr><td colspan="14" class="hint">這個月沒有訂便當的紀錄</td></tr>')
-    + '</tbody><tfoot><tr><th colspan="4">全月合計</th><th>—</th>'
+      }).join('') : '<tr><td colspan="13" class="hint">這個月沒有訂便當的紀錄</td></tr>')
+    + '</tbody><tfoot><tr><th colspan="4">全月合計</th>'
     + '<th>' + pack.sum.served + '</th><th>' + pack.sum.waitN + '</th><th>—</th><th>' + pack.sum.served + '</th>'
     + '<th>' + money(pack.sum.pre) + '</th><th>' + money(pack.sum.dueRefund) + '</th>'
     + '<th>' + money(pack.sum.paid) + '</th><th>' + money(pack.sum.net) + '</th>'
@@ -3375,7 +3428,7 @@ function openMealDetail(key){
   if(!m) return;
   const mo = E.meal.month(state, ym), b = E.meal.bill(state, m, ym);
   const body = '<div class="hint" style="margin:0 0 8px">' + m.cls + '-' + esc(m.seat) + '　' + esc(m.name)
-    + '　' + mealWho(m, true) + '　便當 ' + esc(m.lunch) + '</div>'
+    + '　' + mealWho(m, true) + '</div>'
     + '<p class="hint">實供 ' + b.served + ' 份、金額 ' + money(b.charge) + ' 元、待退 ' + b.waitN + ' 筆。'
     + '點狀態可以切換 1、V、空白。</p>'
     + '<div class="tools" style="flex-wrap:wrap;gap:6px">'
@@ -3411,13 +3464,13 @@ function openMealMembers(){
     + '<span class="hint">這一區只放沒有參加夜自習、但跟著訂便當的學生，供餐日固定每週一；'
     + '夜自習學生不必在這裡重複登打。</span></div>'
     + '<div class="tablewrap"><table class="data"><thead><tr><th>班級</th><th>座號</th><th>姓名</th>'
-    + '<th>便當</th><th>備註</th><th>操作</th></tr></thead><tbody>'
+    + '<th>備註</th><th>操作</th></tr></thead><tbody>'
     + (list.length ? list.map(function(s){
         return '<tr><td>' + s.cls + '</td><td>' + esc(s.seat) + '</td><td>' + esc(s.name) + '</td>'
-          + '<td>' + esc(s.lunch) + '</td><td>' + esc(s.note||'') + '</td>'
+          + '<td>' + esc(s.note||'') + '</td>'
           + '<td><button class="btn tiny" data-mbredit="' + s.key + '">編輯</button> '
           + '<button class="btn tiny" data-mbrdel="' + s.key + '">刪除</button></td></tr>';
-      }).join('') : '<tr><td colspan="6" class="hint">目前沒有額外訂餐者</td></tr>')
+      }).join('') : '<tr><td colspan="5" class="hint">目前沒有額外訂餐者</td></tr>')
     + '</tbody></table></div>';
   const m = modal('便當訂餐名單', body, '<button class="btn" data-close>關閉</button>', true);
   m.querySelector('[data-close]').addEventListener('click', closeModal);
@@ -3446,8 +3499,6 @@ function openMealMemberForm(key){
       + (rec.cls || '') + '"></div>'
     + '<div class="field"><label>座號</label><input id="mbrSeat" value="' + esc(rec.seat||'') + '"></div>'
     + '<div class="field"><label>姓名</label><input id="mbrName" value="' + esc(rec.name||'') + '"></div>'
-    + '<div class="field"><label>便當</label><input id="mbrLunch" list="mbrLunchDL" value="' + esc(rec.lunch||'') + '">'
-      + dlOptions('mbrLunchDL', E.optList(state,'lunchOptions').filter(function(v){ return v !== '不訂'; })) + '</div>'
     + '<div class="field"><label>備註</label><input id="mbrNote" value="' + esc(rec.note||'') + '" placeholder="例如：每週一數學班"></div>'
     + '<p class="hint">供餐日固定每週一（遇放假自動不算）；這一筆不會出現在夜自習的點名、座位與統計。</p>';
   const m = modal(key ? '編輯訂餐者' : '新增訂餐者', body,
@@ -3457,7 +3508,7 @@ function openMealMemberForm(key){
     const cls = Number(m.querySelector('#mbrCls').value);
     const seat = String(m.querySelector('#mbrSeat').value || '').trim();
     const name = m.querySelector('#mbrName').value.trim();
-    const lunch = m.querySelector('#mbrLunch').value.trim() || '葷';
+    const lunch = '訂';   /* 便當名單的人一定是訂 */
     const note = m.querySelector('#mbrNote').value.trim();
     if(!cls || !seat || !name){ toast('班級、座號、姓名都要填'); return; }
     const newKey = key || mealMemberKey(cls, seat, key);
@@ -4243,7 +4294,7 @@ function openExitNotice(key){
 
 /* 座位表：A3 橫式，0.38 吋列號欄 + 14 欄 × 1.1 吋，列高依原檔 9 列 */
 function printSeat(){
-  const iso = ref();
+  const iso = expRef();
   const term = E.opt(state,'term') || '';
   /* 版面比照 Word 範本：A3 橫式；左側段號欄 0.379 吋，右邊 14 欄各 1.104 吋；
      標籤列高 473／300／255 twips，桌子列 3476／3375／4141 twips */
@@ -4279,7 +4330,7 @@ function printList(){
   const rows = E.seatRows(state);
   const sum = [0,0,0,0,0];
   rows.forEach(function(r){ r.days.forEach(function(v,i){ sum[i]+=v; }); });
-  let html = '<div class="tit">夜自習參加天數及聯絡資料（'+(state.config.refDate||E.today())+' 基準）</div>';
+  let html = '<div class="tit">夜自習參加天數及聯絡資料（'+expRef()+' 基準）</div>';
   html += '<table class="wt"><colgroup>'
     + '<col style="width:.38in"><col style="width:.42in"><col style="width:.62in">'
     + '<col style="width:.3in"><col style="width:.3in"><col style="width:.3in"><col style="width:.3in"><col style="width:.3in">'
@@ -4294,7 +4345,7 @@ function printList(){
       + r.days.map(function(v){ return '<td>'+(v?'■':'□')+'</td>'; }).join('')
       + '<td>'+r.days.reduce(function(a,b){ return a+b; },0)+'</td>'
       + '<td>'+esc(s.phone||'')+'</td>'
-      + '<td>'+esc(s.lunch||'')+'</td><td class="vl">'+esc(s.note||'')+'</td></tr>';
+      + '<td>'+esc(lunchText(s.lunch))+'</td><td class="vl">'+esc(s.note||'')+'</td></tr>';
   });
   html += '<tr class="vh"><td colspan="3">每日合計</td>'
     + sum.map(function(v){ return '<td>'+v+'</td>'; }).join('')
@@ -4306,7 +4357,7 @@ function printList(){
 
 /* LINE 公告圖：名單 PNG，班級底色交錯，欄位只有班級、座號、姓名、五天、天數、備註 */
 function exportRosterPng(){
-  const iso = state.config.refDate || E.today();
+  const iso = expRef();
   const rows = E.seatRows(state);
   if(!rows.length){ toast('目前沒有名單可以輸出圖檔'); return; }
 
@@ -4406,7 +4457,7 @@ function exportRosterPng(){
 }
 
 /* ---------- 匯出 ---------- */
-function stamp(){ return (state.config.refDate||E.today()).replace(/-/g,''); }
+function stamp(){ return expRef().replace(/-/g,''); }
 /* 印表日期：2026-10-27 → 1027（月日各兩位，與範本表頭一致） */
 function mmdd(iso){ const p = String(iso||'').split('-'); return p.length===3 ? (p[1]+p[2]) : ''; }
 function download(blob, name){
@@ -4424,7 +4475,7 @@ async function exportSeat(){
     const DocxT = window.docxtemplater;
     const zip = new window.PizZip(buf);
     const doc = new DocxT(zip, { paragraphLoop:true, linebreaks:true, nullGetter:()=>'' });
-    const data = { term: state.meta.term || '', date: mmdd(ref()) };
+    const data = { term: state.meta.term || '', date: mmdd(expRef()) };
     CONFIG.SEAT_SLOTS.forEach(slot=>{ data['s'+slot.i] = E.seatCell(state, slot.i); });
     /* 新版一桌一格：42 張桌子，每桌一張卡；有上下兩位就兩張卡疊在同一格 */
     CONFIG.DESKS.forEach(function(desk, idx){ data['d'+(idx+1)] = E.deskCell(state, idx+1); });
@@ -4491,7 +4542,7 @@ async function exportXlsx(){
     const ExcelJS = window.ExcelJS;
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load(tpl);
-    const iso = ref();
+    const iso = expRef();
     const mat = E.matrix(state, iso);
 
     /* 匯出只留總表與名單兩張：範本裡的手寫表與舊名單全部移除 */
@@ -5113,7 +5164,9 @@ function normalize(){
   state.config = state.config || {};
   if(!state.config.refDate) state.config.refDate = E.today();
   state.config.totals = state.config.totals || {};
-  ['enrollments','calendar','leaves','violations','checkins','duty','dutyNotes','conflicts'].forEach(function(k){ state[k]=state[k]||[]; });
+  ['enrollments','calendar','leaves','violations','checkins','duty','dutyNotes','meals','mealMembers','conflicts'].forEach(function(k){ state[k]=state[k]||[]; });
+  /* 便當選項改成只分訂、不訂：舊設定裡的葷、素自動換掉 */
+  if(/葷|素/.test(String(state.opts.lunchOptions||''))) state.opts.lunchOptions = '訂、不訂';
   state.seats = state.seats || {};
   state.seatPair = state.seatPair || {};
   Object.keys(state.seatPair).forEach(function(k){
@@ -5389,8 +5442,20 @@ document.addEventListener('click', e=>{
     if(k==='in') batchActive(true);
     else if(k==='out') batchActive(false);
     else if(k==='days') batchDays();
+    else if(k==='lunch') batchLunch();
     else { ui.pick.clear(); renderList(); }
     return;
+  }
+});
+
+/* 匯出表單：指定基準日（不指定就跟點名頁同一天） */
+document.addEventListener('input', function(e){
+  if(e.target && e.target.id === 'expRefDate') ui.expDate = e.target.value || '';
+});
+document.addEventListener('click', function(e){
+  if(e.target && e.target.id === 'expRefToday'){
+    ui.expDate = E.today();
+    renderExport();
   }
 });
 document.addEventListener('input', e=>{
