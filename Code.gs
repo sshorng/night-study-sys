@@ -34,6 +34,10 @@ const SHEET_DEF = {
   seats: { name: '座位', cols: ['格號', 'key', '下位'] },
   duty: { name: '輪值', cols: ['日期', '輪值教師', '記事'] },
   dutyNotes: { name: '輪值記事', cols: ['id', '日期', '時間', '內容', '學生'] },
+  /* 便當：只在有例外時才寫一筆（退費／帶走／加訂），其餘日次沿用排程判定 */
+  meals: { name: '便當', cols: ['id', '日期', 'key', '類型', '狀態', '已退日', '備註'] },
+  /* 便當名單：只放不是夜自習學生、但跟著訂便當的人（例如每週一數學班） */
+  mealMembers: { name: '便當名單', cols: ['key', '班級', '座號', '姓名', '便當', '備註'] },
   config: { name: '設定', cols: ['項目', '值'] },
 };
 /* ------------------------------------------------------------------ */
@@ -55,7 +59,7 @@ const GEN_PROP = 'DATA_GENERATION';
 const PARTS_TO_SHEET = {
   students: 'students', enrollments: 'enrollments', calendar: 'calendar', leaves: 'leaves',
   violations: 'violations', checkins: 'checkins', seats: 'seats', seatPair: 'seats',
-  duty: 'duty', dutyNotes: 'dutyNotes',
+  duty: 'duty', dutyNotes: 'dutyNotes', meals: 'meals', mealMembers: 'mealMembers',
   meta: 'config', opts: 'config', config: 'config', conflicts: 'config',
 };
 
@@ -128,7 +132,7 @@ function doGet(e) {
   return json_({
     ok: true,
     service: '夜自習管理系統後端',
-    version: '1.3.1',
+    version: '1.4.0',
     sheets: Object.keys(SHEET_DEF).map(function (k) { return SHEET_DEF[k].name; }),
     sheet: sheetInfo_(),
     templates: templates,
@@ -350,7 +354,7 @@ function sameRows_(a, b) {
 /* 每張表用哪一欄當主鍵；沒有主鍵的表（設定）就整表比對後重寫 */
 const ROW_KEY_COLS = {
   students: 0, enrollments: 0, calendar: 0, leaves: 0, violations: 0,
-  seats: 0, duty: 0, dutyNotes: 0,
+  seats: 0, duty: 0, dutyNotes: 0, meals: 0, mealMembers: 0,
 };
 
 function rowKeyOf_(key, row) {
@@ -525,6 +529,23 @@ function loadState_() {
     };
   });
 
+  /* 便當：只在有例外時才有紀錄（類型＝退費／帶走／加訂），其餘日次由排程判定 */
+  const meals = readRows_('meals').map(function (r) {
+    return {
+      id: String(r[0]), date: dateStr_(r[1]), key: String(r[2] || ''),
+      kind: String(r[3] || ''), status: String(r[4] || ''),
+      paidAt: String(r[5] || ''), note: String(r[6] || ''),
+    };
+  });
+
+  /* 便當名單：不是夜自習學生、但跟著訂便當的人（key 以 x 開頭，不會撞夜自習的鍵） */
+  const mealMembers = readRows_('mealMembers').map(function (r) {
+    return {
+      key: String(r[0] || ''), cls: Number(r[1]) || 0, seat: pad2_(r[2]),
+      name: String(r[3] || ''), lunch: String(r[4] || ''), note: String(r[5] || ''),
+    };
+  });
+
   return {
     meta: safeJson_(cfg.meta, { school: '', term: '' }),
     opts: opts,
@@ -539,6 +560,8 @@ function loadState_() {
     seatPair: seatPair,
     duty: duty,
     dutyNotes: dutyNotes,
+    meals: meals,
+    mealMembers: mealMembers,
     conflicts: safeJson_(cfg.conflicts, []),
   };
 }
@@ -617,6 +640,18 @@ function saveState_(req) {
       return [n.id, n.date, n.time || '', n.text || '', n.key || ''];
     });
     if (writeRows_('dutyNotes', rows)) wrote.push('dutyNotes');
+  }
+  if (ready('meals', ['meals'])) {
+    const rows = (st.meals || []).map(function (m) {
+      return [m.id, m.date, m.key || '', m.kind || '', m.status || '', m.paidAt || '', m.note || ''];
+    });
+    if (writeRows_('meals', rows)) wrote.push('meals');
+  }
+  if (ready('mealMembers', ['mealMembers'])) {
+    const rows = (st.mealMembers || []).map(function (s) {
+      return [s.key, s.cls || '', s.seat || '', s.name || '', s.lunch || '', s.note || ''];
+    });
+    if (writeRows_('mealMembers', rows)) wrote.push('mealMembers');
   }
   /* 設定工作表：保留不認識的列（例如 password），只改這次有送來的項目 */
   if (wantSheet('config')) {

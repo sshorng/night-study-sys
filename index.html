@@ -545,6 +545,68 @@ body.gated .sheet{opacity:.28;pointer-events:none;user-select:none}
 .sheetcue a.sheetopen:focus-visible{outline:2px solid var(--seal);outline-offset:1px}
 .sheetcue a.sheetopen .ico{width:14px;height:14px}
 .sheetcue .sheetmeta{font-size:12px;line-height:1.6;color:var(--ink-3)}
+/* ---------- 分頁列 ---------- */
+.pager{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:14px;
+  padding-top:10px;border-top:1px solid var(--rule-soft);font-size:13px;color:var(--ink-3)}
+.pager .spacer{flex:1 1 auto}
+.pager b{font-family:var(--serif);font-size:14px;color:var(--ink)}
+.pager label{margin:0;font-size:12px}
+.pager select{min-height:36px;padding:0 8px;border:1px solid var(--rule);border-radius:6px;
+  background:var(--card);color:var(--ink);font-size:13px}
+.pager .btn{min-height:36px}
+.pager .btn[disabled]{opacity:.42;cursor:default}
+/* ---------- 便當管理 ---------- */
+.meal-sum{display:flex;flex-wrap:wrap;gap:18px;margin:0 0 14px;padding:10px 14px;
+  border:1px solid var(--rule-soft);border-radius:8px;background:var(--card)}
+.meal-sum .m{display:flex;align-items:baseline;gap:6px}
+.meal-sum .m b{font-family:var(--serif);font-size:20px;font-weight:600}
+.meal-sum .m i{font-style:normal;font-size:12px;color:var(--ink-3);letter-spacing:.08em}
+.meal-sum .m.warn b{color:var(--seal)}
+table.mealgrid{border-collapse:collapse;font-size:12px}
+table.mealgrid th,table.mealgrid td{border:1px solid var(--rule-soft);padding:0;
+  text-align:center;height:28px;min-width:26px;white-space:nowrap}
+table.mealgrid th{background:#F2F4F7;font-weight:700;color:var(--ink-2);font-size:11px;height:24px}
+table.mealgrid th.d{color:var(--ink-3);font-size:10px;font-weight:400}
+table.mealgrid th.we{background:#F7F3E9;color:var(--ink-3);font-size:10px;font-weight:400;min-width:22px}
+table.mealgrid th.hl{background:#FADBD8;color:#8A3226}
+table.mealgrid th.sub{background:#EBF5FB;min-width:34px}
+table.mealgrid th.total{background:#FEF9E7;min-width:66px}
+table.mealgrid th.name,table.mealgrid th.cls,table.mealgrid th.seat,table.mealgrid th.grp{background:#F2F4F7}
+table.mealgrid td{background:var(--card)}
+table.mealgrid tr.band td{background:#F7F1E2}
+table.mealgrid td.name{min-width:86px;text-align:left;padding:0 8px;font-family:var(--serif);font-size:13px}
+table.mealgrid td.cls,table.mealgrid td.seat,table.mealgrid td.grp{color:var(--ink-3);font-size:11px}
+table.mealgrid td.cls{min-width:42px}
+table.mealgrid td.seat{min-width:38px;font-family:var(--mono)}
+table.mealgrid td.grp{min-width:52px}
+table.mealgrid td.cell{position:relative;cursor:pointer;font-family:var(--mono)}
+table.mealgrid td.cell:hover{outline:2px solid var(--seal);outline-offset:-2px}
+table.mealgrid td.cell.fix::after{content:"";position:absolute;top:2px;right:2px;
+  width:4px;height:4px;border-radius:50%;background:var(--seal)}
+table.mealgrid td.cell.on{color:var(--ink);font-weight:700}
+table.mealgrid td.cell.take{background:#FADBD8;color:#8A3226;font-weight:700}
+table.mealgrid td.cell.add{background:#FEF9E7;color:#7A5B12;font-weight:700}
+table.mealgrid td.cell.refund{background:#EBF5FB}
+table.mealgrid td.cell.off{background:#F1EDE3;color:#B4A68B}
+table.mealgrid td.cell.holiday{background:#E7DDC8;color:#A79A83}
+table.mealgrid td.sub{background:#EBF5FB;font-weight:700;min-width:34px;font-family:var(--mono)}
+table.mealgrid td.total{background:#FEF9E7;font-weight:700;text-align:right;padding:0 6px;
+  min-width:66px;font-family:var(--mono)}
+table.mealgrid td.wait{min-width:56px;font-size:11px;color:var(--ink-3)}
+table.mealgrid td.wait b{color:var(--seal);cursor:pointer;text-decoration:underline dotted}
+.meal-h3{display:flex;align-items:center;gap:10px;margin:18px 0 8px}
+.meal-h3 h3{margin:0;font-family:var(--serif);font-size:14px;letter-spacing:.1em;color:var(--ink-2)}
+.meal-pend .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  border-bottom:1px solid var(--rule-soft);padding:6px 0;font-size:13px}
+.meal-pend .row .who{min-width:132px;font-family:var(--serif)}
+.meal-pend .row .why{flex:1 1 120px;color:var(--ink-3);font-size:12px}
+.meal-pend .row .btns{display:flex;gap:6px;margin-left:auto}
+@media (max-width:860px){
+  #mealGridWrap{display:none}
+  #mealCards{display:grid}
+  .meal-sum{gap:10px 16px;padding:10px 12px}
+  .meal-sum .m b{font-size:17px}
+}
 </style>
 </head>
 <body class="gated">
@@ -611,6 +673,7 @@ body.gated .sheet{opacity:.28;pointer-events:none;user-select:none}
       <div class="hint" id="leaveStat" style="margin-bottom:6px"></div>
       <div class="tablewrap" id="leaveTableWrap"><table class="data" id="leaveTable"></table></div>
       <div class="cards" id="leaveCards"></div>
+      <div class="pager" id="leavePager"></div>
     </section>
 
 
@@ -624,6 +687,14 @@ body.gated .sheet{opacity:.28;pointer-events:none;user-select:none}
     <section class="page" id="page-duty">
       <div class="tools" id="dutyTools"></div>
       <div class="week" id="week"></div>
+    </section>
+    <section class="page" id="page-meal">
+      <div class="tools" id="mealTools"></div>
+      <div class="meal-sum" id="mealSum"></div>
+      <div class="tablewrap" id="mealGridWrap"><table class="data mealgrid" id="mealGrid"></table></div>
+      <div class="cards" id="mealCards"></div>
+      <div id="mealBill"></div>
+      <div class="meal-pend" id="mealPending"></div>
     </section>
     <section class="page" id="page-export">
       <div class="tools" id="expTools"></div>
@@ -757,7 +828,7 @@ const LIB = {
    1. CONFIG
    ===================================================================== */
 const CONFIG = {
-  VERSION: '2.16.16',
+  VERSION: '2.17.1',
   GAS_URL: 'https://script.google.com/macros/s/AKfycbxBk3fJaCrPfyojhPVgT6xNE110x3ENSGquQLVWLBz8jdNH2FgX6QMNBQKr1lHLZ8ePtw/exec',
   PASSWORD: '',
   ROLE_KEY: 'nightstudy.role',
@@ -808,7 +879,13 @@ const OPTS = [
   { key:'lunchOptions', label:'便當選項',         def:'葷、素、不訂', type:'text',
     hint:'以頓號分隔，編輯學生時可從清單挑' },
   { key:'exportPrefix', label:'匯出檔名前綴',     def:'夜自習', type:'text',
-    hint:'下載的檔案會是「前綴_座位表_日期.docx」' }
+    hint:'下載的檔案會是「前綴_座位表_日期.docx」' },
+  { key:'mealPrice',    label:'便當單價',         def:'100',   type:'number', min:1, max:9999,
+    hint:'每月收費單、退費與加訂都以這個金額計算' },
+  { key:'mealPayDue',   label:'便當繳費截止說明', def:'',      type:'text',
+    hint:'例：10/1(四) 前；留空則自動寫「本月最後一個上課日 前」' },
+  { key:'mealPayTo',    label:'便當費繳交對象',   def:'',      type:'text',
+    hint:'例：註冊組 江貞儀老師；留空則寫「各班導師」' }
 ];
 
 /* 這三個參數是「常用清單」，設定頁會即時預覽會切成幾個按鈕 */
@@ -822,7 +899,8 @@ let state = {
   opts:{},
   config:{ refDate:'', totals:{} },
   students:[], enrollments:[], calendar:[], leaves:[], violations:[], checkins:[],
-  seats:{}, seatPair:{}, duty:[], conflicts:[]
+  seats:{}, seatPair:{}, duty:[], conflicts:[],
+  meals:[], mealMembers:[]
 };
 let dirty = false;
 /* 目前身分：admin（管理員，全功能）或 teacher（輪值教師，受限） */
@@ -836,11 +914,12 @@ const cloud = { loaded:false, authoritative:false, pending:false, noticed:false,
 /* 背景上傳中：true 時右上角顯示「儲存中…」 */
 let saving = false;
 let ui = { tab:'today', sel:null, vioSel:new Set(), weekRef:'', cls:'all',
-  rcls:0, q:'', show:'in', pick:new Set(), lvFilter:'all', editNote:null, noteDraft:null, dutyEdit:null, draftApplied:false };
+  rcls:0, q:'', show:'in', pick:new Set(), lvFilter:'all', lvPage:1, lvSize:20,
+  editNote:null, noteDraft:null, dutyEdit:null, draftApplied:false };
 
 /* 存檔時只送有變動的項目：改一位學生不必把整份資料再傳一次 */
 const SYNC_PARTS = ['students','enrollments','calendar','leaves','violations','checkins',
-  'seats','seatPair','duty','dutyNotes','meta','opts','config','conflicts'];
+  'seats','seatPair','duty','dutyNotes','meals','mealMembers','meta','opts','config','conflicts'];
 /* 同一張工作表的項目要一起送，避免只送一半把表寫壞 */
 const SYNC_GROUPS = [['seats','seatPair'], ['meta','opts','config','conflicts']];
 /* 網址加 ?perf=1 時，每次雲端往返的耗時會印在 console，方便量測 */
@@ -1147,6 +1226,197 @@ const E = {
     });
     return { pages: pages, tail: tail };
   },
+};
+
+/* ---------- 便當（純函式：零 DOM、零網路，畫面與匯出共用同一套判定） ---------- */
+E.meal = {
+  PRICE_DEF: 100,
+  WEEK: ['一','二','三','四','五'],
+
+  /* 單價以可調參數為準；沒填或填壞就回預設 100 */
+  price(st){
+    const n = Number(E.opt(st,'mealPrice'));
+    return (isFinite(n) && n > 0) ? Math.round(n) : E.meal.PRICE_DEF;
+  },
+  ym(iso){ return String(iso||'').slice(0,7); },
+  /* 2026-10 → 10月份 */
+  ymText(ym){
+    const p = String(ym||'').split('-');
+    return (Number(p[1]) || 0) + '月份';
+  },
+  /* 2026-10 → 2026年10月 */
+  ymLabel(ym){
+    const p = String(ym||'').split('-');
+    return (p[0]||'') + '年' + (Number(p[1]) || 0) + '月';
+  },
+  /* 上一個月／下一個月 */
+  shiftYm(ym, dir){
+    const p = String(ym||'').split('-').map(Number);
+    const d = new Date(p[0] || 2000, (p[1] || 1) - 1 + dir, 1);
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+  },
+
+  /* 該月的每一天（一到五），依週分組；每週固定五格，不屬於這個月的補 null。
+     假日標 holiday（不供餐也不計費），label 是日曆上的說明。 */
+  month(st, ym){
+    const p = String(ym||'').split('-').map(Number);
+    const y = p[0], m = p[1];
+    if(!y || !m) return { weeks:[], days:[], schoolDays:0 };
+    const last = new Date(y, m, 0).getDate();
+    const weeks = [], at = {};
+    for(let d=1; d<=last; d++){
+      const iso = y + '-' + String(m).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+      const w = E.wd(iso);
+      if(w < 1 || w > 5) continue;
+      const mon = E.iso(new Date(y, m-1, d - (w-1)));
+      if(!at[mon]){ at[mon] = { mon:mon, slots:[null,null,null,null,null] }; weeks.push(at[mon]); }
+      at[mon].slots[w-1] = { iso:iso, day:d, wd:w, holiday:!E.isSchoolDay(st, iso), label:E.calLabel(st, iso) };
+    }
+    const days = [];
+    weeks.forEach(function(wk){ wk.slots.forEach(function(sl){ if(sl) days.push(sl); }); });
+    return { weeks:weeks, days:days, schoolDays: days.filter(function(d){ return !d.holiday; }).length };
+  },
+
+  /* 訂便當的人：夜自習在籍且便當不是「不訂」的，加上便當名單的額外訂餐者 */
+  roster(st){
+    const out = [];
+    E.active(st).forEach(function(s){
+      const lunch = String(s.lunch||'').trim();
+      const talked = (st.meals||[]).some(function(m){ return m.key === s.key; });
+      if(!talked && (!lunch || lunch === '不訂')) return;
+      out.push({ key:s.key, cls:Number(s.cls)||0, seat:s.seat||'', name:s.name||'',
+        lunch:lunch || '葷', group:'夜自習', note:s.note || '' });
+    });
+    (st.mealMembers||[]).forEach(function(s){
+      out.push({ key:s.key, cls:Number(s.cls)||0, seat:s.seat||'', name:s.name||'',
+        lunch:String(s.lunch||'').trim() || '葷', group:'數學班', note:s.note || '' });
+    });
+    return out.sort(function(a,b){
+      return (a.cls - b.cls) || String(a.seat).localeCompare(String(b.seat)) || a.key.localeCompare(b.key);
+    });
+  },
+  byKey(st, key){
+    return E.meal.roster(st).find(function(m){ return m.key === key; }) || null;
+  },
+
+  /* 該生該日排定供餐（不含任何例外）：數學班固定星期一，夜自習跟每週參加日 */
+  planned(st, member, iso){
+    if(!member) return false;
+    const w = E.wd(iso);
+    if(w < 1 || w > 5) return false;
+    if(!E.isSchoolDay(st, iso)) return false;
+    if(member.group === '數學班') return w === 1;
+    return E.daysAt(st, member.key, iso)[w-1] === 1;
+  },
+
+  rec(st, key, iso){
+    return (st.meals||[]).find(function(m){ return m.key === key && m.date === iso; }) || null;
+  },
+
+  /* 每一天的狀態：add 加訂、take 帶走（不退）、refund 退費、on 正常供餐、off 不供餐 */
+  day(st, member, iso){
+    const r = E.meal.rec(st, member.key, iso);
+    if(r && r.kind === '加訂') return { mode:'add', charge:1, manual:true, rec:r };
+    if(r && r.kind === '帶走') return { mode:'take', charge:1, manual:true, rec:r };
+    if(r && r.kind === '退費') return { mode:'refund', charge:0, manual:true, rec:r, paid:r.status === '已退' };
+    if(!E.meal.planned(st, member, iso)) return { mode:'off', charge:0, manual:false };
+    if(E.onLeave(st, member.key, iso)) return { mode:'refund', charge:0, manual:false, paid:false };
+    return { mode:'on', charge:1, manual:false };
+  },
+  /* 格子顯示：1、V 或空白（V＝請假但帶走，仍計費） */
+  mark(st, member, iso){
+    const d = E.meal.day(st, member, iso);
+    if(!d.charge) return '';
+    return d.mode === 'take' ? 'V' : '1';
+  },
+
+  /* 一位訂餐者在某個收費期的結算 */
+  bill(st, member, ym){
+    const mo = E.meal.month(st, ym), price = E.meal.price(st);
+    let planned = 0, refundN = 0, refundPaidN = 0, take = 0, add = 0;
+    mo.days.forEach(function(d){
+      const r = E.meal.rec(st, member.key, d.iso);
+      const isAdd = !!(r && r.kind === '加訂');
+      if(E.meal.planned(st, member, d.iso)){
+        planned++;
+        if(isAdd) return;
+        if(r && r.kind === '帶走'){ take++; return; }
+        if(r && r.kind === '退費'){ refundN++; if(r.status === '已退') refundPaidN++; return; }
+        if(E.onLeave(st, member.key, d.iso)){ refundN++; return; }
+        return;
+      }
+      /* 原本沒排、臨時加訂 */
+      if(isAdd) add++;
+    });
+    const served = planned - refundN + add;
+    const pre = planned * price;
+    const dueRefund = refundN * price;
+    const paid = refundPaidN * price;
+    const extra = add * price;
+    return {
+      key:member.key, cls:member.cls, seat:member.seat, name:member.name,
+      group:member.group, lunch:member.lunch,
+      planned:planned, refundN:refundN, refundPaidN:refundPaidN, take:take, add:add,
+      served:served, price:price, pre:pre, dueRefund:dueRefund, paid:paid, extra:extra,
+      net:pre - paid + extra, waitN:refundN - refundPaidN, charge:served * price
+    };
+  },
+
+  /* 整班／全校合計 */
+  summary(st, ym){
+    const rows = E.meal.roster(st).map(function(m){ return E.meal.bill(st, m, ym); });
+    const sum = { kids:0, mKids:0, days:0, served:0, pre:0, dueRefund:0, paid:0, extra:0, net:0, waitN:0, waitMoney:0 };
+    rows.forEach(function(b){
+      if(!b.planned && !b.add) return;
+      sum.kids++;
+      if(b.group === '數學班') sum.mKids++;
+      sum.served += b.served;
+      sum.pre += b.pre;
+      sum.dueRefund += b.dueRefund;
+      sum.paid += b.paid;
+      sum.extra += b.extra;
+      sum.net += b.net;
+      sum.waitN += b.waitN;
+    });
+    sum.waitMoney = sum.dueRefund - sum.paid;
+    sum.days = E.meal.month(st, ym).schoolDays;
+    return { rows:rows, sum:sum };
+  },
+
+  /* 該月還沒處理的退費（請假未標、或手動退費未標已退） */
+  pending(st, ym){
+    const mo = E.meal.month(st, ym), out = [];
+    E.meal.roster(st).forEach(function(m){
+      mo.days.forEach(function(d){
+        const r = E.meal.rec(st, m.key, d.iso);
+        if(r && (r.kind === '帶走' || r.kind === '加訂')) return;
+        if(r && r.kind === '退費'){
+          if(r.status !== '已退') out.push({ member:m, iso:d.iso, id:r.id, why:r.note || '手動退費' });
+          return;
+        }
+        if(!E.meal.planned(st, m, d.iso)) return;
+        const lv = (st.leaves||[]).find(function(l){ return l.key === m.key && l.date === d.iso; });
+        if(lv) out.push({ member:m, iso:d.iso, id:'', why:lv.reason || '請假' });
+      });
+    });
+    return out.sort(function(a,b){
+      return a.iso.localeCompare(b.iso) || (a.member.cls - b.member.cls)
+        || String(a.member.seat).localeCompare(String(b.member.seat));
+    });
+  },
+
+  /* 這個收費期的繳費截止說明與繳交對象（可調參數，留空就自動給合理預設） */
+  payDue(st, ym){
+    const v = String(E.opt(st,'mealPayDue')||'').trim();
+    if(v) return v;
+    const mo = E.meal.month(st, ym);
+    const last = mo.days.filter(function(d){ return !d.holiday; }).pop();
+    if(!last) return '本月最後一個上課日 前';
+    return (E.parse(last.iso).getMonth()+1) + '/' + last.day + '（' + CONFIG.WEEKDAY[last.wd] + '） 前';
+  },
+  payTo(st){
+    return String(E.opt(st,'mealPayTo')||'').trim() || '各班導師';
+  }
 };
 
 /* =====================================================================
@@ -1595,7 +1865,7 @@ function confirmModal(title, messageHTML, onOk, okLabel){
 
 const TABS = [
   ['today','今夜點名'], ['list','學生清單'], ['seat','座位編排'], ['log','異動日誌'],
-  ['leave','請假紀錄'], ['vio','違規紀錄'], ['duty','輪值日誌'], ['export','匯出表單'], ['config','設定與檢查']
+  ['leave','請假紀錄'], ['vio','違規紀錄'], ['duty','輪值日誌'], ['meal','便當管理'], ['export','匯出表單'], ['config','設定與檢查']
 ];
 
 function renderTabs(){
@@ -2379,17 +2649,49 @@ function leaveList(){
     });
 }
 
+/* 每一頁幾筆：篩選一改就回第 1 頁；刪到最後一筆也不會停在空頁 */
+const LEAVE_SIZES = [20, 50, 100];
+function leavePageInfo(total){
+  const size = Math.max(5, Number(ui.lvSize) || 20);
+  const pages = Math.max(1, Math.ceil(total / size));
+  const page = Math.min(Math.max(1, Number(ui.lvPage) || 1), pages);
+  ui.lvPage = page;
+  ui.lvSize = size;
+  const from = (page - 1) * size;
+  return { size:size, pages:pages, page:page, from:from,
+    to:Math.min(total, from + size), total:total };
+}
+
+function renderLeavePager(pi){
+  const el = $('leavePager');
+  if(!el) return;
+  el.innerHTML = '<span>第 <b>' + pi.page + '</b>／' + pi.pages + ' 頁　顯示 '
+    + (pi.total ? (pi.from + 1) + '–' + pi.to : 0) + ' 筆，符合條件共 ' + pi.total + ' 筆</span>'
+    + '<span class="spacer"></span>'
+    + '<label for="lvSize">每頁</label>'
+    + '<select id="lvSize">' + LEAVE_SIZES.map(function(n){
+        return '<option value="' + n + '"' + (pi.size === n ? ' selected' : '') + '>' + n + ' 筆</option>';
+      }).join('') + '</select>'
+    + '<button class="btn tiny" data-lvpage="' + (pi.page - 1) + '"'
+      + (pi.page <= 1 ? ' disabled aria-disabled="true"' : '') + '>‹ 上一頁</button>'
+    + '<button class="btn tiny" data-lvpage="' + (pi.page + 1) + '"'
+      + (pi.page >= pi.pages ? ' disabled aria-disabled="true"' : '') + '>下一頁 ›</button>';
+}
+
 function renderLeave(){
-  const list = leaveList();
+  const filtered = leaveList();
   const all = state.leaves||[];
   const people = new Set(all.map(function(l){ return l.key; }));
+  const pi = leavePageInfo(filtered.length);
+  const list = filtered.slice(pi.from, pi.to);
   $('leaveTools').innerHTML = '<button class="btn primary" id="btnAddLeave">新增請假</button>'
     + '<div class="chips">'
     + [['all','全部'],['today','今天'],['week','本週'],['future','今天以後']]
         .map(function(p){ return '<button class="chip'+(ui.lvFilter===p[0]?' sel':'')+'" data-lvf="'+p[0]+'">'+p[1]+'</button>'; }).join('')
     + '</div>'
     + '<span class="hint">請假只影響當日點名與統計，不動每週參加設定</span>';
-  $('leaveStat').innerHTML = '共 <b>'+all.length+'</b> 筆　涉及 '+people.size+' 人　已繳紙本 <b>'+(all.filter(function(l){ return l.paper; }).length)+'</b> 筆　目前顯示 '+list.length+' 筆'
+  $('leaveStat').innerHTML = '共 <b>'+all.length+'</b> 筆　涉及 '+people.size+' 人　已繳紙本 <b>'
+    + (all.filter(function(l){ return l.paper; }).length)+'</b> 筆　符合條件 '+filtered.length+' 筆'
     + (all.length ? '' : '　還沒有任何請假紀錄，按「新增請假」開始');
   $('leaveTable').innerHTML = '<thead><tr><th>日期</th><th>班級</th><th>座號</th><th>姓名</th><th>事由</th><th class="paper">已繳紙本</th><th>操作</th></tr></thead><tbody>'
     + (list.length ? list.map(function(l){
@@ -2415,6 +2717,7 @@ function renderLeave(){
       +   '<span class="card-btns"><button class="btn tiny" data-lvedit="'+l.id+'">編輯</button><button class="btn tiny" data-leavedel="'+l.id+'">刪除</button></span>'
       + '</div></div>';
   }).join('') : '<p class="hint">目前沒有符合條件的請假紀錄</p>';
+  renderLeavePager(pi);
 }
 
 let IDSEQ = 0;
@@ -2782,6 +3085,333 @@ function refreshOptPreviews(){
   });
 }
 
+/* ---------- 便當管理 ---------- */
+function money(n){ return Number(n||0).toLocaleString('en-US'); }
+function mealYm(){
+  if(!ui.mealYm) ui.mealYm = E.meal.ym(ref());
+  return ui.mealYm;
+}
+function mealCellText(d){
+  if(d.mode === 'on') return '供餐';
+  if(d.mode === 'add') return '加訂（計費）';
+  if(d.mode === 'take') return '請假帶走（不退費）';
+  if(d.mode === 'refund') return d.paid ? '退費已退' : '退費待退';
+  return '不供餐';
+}
+
+function renderMeal(){
+  if(isTeacher()) return;
+  const st = state, ym = mealYm();
+  const mo = E.meal.month(st, ym);
+  const pack = E.meal.summary(st, ym);
+  const price = E.meal.price(st);
+  const view = ui.mealView === 'bill' ? 'bill' : 'grid';
+
+  $('mealTools').innerHTML = ''
+    + '<div class="daynav">'
+    +   '<button class="btn nav" data-mealym="-1" title="上一個月" aria-label="上一個月">‹</button>'
+    +   '<span class="btn" style="min-height:44px;display:inline-flex;align-items:center;padding:0 14px">'
+    +     esc(E.meal.ymLabel(ym)) + '</span>'
+    +   '<button class="btn nav" data-mealym="1" title="下一個月" aria-label="下一個月">›</button>'
+    + '</div>'
+    + '<div class="chips">'
+    +   [['grid','格子式'],['bill','結算表']].map(function(v){
+          return '<button class="chip' + (view === v[0] ? ' sel' : '') + '" data-mealview="' + v[0] + '">'
+            + v[1] + '</button>';
+        }).join('')
+    + '</div>'
+    + '<button class="btn" id="btnMealMember">訂餐名單</button>'
+    + '<button class="btn primary" id="btnMealExport">匯出便當收費</button>'
+    + '<span class="hint">單價 ' + price + ' 元｜' + mo.schoolDays + ' 個上課日｜'
+    +   '點格子切換 1、V、空白；V 是請假但便當帶走，仍要收費</span>';
+
+  const s = pack.sum;
+  $('mealSum').innerHTML = ''
+    + '<div class="m"><b>' + s.served + '</b><i>供餐份數</i></div>'
+    + '<div class="m"><b>' + money(s.pre) + '</b><i>預收金額</i></div>'
+    + '<div class="m' + (s.waitN ? ' warn' : '') + '"><b>' + s.waitN + '</b><i>待退筆數</i></div>'
+    + '<div class="m' + (s.waitMoney ? ' warn' : '') + '"><b>' + money(s.waitMoney) + '</b><i>未退金額</i></div>'
+    + '<div class="m"><b>' + s.mKids + '</b><i>數學班人數</i></div>'
+    + '<div class="m"><b>' + mo.schoolDays + '</b><i>本月上課日</i></div>';
+
+  $('mealGridWrap').style.display = view === 'grid' ? '' : 'none';
+  $('mealCards').style.display = view === 'grid' ? '' : 'none';
+  $('mealBill').style.display = view === 'grid' ? 'none' : '';
+  if(view === 'grid'){ renderMealGrid(mo, pack); renderMealCards(pack); }
+  else renderMealBill(pack, mo);
+  renderMealPending(ym);
+}
+
+function renderMealGrid(mo, pack){
+  const st = state;
+  const byKey = {};
+  pack.rows.forEach(function(b){ byKey[b.key] = b; });
+  const roster = E.meal.roster(st);
+  const has = roster.some(function(m){ return !!byKey[m.key]; });
+
+  let row1 = '<thead><tr><th class="cls" rowspan="2">班級</th><th class="seat" rowspan="2">座號</th>'
+    + '<th class="name" rowspan="2">姓名</th><th class="grp" rowspan="2">身份</th>';
+  let row2 = '<tr>';
+  mo.weeks.forEach(function(wk){
+    wk.slots.forEach(function(sl){
+      row1 += sl ? '<th class="' + (sl.holiday ? 'hl' : 'd') + '" title="' + sl.iso + '">'
+        + sl.day + (sl.holiday ? '休' : '') + '</th>' : '<th class="we"></th>';
+      row2 += '<th class="we">' + (sl ? CONFIG.WEEKDAY[sl.wd] : '') + '</th>';
+    });
+    row1 += '<th class="sub" rowspan="2">小計</th>';
+  });
+  row1 += '<th class="total" rowspan="2">總計金額</th><th class="total" rowspan="2">待退</th>';
+  row2 += '</tr>';
+
+  let body = '<tbody>';
+  if(!has){
+    body += '<tr><td colspan="' + (4 + mo.weeks.length * 6 + 2) + '" class="hint" style="text-align:left;padding:8px">'
+      + '這個月還沒有人訂便當。請到「學生清單」把便當欄填成葷或素，或按「訂餐名單」新增數學班等額外訂餐者。</td></tr>';
+  }
+  let band = -1, lastCls = null;
+  roster.forEach(function(m){
+    const b = byKey[m.key];
+    if(!b) return;
+    if(m.cls !== lastCls){ band++; lastCls = m.cls; }
+    body += '<tr' + (band % 2 ? ' class="band"' : '') + '>'
+      + '<td class="cls">' + m.cls + '</td><td class="seat">' + esc(m.seat) + '</td>'
+      + '<td class="name">' + esc(m.name) + '</td>'
+      + '<td class="grp">' + (m.group === '數學班' ? '數學' : '夜自習') + '</td>';
+    mo.weeks.forEach(function(wk){
+      let weekServed = 0;
+      wk.slots.forEach(function(sl){
+        if(!sl){ body += '<td class="cell off"></td>'; return; }
+        if(sl.holiday){ body += '<td class="cell holiday" title="' + sl.iso + ' 放假">—</td>'; return; }
+        const d = E.meal.day(st, m, sl.iso);
+        if(d.charge) weekServed++;
+        const cls = d.mode === 'take' ? 'take' : (d.mode === 'add' ? 'add'
+          : (d.mode === 'refund' ? 'refund' : (d.mode === 'on' ? 'on' : 'off')));
+        body += '<td class="cell ' + cls + (d.manual ? ' fix' : '') + '"'
+          + ' data-mealcell="' + m.key + '|' + sl.iso + '"'
+          + ' title="' + sl.iso + '　' + mealCellText(d) + '">'
+          + E.meal.mark(st, m, sl.iso) + '</td>';
+      });
+      body += '<td class="sub">' + weekServed + '</td>';
+    });
+    body += '<td class="total">' + money(b.charge) + '</td>'
+      + '<td class="wait">' + (b.waitN ? '<b data-mealmoneypay="' + m.key + '">' + b.waitN + ' 筆</b>' : '—') + '</td>'
+      + '</tr>';
+  });
+  body += '</tbody>';
+  $('mealGrid').innerHTML = row1 + row2 + body;
+}
+
+function renderMealCards(pack){
+  const byKey = {};
+  pack.rows.forEach(function(b){ byKey[b.key] = b; });
+  const rows = E.meal.roster(state).filter(function(m){ return byKey[m.key]; });
+  $('mealCards').innerHTML = rows.length ? rows.map(function(m){
+    const b = byKey[m.key];
+    return '<div class="card">'
+      + '<div class="card-h"><span class="card-who">' + m.cls + '-' + esc(m.seat) + '　' + esc(m.name) + '</span></div>'
+      + '<div class="card-reason">' + (m.group === '數學班' ? '數學班（每週一）' : '夜自習') + '｜便當 ' + esc(m.lunch) + '</div>'
+      + '<div class="card-nums"><span>實供 <b>' + b.served + '</b></span>'
+      +   '<span>退費 <b>' + b.refundN + '</b></span>'
+      +   '<span>金額 <b>' + money(b.charge) + '</b></span></div>'
+      + '<div class="card-foot">'
+      +   (b.waitN ? '<span style="color:var(--seal)">待退 ' + b.waitN + ' 筆</span>' : '<span>沒有待退</span>')
+      +   '<span class="card-btns"><button class="btn tiny" data-mealdetail="' + m.key + '">逐日明細</button></span>'
+      + '</div></div>';
+  }).join('') : '<p class="hint">這個月還沒有人訂便當</p>';
+}
+
+function renderMealBill(pack){
+  $('mealBill').innerHTML = '<div class="tablewrap"><table class="data">'
+    + '<thead><tr><th>班級</th><th>座號</th><th>姓名</th><th>身份</th><th>便當</th>'
+    + '<th>排定</th><th>退費</th><th>帶走</th><th>實供</th>'
+    + '<th>預收</th><th>應退</th><th>已退</th><th>實收</th><th>待退</th></tr></thead><tbody>'
+    + (pack.rows.length ? pack.rows.filter(function(b){ return b.planned || b.add; }).map(function(b){
+        return '<tr><td>' + b.cls + '</td><td>' + esc(b.seat) + '</td><td>' + esc(b.name) + '</td>'
+          + '<td>' + (b.group === '數學班' ? '數學' : '夜自習') + '</td><td>' + esc(b.lunch) + '</td>'
+          + '<td>' + b.planned + '</td><td>' + b.refundN + '</td><td>' + b.take + '</td><td>' + b.served + '</td>'
+          + '<td>' + money(b.pre) + '</td><td>' + money(b.dueRefund) + '</td>'
+          + '<td>' + money(b.paid) + '</td><td>' + money(b.charge) + '</td>'
+          + '<td>' + (b.waitN ? '<b style="color:var(--seal)">' + b.waitN + '</b>' : '—') + '</td></tr>';
+      }).join('') : '<tr><td colspan="14" class="hint">這個月沒有訂便當的紀錄</td></tr>')
+    + '</tbody><tfoot><tr><th colspan="4">全月合計</th><th>—</th>'
+    + '<th>' + pack.sum.served + '</th><th>' + pack.sum.waitN + '</th><th>—</th><th>' + pack.sum.served + '</th>'
+    + '<th>' + money(pack.sum.pre) + '</th><th>' + money(pack.sum.dueRefund) + '</th>'
+    + '<th>' + money(pack.sum.paid) + '</th><th>' + money(pack.sum.net) + '</th>'
+    + '<th>' + pack.sum.waitN + '</th></tr></tfoot></table></div>';
+}
+
+function renderMealPending(ym){
+  const list = E.meal.pending(state, ym);
+  const price = E.meal.price(state);
+  $('mealPending').innerHTML = ''
+    + '<div class="meal-h3"><h3>待處理退費（' + list.length + ' 筆）</h3>'
+    + (list.length ? '<button class="btn tiny seal" id="btnMealPayAll">全月標記已退</button>' : '')
+    + '<span class="hint">請假沒吃要退費；便當已經帶走就按「帶走」，不退費</span></div>'
+    + (list.length ? list.map(function(p){
+        return '<div class="row">'
+          + '<span class="who">' + p.member.cls + '-' + esc(p.member.seat) + '　' + esc(p.member.name) + '</span>'
+          + '<span>' + p.iso + '（' + CONFIG.WEEKDAY[E.wd(p.iso)] + '）</span>'
+          + '<span class="why">' + esc(p.why) + '</span>'
+          + '<span class="btns">'
+          +   '<button class="btn tiny" data-mealtake="' + p.member.key + '|' + p.iso + '">帶走</button>'
+          +   '<button class="btn tiny seal" data-mealpaid="' + p.member.key + '|' + p.iso + '">已退 ' + price + '</button>'
+          + '</span></div>';
+      }).join('') : '<p class="hint">這個月沒有待處理的退費</p>');
+}
+
+/* 點格子：1 → V → 空白 → 回到自動判定 */
+function cycleMealCell(key, iso){
+  const member = E.meal.byKey(state, key);
+  if(!member) return;
+  const d = E.meal.day(state, member, iso);
+  const cur = d.charge ? (d.mode === 'take' ? 'V' : '1') : '';
+  const next = cur === '1' ? 'V' : (cur === 'V' ? '' : '1');
+  state.meals = (state.meals||[]).filter(function(m){ return !(m.key === key && m.date === iso); });
+  if(next === '1'){
+    state.meals.push({ id:newId('m'), date:iso, key:key, kind:'加訂', status:'', paidAt:'', note:'手動指定供餐' });
+  }else if(next === 'V'){
+    state.meals.push({ id:newId('m'), date:iso, key:key, kind:'帶走', status:'', paidAt:'', note:'請假帶走' });
+  }else if(E.meal.planned(state, member, iso)){
+    state.meals.push({ id:newId('m'), date:iso, key:key, kind:'退費', status:'待退', paidAt:'', note:'手動退費' });
+  }
+  commit();
+}
+
+/* 把某一天的退費標成已退／待退；回傳有沒有改到 */
+function mealSetPaid(key, iso, paid){
+  let r = E.meal.rec(state, key, iso);
+  if(!r){
+    r = { id:newId('m'), date:iso, key:key, kind:'退費', status:'待退', paidAt:'', note:'請假退費' };
+    state.meals.push(r);
+  }
+  if(r.kind === '帶走' || r.kind === '加訂') return false;
+  r.status = paid ? '已退' : '待退';
+  r.paidAt = paid ? E.today() : '';
+  return true;
+}
+
+function mealPayAll(ym){
+  const list = E.meal.pending(state, ym);
+  if(!list.length){ toast('這個月沒有待處理的退費'); return; }
+  const total = list.length * E.meal.price(state);
+  confirmModal('整月標記已退',
+    '共 ' + list.length + ' 筆、' + total + ' 元，確定全部標成「已退」嗎？',
+    function(){
+      list.forEach(function(p){ mealSetPaid(p.member.key, p.iso, true); });
+      commit();
+      toast('已標記 ' + list.length + ' 筆退費');
+    }, '全部已退');
+}
+
+function openMealDetail(key){
+  const m = E.meal.byKey(state, key);
+  if(!m) return;
+  const ym = mealYm(), mo = E.meal.month(state, ym), b = E.meal.bill(state, m, ym);
+  const body = '<div class="hint" style="margin:0 0 8px">' + m.cls + '-' + esc(m.seat) + '　' + esc(m.name)
+    + '　' + (m.group === '數學班' ? '數學班（每週一）' : '夜自習') + '　便當 ' + esc(m.lunch) + '</div>'
+    + '<p class="hint">實供 ' + b.served + ' 份、金額 ' + money(b.charge) + ' 元、待退 ' + b.waitN + ' 筆。'
+    + '點狀態可以切換 1、V、空白。</p>'
+    + '<div class="tools" style="flex-wrap:wrap;gap:6px">'
+    + mo.days.filter(function(d){ return !d.holiday && E.meal.planned(state, m, d.iso); })
+        .map(function(d){
+          const x = E.meal.day(state, m, d.iso);
+          const mk = E.meal.mark(state, m, d.iso);
+          const cls = x.mode === 'take' ? 'seal' : (x.mode === 'refund' ? '' : '');
+          return '<button class="btn tiny ' + cls + '" data-mealcell="' + m.key + '|' + d.iso + '">'
+            + (E.parse(d.iso).getMonth()+1) + '/' + d.day + '　' + (mk || '—') + '</button>';
+        }).join('')
+    + '</div>';
+  const mo2 = modal('逐日明細', body, '<button class="btn" data-close>關閉</button>', true);
+  mo2.querySelector('[data-close]').addEventListener('click', closeModal);
+  Array.prototype.forEach.call(mo2.querySelectorAll('[data-mealcell]'), function(btn){
+    btn.addEventListener('click', function(ev){
+      /* 這裡自己處理就好，不要讓頁面上的格子監聽再跑一次，否則會連跳兩格 */
+      ev.stopPropagation();
+      const parts = btn.dataset.mealcell.split('|');
+      closeModal();
+      cycleMealCell(parts[0], parts[1]);
+      openMealDetail(parts[0]);
+    });
+  });
+}
+
+function openMealMembers(){
+  const list = (state.mealMembers||[]).slice().sort(function(a,b){
+    return (a.cls - b.cls) || String(a.seat).localeCompare(String(b.seat));
+  });
+  const body = '<div class="tools"><button class="btn primary" id="mbrAdd">新增訂餐者</button>'
+    + '<span class="hint">這一區只放沒有參加夜自習、但跟著訂便當的學生，供餐日固定每週一；'
+    + '夜自習學生不必在這裡重複登打。</span></div>'
+    + '<div class="tablewrap"><table class="data"><thead><tr><th>班級</th><th>座號</th><th>姓名</th>'
+    + '<th>便當</th><th>備註</th><th>操作</th></tr></thead><tbody>'
+    + (list.length ? list.map(function(s){
+        return '<tr><td>' + s.cls + '</td><td>' + esc(s.seat) + '</td><td>' + esc(s.name) + '</td>'
+          + '<td>' + esc(s.lunch) + '</td><td>' + esc(s.note||'') + '</td>'
+          + '<td><button class="btn tiny" data-mbredit="' + s.key + '">編輯</button> '
+          + '<button class="btn tiny" data-mbrdel="' + s.key + '">刪除</button></td></tr>';
+      }).join('') : '<tr><td colspan="6" class="hint">目前沒有額外訂餐者</td></tr>')
+    + '</tbody></table></div>';
+  const m = modal('便當訂餐名單', body, '<button class="btn" data-close>關閉</button>', true);
+  m.querySelector('[data-close]').addEventListener('click', closeModal);
+  m.querySelector('#mbrAdd').addEventListener('click', function(){ closeModal(); openMealMemberForm(''); });
+  Array.prototype.forEach.call(m.querySelectorAll('[data-mbredit]'), function(btn){
+    btn.addEventListener('click', function(){ closeModal(); openMealMemberForm(btn.dataset.mbredit); });
+  });
+  Array.prototype.forEach.call(m.querySelectorAll('[data-mbrdel]'), function(btn){
+    btn.addEventListener('click', function(){
+      const key = btn.dataset.mbrdel;
+      const rec = (state.mealMembers||[]).find(function(x){ return x.key === key; }) || {};
+      closeModal();
+      confirmModal('刪除訂餐者', esc(rec.cls + '-' + rec.seat + '　' + (rec.name||''))
+        + '\n已建立的便當紀錄不會一起刪除。', function(){
+        state.mealMembers = (state.mealMembers||[]).filter(function(x){ return x.key !== key; });
+        commit(); toast('已刪除訂餐者');
+      }, '刪除');
+    });
+  });
+}
+
+function openMealMemberForm(key){
+  const rec = (state.mealMembers||[]).find(function(x){ return x.key === key; })
+    || { cls:'', seat:'', name:'', lunch:'', note:'' };
+  const body = '<div class="field"><label>班級</label><input id="mbrCls" type="number" min="1" max="99" value="'
+      + (rec.cls || '') + '"></div>'
+    + '<div class="field"><label>座號</label><input id="mbrSeat" value="' + esc(rec.seat||'') + '"></div>'
+    + '<div class="field"><label>姓名</label><input id="mbrName" value="' + esc(rec.name||'') + '"></div>'
+    + '<div class="field"><label>便當</label><input id="mbrLunch" list="mbrLunchDL" value="' + esc(rec.lunch||'') + '">'
+      + dlOptions('mbrLunchDL', E.optList(state,'lunchOptions').filter(function(v){ return v !== '不訂'; })) + '</div>'
+    + '<div class="field"><label>備註</label><input id="mbrNote" value="' + esc(rec.note||'') + '" placeholder="例如：每週一數學班"></div>'
+    + '<p class="hint">供餐日固定每週一（遇放假自動不算）；這一筆不會出現在夜自習的點名、座位與統計。</p>';
+  const m = modal(key ? '編輯訂餐者' : '新增訂餐者', body,
+    '<button class="btn" data-close>取消</button><button class="btn primary" id="mbrSave">儲存</button>');
+  m.querySelector('[data-close]').addEventListener('click', closeModal);
+  m.querySelector('#mbrSave').addEventListener('click', function(){
+    const cls = Number(m.querySelector('#mbrCls').value);
+    const seat = String(m.querySelector('#mbrSeat').value || '').trim();
+    const name = m.querySelector('#mbrName').value.trim();
+    const lunch = m.querySelector('#mbrLunch').value.trim() || '葷';
+    const note = m.querySelector('#mbrNote').value.trim();
+    if(!cls || !seat || !name){ toast('班級、座號、姓名都要填'); return; }
+    const newKey = key || mealMemberKey(cls, seat, key);
+    if(key){
+      const rec2 = (state.mealMembers||[]).find(function(x){ return x.key === key; });
+      if(!rec2) return;
+      rec2.cls = cls; rec2.seat = seat; rec2.name = name; rec2.lunch = lunch; rec2.note = note;
+    }else{
+      state.mealMembers.push({ key:newKey, cls:cls, seat:seat, name:name, lunch:lunch, note:note });
+    }
+    closeModal();
+    commit();
+    toast(key ? '已更新訂餐者' : '已新增訂餐者');
+  });
+}
+
+function mealMemberKey(cls, seat, selfKey){
+  let key = 'x' + cls + '-' + String(seat||'').padStart(2,'0');
+  const used = (state.mealMembers||[]).some(function(x){ return x.key === key && x.key !== selfKey; });
+  if(used) key += '-' + Math.random().toString(36).slice(2,5);
+  return key;
+}
 function render(){
   renderShell();
   renderTabs();
@@ -2792,6 +3422,7 @@ function render(){
   if(ui.tab==='leave') renderLeave();
   if(ui.tab==='vio') renderVio();
   if(ui.tab==='duty') renderDuty();
+  if(ui.tab==='meal') renderMeal();
   if(ui.tab==='export') renderExport();
   if(ui.tab==='config') renderConfig();
 }
@@ -2980,6 +3611,49 @@ $('backupPicker').addEventListener('change', async e=>{
   const f = e.target.files[0]; if(!f) return;
   try{ state = JSON.parse(await f.text()); commit(); toast('已匯入備份'); }
   catch(err){ toast('備份檔格式錯誤'); }
+});
+
+/* ---------- 便當管理：月份、視圖、格子、退費 ---------- */
+document.addEventListener('click', function(e){
+  const t = e.target;
+  if(isTeacher()) return;
+  const ymBtn = t.closest('[data-mealym]');
+  if(ymBtn){
+    ui.mealYm = E.meal.shiftYm(mealYm(), Number(ymBtn.dataset.mealym));
+    renderMeal();
+    return;
+  }
+  const viewBtn = t.closest('[data-mealview]');
+  if(viewBtn){ ui.mealView = viewBtn.dataset.mealview; renderMeal(); return; }
+  if(t.id === 'btnMealMember'){ openMealMembers(); return; }
+  if(t.id === 'btnMealExport'){ openMealExport(); return; }
+  if(t.id === 'btnMealPayAll'){ mealPayAll(mealYm()); return; }
+  const cell = t.closest('[data-mealcell]');
+  if(cell){
+    const p = cell.dataset.mealcell.split('|');
+    cycleMealCell(p[0], p[1]);
+    return;
+  }
+  const detail = t.closest('[data-mealdetail],[data-mealmoneypay]');
+  if(detail){ openMealDetail(detail.dataset.mealdetail || detail.dataset.mealmoneypay); return; }
+  const paidBtn = t.closest('[data-mealpaid]');
+  if(paidBtn){
+    const p = paidBtn.dataset.mealpaid.split('|');
+    if(mealSetPaid(p[0], p[1], true)){ commit(); toast('已標記退費 ' + E.meal.price(state) + ' 元'); }
+    else toast('這一天是帶走或加訂，不需要退費');
+    return;
+  }
+  const takeBtn = t.closest('[data-mealtake]');
+  if(takeBtn){
+    const p = takeBtn.dataset.mealtake.split('|');
+    const mem = E.meal.byKey(state, p[0]);
+    if(!mem) return;
+    state.meals = (state.meals||[]).filter(function(m){ return !(m.key === p[0] && m.date === p[1]); });
+    state.meals.push({ id:newId('m'), date:p[1], key:p[0], kind:'帶走', status:'', paidAt:'', note:'請假帶走' });
+    commit();
+    toast('已標記帶走，這一天照收費');
+    return;
+  }
 });
 
 /* ---------- 輪值記事：逐筆登記，儲存後再以呈現樣式顯示 ---------- */
@@ -3873,6 +4547,400 @@ async function exportXlsx(){
   }catch(err){ toast('匯出失敗：'+err.message, 5000); }
 }
 
+/* ---------- 便當收費表（複刻紙本預繳單：每班一張工作表加全校總表） ---------- */
+function colLetter(n){
+  let s = '';
+  while(n > 0){ const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); }
+  return s;
+}
+
+const MEAL_FONT = '微軟正黑體';
+const MEAL_FILL = {
+  head:'FFF2F4F7', date:'FFF2F4F7', holiday:'FFFADBD8', sub:'FFEBF5FB',
+  total:'FFFEF9E7', price:'FFE8F8F5', sum:'FFEAEDED'
+};
+
+function openMealExport(){
+  const ym = mealYm();
+  const roster = E.meal.roster(state);
+  const clsList = [];
+  roster.forEach(function(m){ if(m.cls && clsList.indexOf(m.cls) < 0) clsList.push(m.cls); });
+  clsList.sort(function(a,b){ return a - b; });
+  if(!clsList.length){ toast('這個月還沒有人訂便當，沒有東西可匯出'); return; }
+  const body = '<p class="hint" style="margin:0 0 8px">收費期：' + esc(E.meal.ymLabel(ym))
+    + '　單價 ' + E.meal.price(state) + ' 元　上課日 ' + E.meal.month(state, ym).schoolDays + ' 天</p>'
+    + '<label class="chk"><input type="checkbox" id="mexTotal" checked> 加一張全校總表（各班合計會即時連動）</label>'
+    + '<div class="tools" style="flex-wrap:wrap;margin-top:10px">'
+    +   '<button class="btn tiny" id="mexAll">全選</button>'
+    +   '<button class="btn tiny" id="mexNone">全不選</button>'
+    + '</div>'
+    + '<div class="tools" style="flex-wrap:wrap;gap:6px 14px;margin-top:6px">'
+    + clsList.map(function(c){
+        return '<label class="chk-inline"><input type="checkbox" data-mexcls="' + c + '" checked> ' + c + '班</label>';
+      }).join('')
+    + '</div>'
+    + '<p class="hint" style="margin-top:10px">每班一張工作表，格子已依系統資料自動填好 1、V 或空白；'
+    + 'V 是請假但便當帶走、仍計費。只勾一個班時，檔名會帶上那個班，方便單獨發給導師。</p>';
+  const m = modal('匯出便當收費', body,
+    '<button class="btn" data-close>取消</button><button class="btn primary" id="mexGo">開始匯出</button>', true);
+  m.querySelector('[data-close]').addEventListener('click', closeModal);
+  m.querySelector('#mexAll').addEventListener('click', function(){
+    m.querySelectorAll('[data-mexcls]').forEach(function(c){ c.checked = true; });
+  });
+  m.querySelector('#mexNone').addEventListener('click', function(){
+    m.querySelectorAll('[data-mexcls]').forEach(function(c){ c.checked = false; });
+  });
+  m.querySelector('#mexGo').addEventListener('click', function(){
+    const picked = Array.prototype.slice.call(m.querySelectorAll('[data-mexcls]'))
+      .filter(function(c){ return c.checked; }).map(function(c){ return Number(c.dataset.mexcls); });
+    if(!picked.length){ toast('請至少勾一個班級'); return; }
+    const withTotal = !!m.querySelector('#mexTotal').checked;
+    closeModal();
+    exportMealXlsx(ym, picked, withTotal);
+  });
+}
+
+async function exportMealXlsx(ym, classes, withTotal){
+  try{
+    await LIB.need(['exceljs']);
+    const ExcelJS = window.ExcelJS;
+    const st = state, mo = E.meal.month(st, ym);
+    const price = E.meal.price(st);
+    const roster = E.meal.roster(st);
+    const school = String(E.opt(st,'school')||'').trim();
+    const term = String(E.opt(st,'term')||'').trim();
+    const weeks = mo.weeks.length;
+    if(!weeks){ toast('這個月沒有上課日，無法匯出'); return; }
+
+    const wb = new ExcelJS.Workbook();
+    const thin = borderAll();
+    const sumRows = {};
+    const prefixTitle = (school ? school + ' ' : '') + E.meal.ymText(ym);
+
+    const pick = classes.filter(function(c){
+      return roster.some(function(m){ return m.cls === c; });
+    });
+    if(!pick.length){ toast('勾選的班級這個月沒有人訂便當'); return; }
+
+    pick.forEach(function(cls){
+      const name = cls + '班';
+      const ws = wb.addWorksheet(name);
+      const members = roster.filter(function(m){ return m.cls === cls; });
+      const totalCol = 4 + weeks * 6;
+      const signCol = totalCol + 1;
+      const lastCol = signCol;
+      const priceRef = '$' + colLetter(totalCol) + '$3';
+
+      /* 欄寬：班級、座號、姓名、每天、每週小計、總計、簽收 */
+      ws.getColumn(1).width = 7;
+      ws.getColumn(2).width = 5.5;
+      ws.getColumn(3).width = 11.5;
+      for(let i = 0; i < weeks; i++){
+        for(let d = 0; d < 5; d++) ws.getColumn(4 + i*6 + d).width = 5;
+        ws.getColumn(9 + i*6).width = 6.2;
+      }
+      ws.getColumn(totalCol).width = 11;
+      ws.getColumn(signCol).width = 9;
+
+      /* 表頭四列 */
+      ws.mergeCells(1, 1, 1, lastCol);
+      setMealCell(ws.getCell(1, 1), prefixTitle + ' 夜自習便當預繳單（班級：' + cls + '）',
+        { size:15, bold:true, align:'center' });
+      ws.getRow(1).height = 26;
+
+      ws.mergeCells(2, 1, 2, lastCol);
+      setMealCell(ws.getCell(2, 1),
+        '請於 ' + E.meal.payDue(st, ym) + ' 將錢收畢連同本單交 ' + E.meal.payTo(st)
+        + '，如有請假或更改請至教務處事先提出（便當盒已送出而臨時請假者不退費）。',
+        { size:9.5, align:'left' });
+      ws.getRow(2).height = 18;
+
+      ws.mergeCells(3, 1, 3, totalCol - 3);
+      setMealCell(ws.getCell(3, 1),
+        '如有出入請自行更正統計完成後填上正確資料，備註每個便當 ' + price + ' 元，下月初進行退費',
+        { size:9.5, align:'left' });
+      ws.mergeCells(3, totalCol - 2, 3, totalCol - 1);
+      setMealCell(ws.getCell(3, totalCol - 2), '便當單價：', { size:9.5, bold:true, align:'right' });
+      setMealCell(ws.getCell(3, totalCol), price, { size:10, bold:true, fill:MEAL_FILL.price, border:thin });
+      ws.getRow(3).height = 18;
+
+      ws.mergeCells(4, 1, 4, lastCol);
+      setMealCell(ws.getCell(4, 1),
+        '負責同學：_________________                                  導師：____________',
+        { size:9.5, align:'left' });
+      ws.getRow(4).height = 20;
+
+      /* 第 5 列日期、第 6 列星期 */
+      ws.mergeCells(5, 1, 5, 2);
+      setMealCell(ws.getCell(5, 1), E.meal.ymText(ym), { size:10, bold:true, fill:MEAL_FILL.head, border:thin, align:'center' });
+      setMealCell(ws.getCell(5, 2), '', { fill:MEAL_FILL.head, border:thin });
+      setMealCell(ws.getCell(5, 3), '日期', { size:10, bold:true, fill:MEAL_FILL.head, border:thin, align:'center' });
+      setMealCell(ws.getCell(6, 3), '姓名／星期', { size:10, bold:true, fill:MEAL_FILL.head, border:thin, align:'center' });
+      setMealCell(ws.getCell(6, 1), String(cls), { size:10, bold:true, fill:MEAL_FILL.head, border:thin, align:'center' });
+      setMealCell(ws.getCell(6, 2), '座號', { size:10, bold:true, fill:MEAL_FILL.head, border:thin, align:'center' });
+      ws.getRow(5).height = 24;
+      ws.getRow(6).height = 22;
+
+      mo.weeks.forEach(function(wk, wi){
+        wk.slots.forEach(function(sl, di){
+          const c = 4 + wi*6 + di;
+          setMealCell(ws.getCell(5, c), sl ? (sl.day + (sl.holiday ? '(休)' : '')) : '—',
+            { size:9, bold:true, fill: sl && sl.holiday ? MEAL_FILL.holiday : MEAL_FILL.head, border:thin, align:'center' });
+          setMealCell(ws.getCell(6, c), CONFIG.WEEKDAY[di + 1],
+            { size:10, bold:true, fill:MEAL_FILL.head, border:thin, align:'center' });
+        });
+        const sc = 9 + wi*6;
+        ws.mergeCells(5, sc, 6, sc);
+        setMealCell(ws.getCell(5, sc), '小計',
+          { size:10, bold:true, fill:MEAL_FILL.sub, border:thin, align:'center' });
+        setMealCell(ws.getCell(6, sc), '', { fill:MEAL_FILL.sub, border:thin });
+      });
+      ws.mergeCells(5, totalCol, 6, totalCol);
+      setMealCell(ws.getCell(5, totalCol), '總計\n金額',
+        { size:10, bold:true, fill:MEAL_FILL.total, border:thin, align:'center' });
+      setMealCell(ws.getCell(6, totalCol), '', { fill:MEAL_FILL.total, border:thin });
+      ws.mergeCells(5, signCol, 6, signCol);
+      setMealCell(ws.getCell(5, signCol), '簽收',
+        { size:10, bold:true, fill:MEAL_FILL.head, border:thin, align:'center' });
+      setMealCell(ws.getCell(6, signCol), '', { fill:MEAL_FILL.head, border:thin });
+
+      /* 學生列 */
+      const first = 7;
+      const rows = Math.max(members.length, 12);
+      for(let i = 0; i < rows; i++){
+        const r = first + i;
+        const mem = members[i] || null;
+        ws.getRow(r).height = 20;
+        setMealCell(ws.getCell(r, 1), cls, { size:10, align:'center', border:thin });
+        setMealCell(ws.getCell(r, 2), mem ? String(mem.seat) : '', { size:10, align:'center', border:thin });
+        setMealCell(ws.getCell(r, 3), mem ? mem.name : '', { size:10, align:'center', border:thin });
+        mo.weeks.forEach(function(wk, wi){
+          wk.slots.forEach(function(sl, di){
+            const c = 4 + wi*6 + di;
+            const mark = (mem && sl && !sl.holiday) ? E.meal.mark(st, mem, sl.iso) : '';
+            setMealCell(ws.getCell(r, c), mark === '' ? null : (mark === 'V' ? 'V' : 1),
+              { size:10, align:'center', border:thin });
+          });
+          const sc = 9 + wi*6;
+          const d1 = colLetter(4 + wi*6), d5 = colLetter(8 + wi*6);
+          setMealCell(ws.getCell(r, sc), {
+            formula: 'IF(C' + r + '="","",SUM(' + d1 + r + ':' + d5 + r + ')'
+              + ' + COUNTIF(' + d1 + r + ':' + d5 + r + ',"V")'
+              + ' + COUNTIF(' + d1 + r + ':' + d5 + r + ',"v"))',
+            result: mem ? countWeek(mem, wk, st) : ''
+          }, { size:10, bold:true, align:'center', border:thin, fill:MEAL_FILL.sub, numfmt:'#,##0;;"-"' });
+        });
+        const subs = [];
+        for(let wi = 0; wi < weeks; wi++) subs.push(colLetter(9 + wi*6) + r);
+        setMealCell(ws.getCell(r, totalCol), {
+          formula: 'IF(C' + r + '="","",(' + subs.join('+') + ')*' + priceRef + ')',
+          result: mem ? E.meal.bill(st, mem, ym).charge : ''
+        }, { size:10, bold:true, align:'center', border:thin, fill:MEAL_FILL.total, numfmt:'$#,##0;($#,##0);"-"' });
+        setMealCell(ws.getCell(r, signCol), '', { size:10, align:'center', border:thin });
+      }
+
+      /* 合計列 */
+      const sumRow = first + rows;
+      sumRows[cls] = sumRow;
+      ws.getRow(sumRow).height = 24;
+      ws.mergeCells(sumRow, 1, sumRow, 2);
+      const sumBorder = { top:{style:'thin',color:{argb:'FF999999'}},
+        left:{style:'thin',color:{argb:'FF999999'}},
+        right:{style:'thin',color:{argb:'FF999999'}},
+        bottom:{style:'double',color:{argb:'FF666666'}} };
+      setMealCell(ws.getCell(sumRow, 1), '', { fill:MEAL_FILL.sum, border:sumBorder });
+      setMealCell(ws.getCell(sumRow, 2), '', { fill:MEAL_FILL.sum, border:sumBorder });
+      setMealCell(ws.getCell(sumRow, 3), '合計',
+        { size:10, bold:true, align:'center', fill:MEAL_FILL.sum, border:sumBorder });
+      mo.weeks.forEach(function(wk, wi){
+        wk.slots.forEach(function(sl, di){
+          const c = 4 + wi*6 + di;
+          const L = colLetter(c);
+          const total = members.reduce(function(n, mem){
+            return (sl && !sl.holiday && E.meal.day(st, mem, sl.iso).charge) ? n + 1 : n;
+          }, 0);
+          setMealCell(ws.getCell(sumRow, c), {
+            formula: 'SUM(' + L + first + ':' + L + (sumRow-1) + ')'
+              + ' + COUNTIF(' + L + first + ':' + L + (sumRow-1) + ',"V")'
+              + ' + COUNTIF(' + L + first + ':' + L + (sumRow-1) + ',"v")',
+            result: total
+          }, { size:10, bold:true, align:'center', fill:MEAL_FILL.sum, border:sumBorder, numfmt:'#,##0;;"-"' });
+        });
+        const sc = 9 + wi*6, L = colLetter(sc);
+        const total = members.reduce(function(n, mem){
+          return n + countWeek(mem, wk, st);
+        }, 0);
+        setMealCell(ws.getCell(sumRow, sc), {
+          formula: 'SUM(' + L + first + ':' + L + (sumRow-1) + ')', result: total
+        }, { size:10, bold:true, align:'center', fill:MEAL_FILL.sub, border:sumBorder, numfmt:'#,##0;;"-"' });
+      });
+      const TL = colLetter(totalCol);
+      const grand = members.reduce(function(n, mem){ return n + E.meal.bill(st, mem, ym).charge; }, 0);
+      setMealCell(ws.getCell(sumRow, totalCol), {
+        formula: 'SUM(' + TL + first + ':' + TL + (sumRow-1) + ')', result: grand
+      }, { size:10, bold:true, align:'center', fill:MEAL_FILL.total, border:sumBorder, numfmt:'$#,##0;($#,##0);"-"' });
+      setMealCell(ws.getCell(sumRow, signCol), '', { fill:MEAL_FILL.sum, border:sumBorder });
+
+      ws.pageSetup = { paperSize:9, orientation:'landscape', fitToPage:true, fitToWidth:1, fitToHeight:1,
+        horizontalCentered:true,
+        margins:{ left:0.35, right:0.35, top:0.35, bottom:0.35, header:0.15, footer:0.15 } };
+    });
+
+    /* 全校總表：每一格都連動各班合計列 */
+    if(withTotal){
+      const ws = wb.addWorksheet('📊' + E.meal.ymText(ym) + '全校總表');
+      const lastCol = 3 + weeks * 6;
+      ws.getColumn(1).width = 8;
+      ws.getColumn(2).width = 11;
+      for(let i = 0; i < weeks; i++){
+        for(let d = 0; d < 5; d++) ws.getColumn(3 + i*6 + d).width = 5;
+        ws.getColumn(8 + i*6).width = 6.2;
+      }
+      ws.getColumn(lastCol).width = 11.5;
+
+      ws.mergeCells(1, 1, 1, lastCol);
+      setMealCell(ws.getCell(1, 1),
+        prefixTitle + ' 全校 ' + pick.length + ' 個班級夜自習便當訂餐與費用總表 (實際自習 '
+        + mo.schoolDays + ' 天' + (term ? '，' + term : '') + ')',
+        { size:15, bold:true, align:'center' });
+      ws.getRow(1).height = 28;
+      ws.mergeCells(2, 1, 2, lastCol);
+      setMealCell(ws.getCell(2, 1),
+        '★ 本表即時連動各班預繳單合計列。放假日已自動扣除不計費。向廠商報餐請看底端全校總計的每日份數。',
+        { size:9, bold:true, align:'left' });
+      ws.getRow(2).height = 20;
+
+      ws.mergeCells(3, 1, 4, 1);
+      ws.mergeCells(3, 2, 4, 2);
+      ws.mergeCells(3, lastCol, 4, lastCol);
+      setMealCell(ws.getCell(3, 1), '班級', { size:10, bold:true, fill:MEAL_FILL.head, border:thin, align:'center' });
+      setMealCell(ws.getCell(3, 2), '參加人數', { size:10, bold:true, fill:MEAL_FILL.head, border:thin, align:'center' });
+      setMealCell(ws.getCell(3, lastCol), '全班預繳\n總金額', { size:10, bold:true, fill:MEAL_FILL.total, border:thin, align:'center' });
+      ws.getRow(3).height = 24;
+      ws.getRow(4).height = 22;
+      mo.weeks.forEach(function(wk, wi){
+        wk.slots.forEach(function(sl, di){
+          const c = 3 + wi*6 + di;
+          setMealCell(ws.getCell(3, c), sl ? (sl.day + (sl.holiday ? '(休)' : '')) : '—',
+            { size:9, bold:true, fill: sl && sl.holiday ? MEAL_FILL.holiday : MEAL_FILL.head, border:thin, align:'center' });
+          setMealCell(ws.getCell(4, c), CONFIG.WEEKDAY[di + 1],
+            { size:10, bold:true, fill:MEAL_FILL.head, border:thin, align:'center' });
+        });
+        const sc = 8 + wi*6;
+        ws.mergeCells(3, sc, 4, sc);
+        setMealCell(ws.getCell(3, sc), '小計', { size:10, bold:true, fill:MEAL_FILL.sub, border:thin, align:'center' });
+      });
+
+      let r = 5;
+      pick.forEach(function(cls){
+        const src = sumRows[cls];
+        const members = roster.filter(function(m){ return m.cls === cls; });
+        setMealCell(ws.getCell(r, 1), cls + '班', { size:10, bold:true, fill:MEAL_FILL.head, border:thin, align:'center' });
+        setMealCell(ws.getCell(r, 2), members.filter(function(m){
+          return E.meal.bill(st, m, ym).planned || E.meal.bill(st, m, ym).add;
+        }).length, { size:10, align:'center', border:thin });
+        mo.weeks.forEach(function(wk, wi){
+          wk.slots.forEach(function(sl, di){
+            const c = 3 + wi*6 + di;
+            const srcCol = colLetter(4 + wi*6 + di);
+            const result = members.reduce(function(n, mem){
+              return (sl && !sl.holiday && E.meal.day(st, mem, sl.iso).charge) ? n + 1 : n;
+            }, 0);
+            setMealCell(ws.getCell(r, c), {
+              formula: "'" + cls + '班' + "'!" + srcCol + src, result: result
+            }, { size:10, align:'center', border:thin, numfmt:'#,##0;;"-"' });
+          });
+          const sc = 8 + wi*6, srcCol = colLetter(9 + wi*6);
+          const total = members.reduce(function(n, mem){ return n + countWeek(mem, wk, st); }, 0);
+          setMealCell(ws.getCell(r, sc), {
+            formula: "'" + cls + '班' + "'!" + srcCol + src, result: total
+          }, { size:10, bold:true, align:'center', fill:MEAL_FILL.sub, border:thin, numfmt:'#,##0;;"-"' });
+        });
+        const grand = members.reduce(function(n, mem){ return n + E.meal.bill(st, mem, ym).charge; }, 0);
+        setMealCell(ws.getCell(r, lastCol), {
+          formula: "'" + cls + '班' + "'!" + colLetter(4 + weeks*6) + src, result: grand
+        }, { size:10, bold:true, align:'center', fill:MEAL_FILL.total, border:thin, numfmt:'$#,##0;($#,##0);"-"' });
+        ws.getRow(r).height = 21;
+        r++;
+      });
+
+      const sumBorder2 = { top:{style:'thin',color:{argb:'FF999999'}},
+        left:{style:'thin',color:{argb:'FF999999'}},
+        right:{style:'thin',color:{argb:'FF999999'}},
+        bottom:{style:'double',color:{argb:'FF666666'}} };
+      const last = r;
+      setMealCell(ws.getCell(last, 1), '全校總計', { size:10, bold:true, fill:MEAL_FILL.sum, border:sumBorder2, align:'center' });
+      const cnt = pick.reduce(function(n, cls){
+        return n + roster.filter(function(m){
+          const b = E.meal.bill(st, m, ym);
+          return m.cls === cls && (b.planned || b.add);
+        }).length;
+      }, 0);
+      setMealCell(ws.getCell(last, 2), { formula:'SUM(B5:B' + (last-1) + ')', result: cnt },
+        { size:10, bold:true, fill:MEAL_FILL.sum, border:sumBorder2, align:'center', numfmt:'0' });
+      for(let c = 3; c <= lastCol; c++){
+        const L = colLetter(c);
+        const isMoney = c === lastCol;
+        let result = 0;
+        if(isMoney) result = pick.reduce(function(n, cls){
+          return n + roster.filter(function(m){ return m.cls === cls; })
+            .reduce(function(x, m){ return x + E.meal.bill(st, m, ym).charge; }, 0);
+        }, 0);
+        else result = pick.reduce(function(n, cls){
+          return n + roster.filter(function(m){ return m.cls === cls; }).reduce(function(x, m){
+            return x + (countCol(m, c, mo, st));
+          }, 0);
+        }, 0);
+        setMealCell(ws.getCell(last, c), {
+          formula:'SUM(' + L + '5:' + L + (last-1) + ')', result: result
+        }, { size:10, bold:true, align:'center', fill: isMoney ? MEAL_FILL.total : MEAL_FILL.sum,
+          border:sumBorder2, numfmt: isMoney ? '$#,##0;($#,##0);"-"' : '#,##0;;"-"' });
+      }
+      ws.pageSetup = { paperSize:9, orientation:'landscape', fitToPage:true, fitToWidth:1, fitToHeight:1,
+        horizontalCentered:true,
+        margins:{ left:0.35, right:0.35, top:0.35, bottom:0.35, header:0.15, footer:0.15 } };
+    }
+
+    wb.calcProperties = { fullCalcOnLoad:true };
+    const raw = await wb.xlsx.writeBuffer();
+    const prefix = E.opt(state,'exportPrefix') || '夜自習';
+    const tail = pick.length === 1 ? ('_' + pick[0] + '班') : ('_' + pick.length + '班全');
+    download(new Blob([raw],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),
+      prefix + '_便當收費_' + ym + tail + '.xlsx');
+    toast('已下載便當收費表');
+  }catch(err){
+    toast('匯出失敗：' + err.message, 6000);
+  }
+}
+
+/* 匯出用：某位訂餐者在一週內的供餐份數 */
+function countWeek(mem, wk, st){
+  let n = 0;
+  wk.slots.forEach(function(sl){
+    if(sl && !sl.holiday && E.meal.day(st, mem, sl.iso).charge) n++;
+  });
+  return n;
+}
+/* 匯出用：全校總表某一欄（日份數或週小計）的合計 */
+function countCol(mem, c, mo, st){
+  const wi = Math.floor((c - 3) / 6), di = (c - 3) % 6;
+  if(di === 5) return countWeek(mem, mo.weeks[wi], st);
+  const wk = mo.weeks[wi];
+  if(!wk) return 0;
+  const sl = wk.slots[di];
+  if(!sl || sl.holiday) return 0;
+  return E.meal.day(st, mem, sl.iso).charge ? 1 : 0;
+}
+/* 匯出用：統一的儲存格樣式 */
+function setMealCell(cell, value, o){
+  o = o || {};
+  cell.value = value;
+  cell.font = { name:MEAL_FONT, size:o.size || 10, bold:!!o.bold };
+  cell.alignment = { horizontal: o.align || 'center', vertical:'middle', wrapText:true };
+  if(o.fill) cell.fill = { type:'pattern', pattern:'solid', fgColor:{ argb:o.fill } };
+  if(o.border) cell.border = o.border;
+  if(o.numfmt) cell.numFmt = o.numfmt;
+}
 /* ---------- 設定 ---------- */
 function saveCfg(){
   const url = $('cfgGas').value.trim() || CONFIG.GAS_URL, pwd = $('cfgPwd').value;
@@ -4205,7 +5273,26 @@ document.addEventListener('click', e=>{
   if(lve){ openLeaveEdit(lve.dataset.lvedit); return; }
   if(del){ deleteLeave(del.dataset.leavedel); return; }
   const lvf = e.target.closest('[data-lvf]');
-  if(lvf){ ui.lvFilter = lvf.dataset.lvf; renderLeave(); return; }
+  if(lvf){ ui.lvFilter = lvf.dataset.lvf; ui.lvPage = 1; renderLeave(); return; }
+  const lvp = e.target.closest('[data-lvpage]');
+  if(lvp){
+    if(lvp.disabled) return;
+    ui.lvPage = Number(lvp.dataset.lvpage) || 1;
+    renderLeave();
+    return;
+  }
+});
+
+/* 請假紀錄：改每頁筆數就回到第 1 頁 */
+document.addEventListener('change', function(e){
+  if(e.target && e.target.id === 'lvSize'){
+    const n = Number(e.target.value);
+    if(LEAVE_SIZES.indexOf(n) >= 0){
+      ui.lvSize = n;
+      ui.lvPage = 1;
+      renderLeave();
+    }
+  }
 });
 
 /* 學生清單：篩選與批次 */
