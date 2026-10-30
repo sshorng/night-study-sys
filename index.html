@@ -15,7 +15,7 @@
   --ok:#3F6B4F; --ok-soft:#E2EBDD;
   /* 便當表格：暖紙底上只留一支冷色（黛青）代表待退，其餘一律暖灰米 */
   --g-head:#EAE2CE; --g-week:#F6EEDD; --g-sub:#EFE6D2; --g-total:#F6EBCE;
-  --g-band:#F7F1E2; --g-off:#F5F0E3; --g-holiday:#E2D5BD;
+  --g-band:#F7F1E2; --g-off:#F5F0E3;
   --g-take:#F2DCD0; --g-take-ink:#8A3226;
   --g-wait:#DCE6E5; --g-wait-ink:#3A585C;
   --g-done:#DFE9DA; --g-foot:#E7DFCB;
@@ -574,7 +574,7 @@ table.mealgrid th,table.mealgrid td{border:1px solid var(--rule-soft);padding:0;
 table.mealgrid th{background:var(--g-head);font-weight:700;color:var(--ink-2);font-size:11px;height:24px}
 table.mealgrid th.d{color:var(--ink-3);font-size:10px;font-weight:400}
 table.mealgrid th.we{background:var(--g-week);color:var(--ink-3);font-size:10px;font-weight:400;min-width:22px}
-table.mealgrid th.hl{background:var(--g-holiday);color:var(--seal)}
+table.mealgrid th.hl{background:var(--g-head);color:var(--seal)}
 table.mealgrid th.sub{background:var(--g-sub);min-width:34px}
 table.mealgrid th.total{background:var(--g-total);min-width:66px}
 table.mealgrid th.name,table.mealgrid th.cls,table.mealgrid th.seat,table.mealgrid th.grp{background:var(--g-head)}
@@ -595,7 +595,7 @@ table.mealgrid td.cell.add{background:var(--g-wait);color:var(--g-wait-ink);font
 table.mealgrid td.cell.refund{background:var(--g-wait);color:var(--g-wait-ink)}
 table.mealgrid td.cell.done{background:var(--g-done);color:var(--ok);font-weight:700}
 table.mealgrid td.cell.off{background:var(--g-off);color:#B4A68B}
-table.mealgrid td.cell.holiday{background:var(--g-holiday);color:#A79A83}
+table.mealgrid td.cell.holiday{background:var(--g-off);color:#A79A83}
 table.mealgrid td.sub{background:var(--g-sub);font-weight:700;min-width:34px;font-family:var(--mono)}
 table.mealgrid td.total{background:var(--g-total);font-weight:700;text-align:right;padding:0 6px;
   min-width:66px;font-family:var(--mono)}
@@ -609,10 +609,9 @@ table.mealgrid td.wait b{color:var(--seal);cursor:pointer;text-decoration:underl
 /* 整塊表頭一起黏在頂端，兩列才不會互相重疊 */
 table.mealgrid thead{position:sticky;top:0;z-index:3;background:var(--g-head)}
 table.mealgrid thead th{background:var(--g-head);vertical-align:middle}
-table.mealgrid thead tr:first-child th{height:28px;border-bottom:1px solid var(--rule)}
+table.mealgrid thead th.hl{background:var(--g-head)}
 table.mealgrid thead tr:nth-child(2) th{height:24px;font-size:10px;color:var(--ink-2)}
 table.mealgrid thead th.d{font-size:12px;color:var(--ink);letter-spacing:.02em}
-table.mealgrid thead th.hl{background:var(--g-holiday)}
 /* 左側標籤欄跨兩列看起來像一格（不用 rowspan，避免 sticky 破版） */
 table.mealgrid thead tr:first-child th.cls,
 table.mealgrid thead tr:first-child th.seat,
@@ -645,6 +644,9 @@ table.mealgrid tfoot td.sum.wait{color:var(--seal)}
 .meal-notice .mn-money{font-size:12px;color:#8A3226}
 .meal-notice .mn-h .spacer{flex:1 1 auto}
 .meal-notice .mn-b{border-top:1px solid #E3C4BA;padding:2px 12px 8px}
+.meal-notice .mn-tools{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  padding:6px 0 4px;border-bottom:1px solid #EBD3CA}
+.meal-notice .pendpick{width:16px;height:16px;margin:0;flex:none;accent-color:var(--seal);cursor:pointer}
 .meal-notice .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
   border-bottom:1px solid #EBD3CA;padding:6px 0;font-size:13px}
 .meal-notice .row:last-child{border-bottom:0}
@@ -878,7 +880,7 @@ const LIB = {
    1. CONFIG
    ===================================================================== */
 const CONFIG = {
-  VERSION: '2.26.0',
+  VERSION: '2.27.0',
   GAS_URL: 'https://script.google.com/macros/s/AKfycbxBk3fJaCrPfyojhPVgT6xNE110x3ENSGquQLVWLBz8jdNH2FgX6QMNBQKr1lHLZ8ePtw/exec',
   PASSWORD: '',
   ROLE_KEY: 'nightstudy.role',
@@ -3616,6 +3618,12 @@ function renderMealPending(ym){
   const price = E.meal.price(state);
   /* 預設收合；開合狀態存在這台裝置，下次進來照上次的樣子 */
   const open = ui.mealNoticeOpen === true;
+  /* 勾選狀態放 ui，重畫或點帶走都不會掉；已經不在清單裡的勾選自動清掉 */
+  ui.pendPick = ui.pendPick || {};
+  const alive = {};
+  list.forEach(function(p){ alive[p.member.key + '|' + p.iso] = 1; });
+  Object.keys(ui.pendPick).forEach(function(k){ if(!alive[k]) delete ui.pendPick[k]; });
+  const picked = Object.keys(ui.pendPick).length;
   /* 待處理退費放在統計表上方，做成可以收合的通知框，方便隨時追 */
   $('mealNotice').innerHTML = list.length
     ? '<div class="meal-notice">'
@@ -3627,16 +3635,26 @@ function renderMealPending(ym){
       +   '<button class="btn tiny" data-mealnotice="toggle">' + (open ? '收起' : '展開') + '</button>'
       + '</div>'
       + (open
-          ? '<div class="mn-b">' + list.map(function(p){
+          ? '<div class="mn-b">'
+            + '<div class="mn-tools">'
+            +   '<label class="chk-inline"><input type="checkbox" data-pendall'
+            +     (picked && picked === list.length ? ' checked' : '') + '> 全選</label>'
+            +   '<button class="btn tiny seal" id="btnMealPayPick"' + (picked ? '' : ' disabled')
+            +     '>退費勾選 ' + picked + ' 筆</button>'
+            + '</div>'
+            + list.map(function(p){
+              const id = p.member.key + '|' + p.iso;
               return '<div class="row">'
+                + '<input type="checkbox" class="pendpick" data-pendpick="' + id + '"'
+                +   (ui.pendPick[id] ? ' checked' : '') + '>'
                 + '<span class="who">' + p.member.cls + '-' + esc(p.member.seat) + '　' + esc(p.member.name) + '</span>'
                 + '<span>' + p.iso + '（' + CONFIG.WEEKDAY[E.wd(p.iso)] + '）</span>'
                 + '<span class="why">' + esc(p.why) + '</span>'
                 + '<span class="btns">'
-                +   '<button class="btn tiny" data-mealtake="' + p.member.key + '|' + p.iso + '">帶走</button>'
-                +   '<button class="btn tiny seal" data-mealpaid="' + p.member.key + '|' + p.iso + '">已退 ' + price + '</button>'
+                +   '<button class="btn tiny" data-mealtake="' + id + '">帶走</button>'
                 + '</span></div>';
-            }).join('') + '</div>'
+            }).join('')
+            + '</div>'
           : '')
       + '</div>'
     : '';
@@ -3685,6 +3703,40 @@ function mealPayAll(ym){
       commit();
       toast('已標記 ' + list.length + ' 筆退費');
     }, '全部已退');
+}
+
+/* 勾選幾筆就退幾筆：一次 commit，只跳一次提示 */
+function mealPayPick(ym){
+  const ids = Object.keys(ui.pendPick || {});
+  if(!ids.length){ toast('先勾選要退的筆數'); return; }
+  const price = E.meal.price(state);
+  confirmModal('標記已退',
+    '勾選的 ' + ids.length + ' 筆、共 ' + money(ids.length * price) + ' 元，確定標成「已退」嗎？',
+    function(){
+      let n = 0;
+      ids.forEach(function(id){
+        const p = id.split('|');
+        if(mealSetPaid(p[0], p[1], true)) n++;
+      });
+      ui.pendPick = {};
+      commit();
+      toast('已標記 ' + n + ' 筆退費');
+    }, '標記已退');
+}
+
+/* 勾選變動時只更新按鈕與全選狀態，不重畫整塊，避免畫面跳動 */
+function syncPendPick(){
+  const n = Object.keys(ui.pendPick || {}).length;
+  const btn = $('btnMealPayPick');
+  if(btn){
+    btn.disabled = !n;
+    btn.textContent = '退費勾選 ' + n + ' 筆';
+  }
+  const all = document.querySelector('[data-pendall]');
+  if(all){
+    const boxes = document.querySelectorAll('[data-pendpick]');
+    all.checked = boxes.length > 0 && n === boxes.length;
+  }
 }
 
 function openMealDetail(key){
@@ -4203,6 +4255,7 @@ document.addEventListener('click', function(e){
     return;
   }
   if(t.id === 'btnMealPayAll'){ mealPayAll(mealYm()); return; }
+  if(t.id === 'btnMealPayPick'){ mealPayPick(mealYm()); return; }
   const ntg = t.closest('[data-mealnotice]');
   if(ntg){
     ui.mealNoticeOpen = !(ui.mealNoticeOpen === true);
@@ -4218,6 +4271,24 @@ document.addEventListener('click', function(e){
   }
   const detail = t.closest('[data-mealdetail],[data-mealmoneypay]');
   if(detail){ openMealDetail(detail.dataset.mealdetail || detail.dataset.mealmoneypay); return; }
+  const pendPick = t.closest('[data-pendpick]');
+  if(pendPick){
+    const id = pendPick.dataset.pendpick;
+    ui.pendPick = ui.pendPick || {};
+    if(pendPick.checked) ui.pendPick[id] = 1; else delete ui.pendPick[id];
+    syncPendPick();
+    return;
+  }
+  const pendAll = t.closest('[data-pendall]');
+  if(pendAll){
+    ui.pendPick = {};
+    document.querySelectorAll('[data-pendpick]').forEach(function(b){
+      b.checked = pendAll.checked;
+      if(pendAll.checked) ui.pendPick[b.dataset.pendpick] = 1;
+    });
+    syncPendPick();
+    return;
+  }
   const paidBtn = t.closest('[data-mealpaid]');
   if(paidBtn){
     const p = paidBtn.dataset.mealpaid.split('|');
@@ -5153,7 +5224,7 @@ function colLetter(n){
 const MEAL_FONT = '微軟正黑體';
 const MEAL_FILL = {
   /* 與網頁格子同一套暖紙色：表頭暖米、假日米赭、小計淺米、金額淡琥珀、合計暖灰 */
-  head:'FFEAE2CE', date:'FFEAE2CE', holiday:'FFE2D5BD', sub:'FFEFE6D2',
+  head:'FFEAE2CE', date:'FFEAE2CE', holiday:'FFEAE2CE', sub:'FFEFE6D2',
   total:'FFF6EBCE', price:'FFF1E2BE', sum:'FFE7DFCB'
 };
 
