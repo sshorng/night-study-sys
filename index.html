@@ -828,7 +828,7 @@ const LIB = {
    1. CONFIG
    ===================================================================== */
 const CONFIG = {
-  VERSION: '2.19.0',
+  VERSION: '2.20.0',
   GAS_URL: 'https://script.google.com/macros/s/AKfycbxBk3fJaCrPfyojhPVgT6xNE110x3ENSGquQLVWLBz8jdNH2FgX6QMNBQKr1lHLZ8ePtw/exec',
   PASSWORD: '',
   ROLE_KEY: 'nightstudy.role',
@@ -3601,13 +3601,113 @@ function openMealDetail(key){
   });
 }
 
+/* 從學生名單挑人加入便當名單：可批次、可篩班級與座號 */
+function openMealMemberPick(){
+  const st = state;
+  const inList = {}, ordering = {};
+  (st.mealMembers||[]).forEach(function(x){ inList[x.key] = true; });
+  E.meal.roster(st, mealYm()).forEach(function(x){ ordering[x.key] = true; });
+  const classes = E.classes(st);
+  const pick = new Set();
+  let cls = 0, q = '';
+
+  const body = '<div class="tools" id="mpickBar"></div>'
+    + '<div class="tablewrap" id="mpickTable" style="max-height:46vh;overflow:auto"></div>'
+    + '<div class="tools" style="margin-top:10px">'
+    +   '<label class="hint" style="margin:0">開始日</label>'
+    +   '<input type="date" id="mpickFrom" class="btn" style="min-height:40px">'
+    +   '<input id="mpickNote" placeholder="備註（例如：每週一數學班）" style="flex:1 1 200px;min-height:40px">'
+    + '</div>'
+    + '<p class="hint">勾選後按「加入」，一次可以加很多人；開始日留空表示不限。</p>';
+  const m = modal('從學生名單加入便當名單', body,
+    '<button class="btn" data-close>取消</button><button class="btn primary" id="mpickGo">加入</button>', true);
+  m.querySelector('[data-close]').addEventListener('click', closeModal);
+
+  function rows(){
+    return (st.students||[]).filter(function(s){
+      if(cls && Number(s.cls) !== cls) return false;
+      const kw = q.trim();
+      if(kw && String(s.seat).indexOf(kw) !== 0 && String(s.name).indexOf(kw) < 0) return false;
+      return true;
+    }).sort(function(a,b){
+      return (Number(a.cls) - Number(b.cls)) || String(a.seat).localeCompare(String(b.seat));
+    });
+  }
+  function draw(){
+    m.querySelector('#mpickBar').innerHTML = '<div class="chips">'
+      + '<button class="chip' + (cls === 0 ? ' sel' : '') + '" data-mpickcls="0">全部</button>'
+      + classes.map(function(c){
+          return '<button class="chip' + (cls === c ? ' sel' : '') + '" data-mpickcls="' + c + '">' + c + '</button>';
+        }).join('')
+      + '</div>'
+      + '<input id="mpickQ" placeholder="搜尋座號或姓名" value="' + esc(q) + '" style="min-width:150px;min-height:40px">'
+      + '<button class="btn tiny" id="mpickAll">全選</button>'
+      + '<button class="btn tiny" id="mpickNone">取消全選</button>'
+      + '<span class="hint">已勾 ' + pick.size + ' 人</span>';
+    const list = rows();
+    m.querySelector('#mpickTable').innerHTML = '<table class="data"><thead><tr>'
+      + '<th style="width:44px"></th><th>班級</th><th>座號</th><th>姓名</th><th>目前</th>'
+      + '</tr></thead><tbody>'
+      + (list.length ? list.map(function(s){
+          const added = inList[s.key] || ordering[s.key];
+          const now = ordering[s.key] ? '訂餐中'
+            : (inList[s.key] ? '已在便當名單' : (lunchText(s.lunch) === '不訂' ? '不訂' : '訂'));
+          return '<tr><td><input type="checkbox" data-mpick="' + s.key + '"'
+            + (added ? ' disabled' : (pick.has(s.key) ? ' checked' : '')) + '></td>'
+            + '<td>' + s.cls + '</td><td>' + esc(s.seat) + '</td><td>' + esc(s.name) + '</td>'
+            + '<td>' + (added ? '<span class="pill">' + now + '</span>' : now) + '</td></tr>';
+        }).join('') : '<tr><td colspan="5" class="hint">沒有符合的學生</td></tr>')
+      + '</tbody></table>';
+  }
+  draw();
+
+  m.addEventListener('click', function(ev){
+    const c = ev.target.closest('[data-mpickcls]');
+    if(c){ cls = Number(c.dataset.mpickcls); draw(); return; }
+    if(ev.target.id === 'mpickAll'){
+      rows().forEach(function(s){ if(!inList[s.key] && !ordering[s.key]) pick.add(s.key); });
+      draw(); return;
+    }
+    if(ev.target.id === 'mpickNone'){ pick.clear(); draw(); return; }
+  });
+  m.addEventListener('input', function(ev){
+    if(ev.target.id !== 'mpickQ') return;
+    q = ev.target.value;
+    draw();
+    const el = m.querySelector('#mpickQ');
+    if(el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
+  });
+  m.addEventListener('change', function(ev){
+    const cb = ev.target.closest('[data-mpick]');
+    if(!cb) return;
+    if(cb.checked) pick.add(cb.dataset.mpick); else pick.delete(cb.dataset.mpick);
+    const hint = m.querySelector('#mpickBar .hint');
+    if(hint) hint.textContent = '已勾 ' + pick.size + ' 人';
+  });
+  m.querySelector('#mpickGo').addEventListener('click', function(){
+    if(!pick.size){ toast('請先勾選學生'); return; }
+    const from = m.querySelector('#mpickFrom').value;
+    const note = m.querySelector('#mpickNote').value.trim();
+    let n = 0;
+    pick.forEach(function(k){
+      const s = E.byKey(st, k); if(!s) return;
+      if((st.mealMembers||[]).some(function(x){ return x.key === k; })) return;
+      st.mealMembers.push({ key:k, cls:s.cls, seat:s.seat, name:s.name, lunch:'訂', from:from, note:note });
+      n++;
+    });
+    closeModal(); commit();
+    toast('已加入 ' + n + ' 位訂餐者');
+  });
+}
+
 function openMealMembers(){
   const list = (state.mealMembers||[]).slice().sort(function(a,b){
     return (a.cls - b.cls) || String(a.seat).localeCompare(String(b.seat));
   });
-  const body = '<div class="tools"><button class="btn primary" id="mbrAdd">新增訂餐者</button>'
-    + '<span class="hint">這一區只放沒有參加夜自習、但跟著訂便當的學生，供餐日固定每週一；'
-    + '夜自習學生不必在這裡重複登打。</span></div>'
+  const body = '<div class="tools"><button class="btn primary" id="mbrAdd">手動新增</button>'
+    + '<button class="btn primary" id="mbrPick">從學生名單加入</button>'
+    + '<span class="hint">這一區放「有訂便當、但不是照夜自習參加日供餐」的學生，'
+    + '例如每週一數學班；直接從學生名單勾選比較快，不必重打班級座號。</span></div>'
     + '<div class="tablewrap"><table class="data"><thead><tr><th>班級</th><th>座號</th><th>姓名</th>'
     + '<th>備註</th><th>操作</th></tr></thead><tbody>'
     + (list.length ? list.map(function(s){
@@ -3620,6 +3720,7 @@ function openMealMembers(){
   const m = modal('便當訂餐名單', body, '<button class="btn" data-close>關閉</button>', true);
   m.querySelector('[data-close]').addEventListener('click', closeModal);
   m.querySelector('#mbrAdd').addEventListener('click', function(){ closeModal(); openMealMemberForm(''); });
+  m.querySelector('#mbrPick').addEventListener('click', function(){ closeModal(); openMealMemberPick(); });
   Array.prototype.forEach.call(m.querySelectorAll('[data-mbredit]'), function(btn){
     btn.addEventListener('click', function(){ closeModal(); openMealMemberForm(btn.dataset.mbredit); });
   });
