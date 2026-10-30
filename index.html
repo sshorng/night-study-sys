@@ -606,7 +606,8 @@ table.mealgrid th.total,table.mealgrid td.total{border-left:1px solid var(--rule
 table.mealgrid td.wait{min-width:56px;font-size:11px;color:var(--ink-3)}
 table.mealgrid td.wait b{color:var(--seal);cursor:pointer;text-decoration:underline dotted}
 /* 表格自己捲，表頭與合計列才會固定 */
-#mealGridWrap{max-height:calc(100vh - 250px);overflow:auto}
+/* 表格自己捲，表頭與合計列才會固定；留 120px 給視窗上下，其餘全部給表格 */
+#mealGridWrap{max-height:calc(100vh - 120px);min-height:280px;overflow:auto}
 /* 整塊表頭一起黏在頂端，兩列才不會互相重疊 */
 table.mealgrid thead{position:sticky;top:0;z-index:3;background:var(--g-head)}
 table.mealgrid thead th{background:var(--g-head);vertical-align:middle}
@@ -904,7 +905,7 @@ const LIB = {
    1. CONFIG
    ===================================================================== */
 const CONFIG = {
-  VERSION: '2.31.1',
+  VERSION: '2.31.2',
   GAS_URL: 'https://script.google.com/macros/s/AKfycbxBk3fJaCrPfyojhPVgT6xNE110x3ENSGquQLVWLBz8jdNH2FgX6QMNBQKr1lHLZ8ePtw/exec',
   PASSWORD: '',
   ROLE_KEY: 'nightstudy.role',
