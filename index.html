@@ -646,8 +646,9 @@ table.mealgrid tfoot td.sum.wait{color:var(--seal)}
 .meal-notice .mn-money{font-size:12px;color:#8A3226;font-variant-numeric:tabular-nums}
 .meal-notice .mn-h .spacer{flex:1 1 auto}
 .meal-notice .mn-b{border-top:1px solid #E3C4BA}
-.meal-notice .mn-tools{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
-  padding:7px 12px;background:var(--sheet);border-bottom:1px solid var(--rule-soft);font-size:13px}
+.meal-notice .mn-h .chk-inline{min-height:30px;gap:7px;font-size:12.5px;color:#7E2415}
+.meal-notice .mn-h .chk-inline input{width:16px;height:16px;accent-color:var(--seal)}
+.meal-notice .mn-h .btn{min-height:30px;padding:0 10px;font-size:12.5px}
 .meal-notice .pendpick{width:16px;height:16px;margin:0;flex:none;accent-color:var(--seal);cursor:pointer}
 .meal-notice .row{display:grid;grid-template-columns:18px 176px 124px minmax(70px,1fr) auto;
   align-items:center;gap:10px;padding:0 12px;min-height:38px;
@@ -903,7 +904,7 @@ const LIB = {
    1. CONFIG
    ===================================================================== */
 const CONFIG = {
-  VERSION: '2.31.0',
+  VERSION: '2.31.1',
   GAS_URL: 'https://script.google.com/macros/s/AKfycbxBk3fJaCrPfyojhPVgT6xNE110x3ENSGquQLVWLBz8jdNH2FgX6QMNBQKr1lHLZ8ePtw/exec',
   PASSWORD: '',
   ROLE_KEY: 'nightstudy.role',
@@ -3651,18 +3652,18 @@ function renderMealPending(ym){
       + '<div class="mn-h">'
       +   '<b>待處理退費 ' + list.length + ' 筆</b>'
       +   '<span class="mn-money">共 ' + money(list.length * price) + ' 元</span>'
-      +   '<button class="btn tiny seal" id="btnMealPayAll">全月標記已退</button>'
       +   '<span class="spacer"></span>'
+      +   (open
+          ? '<label class="chk-inline"><input type="checkbox" data-pendall'
+            + (picked && picked === list.length ? ' checked' : '') + '> 全選</label>'
+            + '<button class="btn tiny seal" id="btnMealPayPick"' + (picked ? '' : ' disabled')
+            +   '>退費勾選 ' + picked + ' 筆</button>'
+          : '')
+      +   '<button class="btn tiny seal" id="btnMealPayAll">全月標記已退</button>'
       +   '<button class="btn tiny" data-mealnotice="toggle">' + (open ? '收起' : '展開') + '</button>'
       + '</div>'
       + (open
           ? '<div class="mn-b">'
-            + '<div class="mn-tools">'
-            +   '<label class="chk-inline"><input type="checkbox" data-pendall'
-            +     (picked && picked === list.length ? ' checked' : '') + '> 全選</label>'
-            +   '<button class="btn tiny seal" id="btnMealPayPick"' + (picked ? '' : ' disabled')
-            +     '>退費勾選 ' + picked + ' 筆</button>'
-            + '</div>'
             + '<div class="row mn-head"><span></span><span>學生</span><span>日期</span><span>事由</span>'
             +   '<span style="text-align:right">處理</span></div>'
             + list.map(function(p){
