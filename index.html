@@ -603,6 +603,15 @@ table.mealgrid thead tr:first-child th{height:28px;border-bottom:1px solid var(-
 table.mealgrid thead tr:nth-child(2) th{height:24px;font-size:10px;color:var(--ink-2)}
 table.mealgrid thead th.d{font-size:12px;color:var(--ink);letter-spacing:.02em}
 table.mealgrid thead th.hl{background:#FADBD8}
+/* 左側標籤欄跨兩列看起來像一格（不用 rowspan，避免 sticky 破版） */
+table.mealgrid thead tr:first-child th.cls,
+table.mealgrid thead tr:first-child th.seat,
+table.mealgrid thead tr:first-child th.name,
+table.mealgrid thead tr:first-child th.grp{border-bottom:0;vertical-align:bottom}
+table.mealgrid thead tr:nth-child(2) th.cls,
+table.mealgrid thead tr:nth-child(2) th.seat,
+table.mealgrid thead tr:nth-child(2) th.name,
+table.mealgrid thead tr:nth-child(2) th.grp{border-top:0}
 table.mealgrid thead th.sub{background:#EBF5FB}
 table.mealgrid thead th.total{background:#FEF9E7}
 table.mealgrid thead th.we{background:#F7F3E9}
@@ -859,7 +868,7 @@ const LIB = {
    1. CONFIG
    ===================================================================== */
 const CONFIG = {
-  VERSION: '2.22.2',
+  VERSION: '2.22.3',
   GAS_URL: 'https://script.google.com/macros/s/AKfycbxBk3fJaCrPfyojhPVgT6xNE110x3ENSGquQLVWLBz8jdNH2FgX6QMNBQKr1lHLZ8ePtw/exec',
   PASSWORD: '',
   ROLE_KEY: 'nightstudy.role',
@@ -3427,18 +3436,21 @@ function renderMealGrid(mo, pack){
   const roster = E.meal.roster(st, mo.ym);
   const has = roster.some(function(m){ return !!byKey[m.key]; });
 
-  let row1 = '<thead><tr><th class="cls" rowspan="2">班級</th><th class="seat" rowspan="2">座號</th>'
-    + '<th class="name" rowspan="2">姓名</th><th class="grp" rowspan="2">身份</th>';
-  let row2 = '<tr>';
+  /* 兩列表頭都用完整格數，不用 rowspan：Chrome 的 sticky 加 rowspan 會讓欄位對不齊 */
+  let row1 = '<thead><tr><th class="cls">班級</th><th class="seat">座號</th>'
+    + '<th class="name">姓名</th><th class="grp">身份</th>';
+  let row2 = '<tr><th class="cls"></th><th class="seat"></th><th class="name"></th><th class="grp"></th>';
   mo.weeks.forEach(function(wk){
     wk.slots.forEach(function(sl){
       row1 += sl ? '<th class="' + (sl.holiday ? 'hl' : 'd') + '" title="' + sl.iso + '">'
         + sl.day + (sl.holiday ? '休' : '') + '</th>' : '<th class="we"></th>';
       row2 += '<th class="we">' + (sl ? CONFIG.WEEKDAY[sl.wd] : '') + '</th>';
     });
-    row1 += '<th class="sub" rowspan="2">小計</th>';
+    row1 += '<th class="sub">小計</th>';
+    row2 += '<th class="sub"></th>';
   });
-  row1 += '<th class="total" rowspan="2">總計金額</th><th class="total" rowspan="2">待退</th>';
+  row1 += '<th class="total">總計金額</th><th class="total">待退</th>';
+  row2 += '<th class="total"></th><th class="total"></th>';
   row2 += '</tr>';
 
   let body = '<tbody>';
