@@ -596,7 +596,12 @@ table.mealgrid td.wait{min-width:56px;font-size:11px;color:var(--ink-3)}
 table.mealgrid td.wait b{color:var(--seal);cursor:pointer;text-decoration:underline dotted}
 /* 表格自己捲，表頭與合計列才會固定 */
 #mealGridWrap{max-height:calc(100vh - 250px);overflow:auto}
-table.mealgrid thead th{position:sticky;top:0;z-index:3}
+/* 整塊表頭一起黏在頂端，兩列才不會互相重疊 */
+table.mealgrid thead{position:sticky;top:0;z-index:3;background:#F2F4F7}
+table.mealgrid thead th{background:#F2F4F7;vertical-align:middle}
+table.mealgrid thead tr:first-child th{height:28px;border-bottom:1px solid var(--rule)}
+table.mealgrid thead tr:nth-child(2) th{height:24px;font-size:10px;color:var(--ink-2)}
+table.mealgrid thead th.d{font-size:12px;color:var(--ink);letter-spacing:.02em}
 table.mealgrid thead th.hl{background:#FADBD8}
 table.mealgrid thead th.sub{background:#EBF5FB}
 table.mealgrid thead th.total{background:#FEF9E7}
@@ -604,8 +609,8 @@ table.mealgrid thead th.we{background:#F7F3E9}
 table.mealgrid tfoot th,table.mealgrid tfoot td{position:sticky;bottom:0;z-index:2;
   background:#EAEDED;font-weight:700;border-top:2px solid var(--ink)}
 table.mealgrid tfoot td.sum{font-family:var(--mono);text-align:center}
-table.mealgrid tfoot td.sum.sub{background:#DFEEF8}
-table.mealgrid tfoot td.sum.total{background:#FBF0CC;text-align:right;padding:0 6px}
+table.mealgrid tfoot{position:sticky;bottom:0;z-index:2;background:#EAEDED}
+table.mealgrid tfoot th,table.mealgrid tfoot td{background:#EAEDED;font-weight:700;border-top:2px solid var(--ink)}
 table.mealgrid tfoot td.sum.wait{color:var(--seal)}
 .meal-h3{display:flex;align-items:center;gap:10px;margin:18px 0 8px}
 .meal-h3 h3{margin:0;font-family:var(--serif);font-size:14px;letter-spacing:.1em;color:var(--ink-2)}
@@ -823,7 +828,7 @@ const LIB = {
   },
   ready: { exceljs:false, pizzip:false, docx:false },
   waiting: {},
-  load(key){
+  VERSION: '2.22.2',
     if(this.ready[key]) return Promise.resolve(true);
     if(this.waiting[key]) return this.waiting[key];
     const self = this;
