@@ -881,7 +881,7 @@ const LIB = {
    1. CONFIG
    ===================================================================== */
 const CONFIG = {
-  VERSION: '2.30.2',
+  VERSION: '2.30.3',
   GAS_URL: 'https://script.google.com/macros/s/AKfycbxBk3fJaCrPfyojhPVgT6xNE110x3ENSGquQLVWLBz8jdNH2FgX6QMNBQKr1lHLZ8ePtw/exec',
   PASSWORD: '',
   ROLE_KEY: 'nightstudy.role',
@@ -3441,8 +3441,6 @@ function renderMeal(){
     + '<button class="btn" id="btnMealMember">訂餐名單</button>'
     + '<button class="btn" id="btnMealAdjust">整體加退</button>'
     + '<button class="btn primary" id="btnMealExport">匯出便當預繳單</button>'
-    + '<span class="hint">單價 ' + price + ' 元｜' + mo.schoolDays + ' 個上課日｜'
-    +   '點格子切換 1、V、空白｜1 供餐　V 帶走（仍收費）　假 請假待退　變 月中變動待退　退 已退</span>'
     + '<button class="btn tiny" id="btnMealPeriod">收費期 '
     +   (per.from && per.to ? (perText(per.from) + '～' + perText(per.to)) : '整月')
     +   (per.custom ? '（已調整）' : '') + '</button>';
