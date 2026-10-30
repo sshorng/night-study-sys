@@ -485,7 +485,7 @@ body.role-teacher .stu-tag:hover{background:var(--seal-soft)}
 #printArea th,#printArea td{border:1px solid #333;padding:2px 3px;text-align:center;font-size:9pt;
   font-family:var(--serif);line-height:1.4;vertical-align:middle}
 #printArea th{background:#EDEDED;font-weight:700}
-#printArea .printpage{margin-bottom:0}
+#printArea .printpage{margin-bottom:0;padding:1.5cm .3in;box-sizing:border-box}
 #printArea .lian{border:1.2px solid #333;margin-bottom:4mm}
 #printArea .lian .t{background:#EDEDED}
 /* 套 Word 範本尺寸的列印表格 */
@@ -506,7 +506,7 @@ body.role-teacher .stu-tag:hover{background:var(--seal-soft)}
 #printArea .wt .vh td{font-weight:700;background:#EDEDED}
 #printArea .vio{margin:0;width:5.21in}
 #printArea .duo{display:grid;grid-template-columns:5.22in 5.22in;column-gap:.24in;justify-content:center;align-items:start}
-#printArea .duo .side{min-width:0;display:flex;flex-direction:column;height:7.66in;justify-content:space-between}
+#printArea .duo .side{min-width:0;display:flex;flex-direction:column;height:7.04in;justify-content:space-between}
 #printArea .seatmap td{font-size:12pt;line-height:1.15;padding:0}
 #printArea .seatmap .lbl{font-size:16pt;font-weight:700}
 @media print{
@@ -880,7 +880,7 @@ const LIB = {
    1. CONFIG
    ===================================================================== */
 const CONFIG = {
-  VERSION: '2.30.0',
+  VERSION: '2.30.1',
   GAS_URL: 'https://script.google.com/macros/s/AKfycbxBk3fJaCrPfyojhPVgT6xNE110x3ENSGquQLVWLBz8jdNH2FgX6QMNBQKr1lHLZ8ePtw/exec',
   PASSWORD: '',
   ROLE_KEY: 'nightstudy.role',
@@ -4791,7 +4791,8 @@ function printNotice(items, kind){
       + '</div></div>';
   }).join('');
   closeModal();
-  doPrint(html, 'A4 landscape', '0.3in');
+  /* 邊界做進內容（.printpage 的 padding），列印對話框選「無」時留白才留得住 */
+  doPrint(html, 'A4 landscape', '0');
   toast('已送往列印，共 '+pages.length+' 頁（A4 橫式，左右各一份）');
 }
 function printVio(ids){
