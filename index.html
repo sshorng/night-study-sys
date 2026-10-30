@@ -587,6 +587,8 @@ table.mealgrid td.cell.on{color:var(--ink);font-weight:700}
 table.mealgrid td.cell.take{background:#FADBD8;color:#8A3226;font-weight:700}
 table.mealgrid td.cell.add{background:#FEF9E7;color:#7A5B12;font-weight:700}
 table.mealgrid td.cell.refund{background:#EBF5FB}
+table.mealgrid td.cell.done{background:#E2EBDD;color:var(--ok);font-weight:700}
+table.mealgrid td.cell.refund{color:#4A7A93}
 table.mealgrid td.cell.off{background:#F1EDE3;color:#B4A68B}
 table.mealgrid td.cell.holiday{background:#E7DDC8;color:#A79A83}
 table.mealgrid td.sub{background:#EBF5FB;font-weight:700;min-width:34px;font-family:var(--mono)}
@@ -868,7 +870,7 @@ const LIB = {
    1. CONFIG
    ===================================================================== */
 const CONFIG = {
-  VERSION: '2.22.3',
+  VERSION: '2.23.0',
   GAS_URL: 'https://script.google.com/macros/s/AKfycbxBk3fJaCrPfyojhPVgT6xNE110x3ENSGquQLVWLBz8jdNH2FgX6QMNBQKr1lHLZ8ePtw/exec',
   PASSWORD: '',
   ROLE_KEY: 'nightstudy.role',
@@ -1488,11 +1490,22 @@ E.meal = {
     if(E.onLeave(st, member.key, iso)) return { mode:'refund', charge:0, manual:false, paid:false, why:'leave' };
     return { mode:'on', charge:1, manual:false };
   },
-  /* 格子顯示：1、V 或空白（V＝請假但帶走，仍計費） */
+  /* 匯出用的格子值：1、V 或空白（Excel 只認這三種） */
   mark(st, member, iso){
     const d = E.meal.day(st, member, iso);
     if(!d.charge) return '';
     return d.mode === 'take' ? 'V' : '1';
+  },
+  /* 網頁格子顯示：把請假、待退、已退也標出來 */
+  cellText(st, member, iso){
+    const d = E.meal.day(st, member, iso);
+    if(d.mode === 'on' || d.mode === 'add') return '1';
+    if(d.mode === 'take') return 'V';
+    if(d.mode === 'refund'){
+      if(d.paid) return '退';
+      return d.why === 'leave' ? '假' : '變';
+    }
+    return '';
   },
 
   /* 一位訂餐者在某個收費期的結算 */
@@ -3405,7 +3418,7 @@ function renderMeal(){
     + '<button class="btn" id="btnMealAdjust">整體加退</button>'
     + '<button class="btn primary" id="btnMealExport">匯出便當收費</button>'
     + '<span class="hint">單價 ' + price + ' 元｜' + mo.schoolDays + ' 個上課日｜'
-    +   '點格子切換 1、V、空白；V 是請假但便當帶走，仍要收費</span>'
+    +   '點格子切換 1、V、空白｜1 供餐　V 帶走（仍收費）　假 請假待退　變 月中變動待退　退 已退</span>'
     + '<button class="btn tiny" id="btnMealPeriod">收費期 '
     +   (per.from && per.to ? (perText(per.from) + '～' + perText(per.to)) : '整月')
     +   (per.custom ? '（已調整）' : '') + '</button>';
@@ -3449,7 +3462,7 @@ function renderMealGrid(mo, pack){
     row1 += '<th class="sub">小計</th>';
     row2 += '<th class="sub"></th>';
   });
-  row1 += '<th class="total">總計金額</th><th class="total">待退</th>';
+  row1 += '<th class="total">實收金額</th><th class="total">待退</th>';
   row2 += '<th class="total"></th><th class="total"></th>';
   row2 += '</tr>';
 
@@ -3475,11 +3488,12 @@ function renderMealGrid(mo, pack){
         const d = E.meal.day(st, m, sl.iso);
         if(d.charge) weekServed++;
         const cls = d.mode === 'take' ? 'take' : (d.mode === 'add' ? 'add'
-          : (d.mode === 'refund' ? 'refund' : (d.mode === 'on' ? 'on' : 'off')));
+          : (d.mode === 'refund' ? (d.paid ? 'done' : 'refund')
+            : (d.mode === 'on' ? 'on' : 'off')));
         body += '<td class="cell ' + cls + (d.manual ? ' fix' : '') + '"'
           + ' data-mealcell="' + m.key + '|' + sl.iso + '"'
           + ' title="' + sl.iso + '　' + mealCellText(d) + '">'
-          + E.meal.mark(st, m, sl.iso) + '</td>';
+          + E.meal.cellText(st, m, sl.iso) + '</td>';
       });
       body += '<td class="sub">' + weekServed + '</td>';
     });
