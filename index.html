@@ -828,12 +828,12 @@ const LIB = {
   },
   ready: { exceljs:false, pizzip:false, docx:false },
   waiting: {},
-  VERSION: '2.22.2',
+  load(key){
     if(this.ready[key]) return Promise.resolve(true);
     if(this.waiting[key]) return this.waiting[key];
     const self = this;
     this.waiting[key] = new Promise(function(resolve, reject){
-  VERSION: '2.22.1',
+      const s = document.createElement('script');
       s.src = self.URLS[key];
       s.async = true;
       s.onload = function(){ self.ready[key] = true; resolve(true); };
@@ -846,7 +846,6 @@ const LIB = {
     for(let i=0;i<keys.length;i++) await this.load(keys[i]);
     return true;
   },
-  VERSION: '2.21.0',
   warm(){
     const run = function(){ ['pizzip','docx','exceljs'].forEach(function(k){ LIB.load(k).catch(function(){}); }); };
     if(window.requestIdleCallback) requestIdleCallback(run, { timeout: 8000 });
@@ -860,7 +859,7 @@ const LIB = {
    1. CONFIG
    ===================================================================== */
 const CONFIG = {
-  VERSION: '2.20.0',
+  VERSION: '2.22.2',
   GAS_URL: 'https://script.google.com/macros/s/AKfycbxBk3fJaCrPfyojhPVgT6xNE110x3ENSGquQLVWLBz8jdNH2FgX6QMNBQKr1lHLZ8ePtw/exec',
   PASSWORD: '',
   ROLE_KEY: 'nightstudy.role',
