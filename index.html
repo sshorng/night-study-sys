@@ -13,6 +13,12 @@
   --rule:#C3B394; --rule-soft:#D6C9AC;
   --seal:#9E2B18; --seal-soft:#F0DAD2;
   --ok:#3F6B4F; --ok-soft:#E2EBDD;
+  /* 便當表格：暖紙底上只留一支冷色（黛青）代表待退，其餘一律暖灰米 */
+  --g-head:#EAE2CE; --g-week:#F6EEDD; --g-sub:#EFE6D2; --g-total:#F6EBCE;
+  --g-band:#F7F1E2; --g-off:#F5F0E3; --g-holiday:#E2D5BD;
+  --g-take:#F2DCD0; --g-take-ink:#8A3226;
+  --g-wait:#DCE6E5; --g-wait-ink:#3A585C;
+  --g-done:#DFE9DA; --g-foot:#E7DFCB;
   --serif:"Noto Serif TC","標楷體","DFKai-SB",serif;
   --sans:"Noto Sans TC","Microsoft JhengHei",sans-serif;
   --mono:ui-monospace,"Cascadia Mono",Consolas,monospace;
@@ -565,15 +571,15 @@ body.gated .sheet{opacity:.28;pointer-events:none;user-select:none}
 table.mealgrid{border-collapse:collapse;font-size:12px}
 table.mealgrid th,table.mealgrid td{border:1px solid var(--rule-soft);padding:0;
   text-align:center;height:28px;min-width:26px;white-space:nowrap}
-table.mealgrid th{background:#F2F4F7;font-weight:700;color:var(--ink-2);font-size:11px;height:24px}
+table.mealgrid th{background:var(--g-head);font-weight:700;color:var(--ink-2);font-size:11px;height:24px}
 table.mealgrid th.d{color:var(--ink-3);font-size:10px;font-weight:400}
-table.mealgrid th.we{background:#F7F3E9;color:var(--ink-3);font-size:10px;font-weight:400;min-width:22px}
-table.mealgrid th.hl{background:#FADBD8;color:#8A3226}
-table.mealgrid th.sub{background:#EBF5FB;min-width:34px}
-table.mealgrid th.total{background:#FEF9E7;min-width:66px}
-table.mealgrid th.name,table.mealgrid th.cls,table.mealgrid th.seat,table.mealgrid th.grp{background:#F2F4F7}
+table.mealgrid th.we{background:var(--g-week);color:var(--ink-3);font-size:10px;font-weight:400;min-width:22px}
+table.mealgrid th.hl{background:var(--g-holiday);color:var(--seal)}
+table.mealgrid th.sub{background:var(--g-sub);min-width:34px}
+table.mealgrid th.total{background:var(--g-total);min-width:66px}
+table.mealgrid th.name,table.mealgrid th.cls,table.mealgrid th.seat,table.mealgrid th.grp{background:var(--g-head)}
 table.mealgrid td{background:var(--card)}
-table.mealgrid tr.band td{background:#F7F1E2}
+table.mealgrid tr.band td{background:var(--g-band)}
 table.mealgrid td.name{min-width:86px;text-align:left;padding:0 8px;font-family:var(--serif);font-size:13px}
 table.mealgrid td.cls,table.mealgrid td.seat,table.mealgrid td.grp{color:var(--ink-3);font-size:11px}
 table.mealgrid td.cls{min-width:42px}
@@ -584,27 +590,29 @@ table.mealgrid td.cell:hover{outline:2px solid var(--seal);outline-offset:-2px}
 table.mealgrid td.cell.fix::after{content:"";position:absolute;top:2px;right:2px;
   width:4px;height:4px;border-radius:50%;background:var(--seal)}
 table.mealgrid td.cell.on{color:var(--ink);font-weight:700}
-table.mealgrid td.cell.take{background:#FADBD8;color:#8A3226;font-weight:700}
-table.mealgrid td.cell.add{background:#FEF9E7;color:#7A5B12;font-weight:700}
-table.mealgrid td.cell.refund{background:#EBF5FB}
-table.mealgrid td.cell.done{background:#E2EBDD;color:var(--ok);font-weight:700}
-table.mealgrid td.cell.refund{color:#4A7A93}
-table.mealgrid td.cell.off{background:#F1EDE3;color:#B4A68B}
-table.mealgrid td.cell.holiday{background:#E7DDC8;color:#A79A83}
-table.mealgrid td.sub{background:#EBF5FB;font-weight:700;min-width:34px;font-family:var(--mono)}
-table.mealgrid td.total{background:#FEF9E7;font-weight:700;text-align:right;padding:0 6px;
+table.mealgrid td.cell.take{background:var(--g-take);color:var(--g-take-ink);font-weight:700}
+table.mealgrid td.cell.add{background:var(--g-wait);color:var(--g-wait-ink);font-weight:700}
+table.mealgrid td.cell.refund{background:var(--g-wait);color:var(--g-wait-ink)}
+table.mealgrid td.cell.done{background:var(--g-done);color:var(--ok);font-weight:700}
+table.mealgrid td.cell.off{background:var(--g-off);color:#B4A68B}
+table.mealgrid td.cell.holiday{background:var(--g-holiday);color:#A79A83}
+table.mealgrid td.sub{background:var(--g-sub);font-weight:700;min-width:34px;font-family:var(--mono)}
+table.mealgrid td.total{background:var(--g-total);font-weight:700;text-align:right;padding:0 6px;
   min-width:66px;font-family:var(--mono)}
+/* 小計與金額欄改用實線分欄，補回原本靠藍色做的線索 */
+table.mealgrid th.sub,table.mealgrid td.sub,
+table.mealgrid th.total,table.mealgrid td.total{border-left:1px solid var(--rule)}
 table.mealgrid td.wait{min-width:56px;font-size:11px;color:var(--ink-3)}
 table.mealgrid td.wait b{color:var(--seal);cursor:pointer;text-decoration:underline dotted}
 /* 表格自己捲，表頭與合計列才會固定 */
 #mealGridWrap{max-height:calc(100vh - 250px);overflow:auto}
 /* 整塊表頭一起黏在頂端，兩列才不會互相重疊 */
-table.mealgrid thead{position:sticky;top:0;z-index:3;background:#F2F4F7}
-table.mealgrid thead th{background:#F2F4F7;vertical-align:middle}
+table.mealgrid thead{position:sticky;top:0;z-index:3;background:var(--g-head)}
+table.mealgrid thead th{background:var(--g-head);vertical-align:middle}
 table.mealgrid thead tr:first-child th{height:28px;border-bottom:1px solid var(--rule)}
 table.mealgrid thead tr:nth-child(2) th{height:24px;font-size:10px;color:var(--ink-2)}
 table.mealgrid thead th.d{font-size:12px;color:var(--ink);letter-spacing:.02em}
-table.mealgrid thead th.hl{background:#FADBD8}
+table.mealgrid thead th.hl{background:var(--g-holiday)}
 /* 左側標籤欄跨兩列看起來像一格（不用 rowspan，避免 sticky 破版） */
 table.mealgrid thead tr:first-child th.cls,
 table.mealgrid thead tr:first-child th.seat,
@@ -614,14 +622,14 @@ table.mealgrid thead tr:nth-child(2) th.cls,
 table.mealgrid thead tr:nth-child(2) th.seat,
 table.mealgrid thead tr:nth-child(2) th.name,
 table.mealgrid thead tr:nth-child(2) th.grp{border-top:0}
-table.mealgrid thead th.sub{background:#EBF5FB}
-table.mealgrid thead th.total{background:#FEF9E7}
-table.mealgrid thead th.we{background:#F7F3E9}
+table.mealgrid thead th.sub{background:var(--g-sub)}
+table.mealgrid thead th.total{background:var(--g-total)}
+table.mealgrid thead th.we{background:var(--g-week)}
 table.mealgrid tfoot th,table.mealgrid tfoot td{position:sticky;bottom:0;z-index:2;
-  background:#EAEDED;font-weight:700;border-top:2px solid var(--ink)}
+  background:var(--g-foot);font-weight:700;border-top:2px solid var(--ink)}
 table.mealgrid tfoot td.sum{font-family:var(--mono);text-align:center}
-table.mealgrid tfoot{position:sticky;bottom:0;z-index:2;background:#EAEDED}
-table.mealgrid tfoot th,table.mealgrid tfoot td{background:#EAEDED;font-weight:700;border-top:2px solid var(--ink)}
+table.mealgrid tfoot{position:sticky;bottom:0;z-index:2;background:var(--g-foot)}
+table.mealgrid tfoot th,table.mealgrid tfoot td{background:var(--g-foot);font-weight:700;border-top:2px solid var(--ink)}
 table.mealgrid tfoot td.sum.wait{color:var(--seal)}
 .meal-h3{display:flex;align-items:center;gap:10px;margin:18px 0 8px}
 .meal-h3 h3{margin:0;font-family:var(--serif);font-size:14px;letter-spacing:.1em;color:var(--ink-2)}
@@ -870,7 +878,7 @@ const LIB = {
    1. CONFIG
    ===================================================================== */
 const CONFIG = {
-  VERSION: '2.24.0',
+  VERSION: '2.25.0',
   GAS_URL: 'https://script.google.com/macros/s/AKfycbxBk3fJaCrPfyojhPVgT6xNE110x3ENSGquQLVWLBz8jdNH2FgX6QMNBQKr1lHLZ8ePtw/exec',
   PASSWORD: '',
   ROLE_KEY: 'nightstudy.role',
@@ -5131,8 +5139,9 @@ function colLetter(n){
 
 const MEAL_FONT = '微軟正黑體';
 const MEAL_FILL = {
-  head:'FFF2F4F7', date:'FFF2F4F7', holiday:'FFFADBD8', sub:'FFEBF5FB',
-  total:'FFFEF9E7', price:'FFE8F8F5', sum:'FFEAEDED'
+  /* 與網頁格子同一套暖紙色：表頭暖米、假日米赭、小計淺米、金額淡琥珀、合計暖灰 */
+  head:'FFEAE2CE', date:'FFEAE2CE', holiday:'FFE2D5BD', sub:'FFEFE6D2',
+  total:'FFF6EBCE', price:'FFF1E2BE', sum:'FFE7DFCB'
 };
 
 function openMealExport(){
