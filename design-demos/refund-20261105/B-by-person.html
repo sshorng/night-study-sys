@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>待處理退費 · 方向 B 依學生分組</title>
+<style>
+:root{
+  --paper:#E8DDC4; --sheet:#F3EBD9; --card:#FAF4E6;
+  --ink:#1F1B15; --ink-2:#4A4237; --ink-3:#6C6251;
+  --rule:#C3B394; --rule-soft:#D6C9AC;
+  --seal:#9E2B18; --seal-soft:#F0DAD2;
+  --serif:"Noto Serif TC","標楷體","DFKai-SB",serif;
+  --sans:"Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;padding:24px;background:var(--paper);font-family:var(--sans);color:var(--ink)}
+
+.head{max-width:1180px;margin:0 auto 14px;display:flex;align-items:baseline;gap:14px}
+.head h1{margin:0;font-family:var(--serif);font-size:18px;letter-spacing:.1em}
+.head .sum{font-size:13px;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.head .sp{flex:1}
+.b{font-family:inherit;font-size:13px;line-height:1;padding:7px 12px;border-radius:6px;
+  border:1px solid var(--rule);background:#FFFDF6;color:var(--ink-2);cursor:pointer}
+.b:hover{border-color:var(--seal);color:var(--seal)}
+.b.seal{background:var(--seal);border-color:var(--seal);color:#FBF3E4}
+.b.seal:hover{color:#FBF3E4;filter:brightness(1.08)}
+
+.grid{max-width:1180px;margin:0 auto;display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.person{background:var(--card);border:1px solid var(--rule-soft);border-radius:9px;padding:12px 14px 10px}
+.person h3{margin:0 0 2px;font-family:var(--serif);font-size:15px;letter-spacing:.04em;display:flex;align-items:baseline;gap:8px}
+.person h3 i{font-style:normal;font-size:12px;color:var(--ink-3);font-family:var(--sans);font-variant-numeric:tabular-nums}
+.person .meta{font-size:12px;color:var(--ink-3);margin-bottom:9px}
+.person .meta b{color:var(--seal);font-weight:600}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.chip{display:inline-flex;align-items:baseline;gap:6px;padding:5px 9px;border-radius:999px;
+  background:var(--seal-soft);color:#7E2415;font-size:12.5px;border:1px solid #E3C4BA}
+.chip b{font-weight:600;font-variant-numeric:tabular-nums}
+.chip span{color:#8A3226;opacity:.85}
+.acts{display:flex;gap:6px;border-top:1px dashed var(--rule-soft);padding-top:9px}
+.acts .b{padding:6px 10px;font-size:12.5px}
+.acts .b:last-child{margin-left:auto}
+</style>
+</head>
+<body>
+<div class="head">
+  <h1>待處理退費</h1>
+  <span class="sum">33 筆　18 位學生　共 3,300 元</span>
+  <span class="sp"></span>
+  <button class="b seal">全月標記已退</button>
+  <button class="b">收起</button>
+</div>
+
+<div class="grid">
+  <div class="person">
+    <h3><i>903-35</i>黃彥錦</h3>
+    <div class="meta"><b>2 筆</b>　共 200 元</div>
+    <div class="chips">
+      <span class="chip"><b>10/01</b> 四<span>事假</span></span>
+      <span class="chip"><b>10/07</b> 三<span>事假</span></span>
+    </div>
+    <div class="acts"><button class="b">全部帶走</button><button class="b seal">退 200 元</button></div>
+  </div>
+
+  <div class="person">
+    <h3><i>904-15</i>潘力綺</h3>
+    <div class="meta"><b>2 筆</b>　共 200 元</div>
+    <div class="chips">
+      <span class="chip"><b>10/01</b> 四<span>病假</span></span>
+      <span class="chip"><b>10/09</b> 五<span>病假</span></span>
+    </div>
+    <div class="acts"><button class="b">全部帶走</button><button class="b seal">退 200 元</button></div>
+  </div>
+
+  <div class="person">
+    <h3><i>905-05</i>盧宛欣</h3>
+    <div class="meta"><b>1 筆</b>　共 100 元</div>
+    <div class="chips"><span class="chip"><b>10/01</b> 四<span>事假</span></span></div>
+    <div class="acts"><button class="b">全部帶走</button><button class="b seal">退 100 元</button></div>
+  </div>
+
+  <div class="person">
+    <h3><i>905-04</i>邱盈甄</h3>
+    <div class="meta"><b>2 筆</b>　共 200 元</div>
+    <div class="chips">
+      <span class="chip"><b>10/05</b> 一<span>月中改參加時間</span></span>
+      <span class="chip"><b>10/06</b> 二<span>月中改參加時間</span></span>
+    </div>
+    <div class="acts"><button class="b">全部帶走</button><button class="b seal">退 200 元</button></div>
+  </div>
+
+  <div class="person">
+    <h3><i>901-34</i>洪伯衍</h3>
+    <div class="meta"><b>3 筆</b>　共 300 元</div>
+    <div class="chips">
+      <span class="chip"><b>10/07</b> 三<span>月中改參加時間</span></span>
+      <span class="chip"><b>10/08</b> 四<span>月中改參加時間</span></span>
+      <span class="chip"><b>10/12</b> 一<span>月中改參加時間</span></span>
+    </div>
+    <div class="acts"><button class="b">全部帶走</button><button class="b seal">退 300 元</button></div>
+  </div>
+
+  <div class="person">
+    <h3><i>904-11</i>董楹淇</h3>
+    <div class="meta"><b>1 筆</b>　共 100 元</div>
+    <div class="chips"><span class="chip"><b>10/08</b> 四<span>視力複檢</span></span></div>
+    <div class="acts"><button class="b">全部帶走</button><button class="b seal">退 100 元</button></div>
+  </div>
+
+  <div class="person">
+    <h3><i>902-08</i>陳品妍</h3>
+    <div class="meta"><b>2 筆</b>　共 200 元</div>
+    <div class="chips">
+      <span class="chip"><b>10/08</b> 四<span>事假</span></span>
+      <span class="chip"><b>10/15</b> 四<span>事假</span></span>
+    </div>
+    <div class="acts"><button class="b">全部帶走</button><button class="b seal">退 200 元</button></div>
+  </div>
+
+  <div class="person">
+    <h3><i>906-02</i>林丞尉</h3>
+    <div class="meta"><b>1 筆</b>　共 100 元</div>
+    <div class="chips"><span class="chip"><b>10/12</b> 一<span>病假</span></span></div>
+    <div class="acts"><button class="b">全部帶走</button><button class="b seal">退 100 元</button></div>
+  </div>
+
+  <div class="person">
+    <h3><i>905-17</i>吳昀臻</h3>
+    <div class="meta"><b>1 筆</b>　共 100 元</div>
+    <div class="chips"><span class="chip"><b>10/13</b> 二<span>事假</span></span></div>
+    <div class="acts"><button class="b">全部帶走</button><button class="b seal">退 100 元</button></div>
+  </div>
+</div>
+</body>
+</html>

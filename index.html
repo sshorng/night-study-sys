@@ -3651,6 +3651,7 @@ function renderMealPending(ym){
                 + '<span class="why">' + esc(p.why) + '</span>'
                 + '<span class="btns">'
                 +   '<button class="btn tiny" data-mealtake="' + id + '">帶走</button>'
+                +   '<button class="btn tiny seal" data-mealpaid="' + id + '">已退 ' + price + '</button>'
                 + '</span></div>';
             }).join('')
             + '</div>'

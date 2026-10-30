@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>待處理退費 · 方向 C 依日期分段</title>
+<style>
+:root{
+  --paper:#E8DDC4; --sheet:#F3EBD9; --card:#FAF4E6;
+  --ink:#1F1B15; --ink-2:#4A4237; --ink-3:#6C6251;
+  --rule:#C3B394; --rule-soft:#D6C9AC;
+  --seal:#9E2B18; --seal-soft:#F0DAD2;
+  --serif:"Noto Serif TC","標楷體","DFKai-SB",serif;
+  --sans:"Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;padding:24px;background:var(--paper);font-family:var(--sans);color:var(--ink)}
+.wrap{max-width:1180px;margin:0 auto}
+
+.top{display:flex;align-items:center;gap:14px;margin-bottom:12px}
+.top h1{margin:0;font-family:var(--serif);font-size:18px;letter-spacing:.1em}
+.top .sum{font-size:13px;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.top .sp{flex:1}
+.b{font-family:inherit;font-size:13px;line-height:1;padding:7px 12px;border-radius:6px;
+  border:1px solid var(--rule);background:#FFFDF6;color:var(--ink-2);cursor:pointer}
+.b:hover{border-color:var(--seal);color:var(--seal)}
+.b.seal{background:var(--seal);border-color:var(--seal);color:#FBF3E4}
+.b.seal:hover{color:#FBF3E4;filter:brightness(1.08)}
+.b.ghost{border-color:transparent;background:transparent;color:var(--ink-3);padding:6px 8px}
+.b.ghost:hover{border-color:var(--rule-soft);color:var(--seal)}
+
+.day{background:var(--card);border:1px solid var(--rule-soft);border-radius:9px;overflow:hidden;margin-bottom:10px}
+.dh{display:flex;align-items:baseline;gap:12px;padding:9px 14px;background:var(--sheet);
+  border-bottom:1px solid var(--rule-soft)}
+.dh .d{font-family:var(--serif);font-size:15px;letter-spacing:.06em}
+.dh .w{font-size:12px;color:var(--ink-3)}
+.dh .n{font-size:12px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.dh .sp{flex:1}
+
+.r{display:grid;grid-template-columns:190px 1fr 210px;align-items:center;gap:14px;
+  padding:0 14px;height:38px;border-bottom:1px solid #EDE4D0;font-size:14px}
+.r:last-child{border-bottom:0}
+.r:hover{background:#FFFCF2}
+.r .who{font-family:var(--serif);white-space:nowrap}
+.r .who i{font-style:normal;font-size:13px;color:var(--ink-3);margin-right:8px;
+  font-family:var(--sans);font-variant-numeric:tabular-nums}
+.r .why{font-size:13px;color:var(--ink-3)}
+.r .act{text-align:right}
+.r .act .b + .b{margin-left:6px}
+.pick{width:15px;height:15px;accent-color:var(--seal);margin:0 10px 0 0;vertical-align:-2px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <h1>待處理退費</h1>
+    <span class="sum">33 筆　共 3,300 元</span>
+    <span class="sp"></span>
+    <button class="b seal">全月標記已退</button>
+    <button class="b">收起</button>
+  </div>
+
+  <div class="day">
+    <div class="dh">
+      <span class="d">10/01</span><span class="w">星期四</span>
+      <span class="n">3 筆　300 元</span>
+      <span class="sp"></span>
+      <button class="b">本日全部已退</button>
+    </div>
+    <div class="r"><span class="who"><input class="pick" type="checkbox"><i>903-35</i>黃彥錦</span><span class="why">事假</span>
+      <span class="act"><button class="b ghost">帶走</button><button class="b seal">已退 100</button></span></div>
+    <div class="r"><span class="who"><input class="pick" type="checkbox"><i>904-15</i>潘力綺</span><span class="why">病假</span>
+      <span class="act"><button class="b ghost">帶走</button><button class="b seal">已退 100</button></span></div>
+    <div class="r"><span class="who"><input class="pick" type="checkbox"><i>905-05</i>盧宛欣</span><span class="why">事假</span>
+      <span class="act"><button class="b ghost">帶走</button><button class="b seal">已退 100</button></span></div>
+  </div>
+
+  <div class="day">
+    <div class="dh">
+      <span class="d">10/05</span><span class="w">星期一</span>
+      <span class="n">2 筆　200 元</span>
+      <span class="sp"></span>
+      <button class="b">本日全部已退</button>
+    </div>
+    <div class="r"><span class="who"><input class="pick" type="checkbox"><i>905-04</i>邱盈甄</span><span class="why">月中改參加時間</span>
+      <span class="act"><button class="b ghost">帶走</button><button class="b seal">已退 100</button></span></div>
+    <div class="r"><span class="who"><input class="pick" type="checkbox"><i>902-08</i>陳品妍</span><span class="why">病假</span>
+      <span class="act"><button class="b ghost">帶走</button><button class="b seal">已退 100</button></span></div>
+  </div>
+
+  <div class="day">
+    <div class="dh">
+      <span class="d">10/07</span><span class="w">星期三</span>
+      <span class="n">3 筆　300 元</span>
+      <span class="sp"></span>
+      <button class="b">本日全部已退</button>
+    </div>
+    <div class="r"><span class="who"><input class="pick" type="checkbox"><i>901-34</i>洪伯衍</span><span class="why">月中改參加時間</span>
+      <span class="act"><button class="b ghost">帶走</button><button class="b seal">已退 100</button></span></div>
+    <div class="r"><span class="who"><input class="pick" type="checkbox"><i>903-35</i>黃彥錦</span><span class="why">事假</span>
+      <span class="act"><button class="b ghost">帶走</button><button class="b seal">已退 100</button></span></div>
+    <div class="r"><span class="who"><input class="pick" type="checkbox"><i>906-02</i>林丞尉</span><span class="why">病假</span>
+      <span class="act"><button class="b ghost">帶走</button><button class="b seal">已退 100</button></span></div>
+  </div>
+
+  <div class="day">
+    <div class="dh">
+      <span class="d">10/08</span><span class="w">星期四</span>
+      <span class="n">3 筆　300 元</span>
+      <span class="sp"></span>
+      <button class="b">本日全部已退</button>
+    </div>
+    <div class="r"><span class="who"><input class="pick" type="checkbox"><i>904-11</i>董楹淇</span><span class="why">視力複檢</span>
+      <span class="act"><button class="b ghost">帶走</button><button class="b seal">已退 100</button></span></div>
+    <div class="r"><span class="who"><input class="pick" type="checkbox"><i>901-34</i>洪伯衍</span><span class="why">月中改參加時間</span>
+      <span class="act"><button class="b ghost">帶走</button><button class="b seal">已退 100</button></span></div>
+    <div class="r"><span class="who"><input class="pick" type="checkbox"><i>902-08</i>陳品妍</span><span class="why">事假</span>
+      <span class="act"><button class="b ghost">帶走</button><button class="b seal">已退 100</button></span></div>
+  </div>
+
+  <div class="day">
+    <div class="dh">
+      <span class="d">10/12</span><span class="w">星期一</span>
+      <span class="n">2 筆　200 元</span>
+      <span class="sp"></span>
+      <button class="b">本日全部已退</button>
+    </div>
+    <div class="r"><span class="who"><input class="pick" type="checkbox"><i>906-02</i>林丞尉</span><span class="why">病假</span>
+      <span class="act"><button class="b ghost">帶走</button><button class="b seal">已退 100</button></span></div>
+    <div class="r"><span class="who"><input class="pick" type="checkbox"><i>905-17</i>吳昀臻</span><span class="why">事假</span>
+      <span class="act"><button class="b ghost">帶走</button><button class="b seal">已退 100</button></span></div>
+  </div>
+</div>
+</body>
+</html>
