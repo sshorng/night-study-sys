@@ -828,7 +828,7 @@ const LIB = {
    1. CONFIG
    ===================================================================== */
 const CONFIG = {
-  VERSION: '2.17.1',
+  VERSION: '2.17.3',
   GAS_URL: 'https://script.google.com/macros/s/AKfycbxBk3fJaCrPfyojhPVgT6xNE110x3ENSGquQLVWLBz8jdNH2FgX6QMNBQKr1lHLZ8ePtw/exec',
   PASSWORD: '',
   ROLE_KEY: 'nightstudy.role',
@@ -1274,53 +1274,101 @@ E.meal = {
     }
     const days = [];
     weeks.forEach(function(wk){ wk.slots.forEach(function(sl){ if(sl) days.push(sl); }); });
-    return { weeks:weeks, days:days, schoolDays: days.filter(function(d){ return !d.holiday; }).length };
+    return { ym:(y + '-' + String(m).padStart(2,'0')), weeks:weeks, days:days,
+      schoolDays: days.filter(function(d){ return !d.holiday; }).length };
   },
 
-  /* 訂便當的人：夜自習在籍且便當不是「不訂」的，加上便當名單的額外訂餐者 */
-  roster(st){
-    const out = [];
-    E.active(st).forEach(function(s){
+  /* 該生第一次「加入夜自習」的日期；沒有加入紀錄就當作本來就在 */
+  startIso(st, key){
+    const joins = (st.enrollments||[]).filter(function(e){ return e.key === key && e.kind === 'join'; });
+    if(!joins.length) return '';
+    return joins.map(function(e){ return e.date; }).sort()[0];
+  },
+  /* 該生「月初當時」的參加設定：月中退出或改時間，原本排過的日子還算得出來 */
+  baseDays(st, key, ym){
+    const day1 = String(ym||'') + '-01';
+    const first = E.meal.startIso(st, key);
+    if(first && first > day1) return [0,0,0,0,0];   /* 這個月才加入，月初還沒有他 */
+    return E.daysAt(st, key, day1);
+  },
+  /* 該月有沒有排定過（含月中被減掉的日子）：決定名單留不留 */
+  hadPlan(st, key, ym){
+    const mo = E.meal.month(st, ym), base = E.meal.baseDays(st, key, ym);
+    const first = E.meal.startIso(st, key);
+    return mo.days.some(function(d){
+      if(first && d.iso < first) return false;
+      if(base[d.wd-1] === 1) return true;
+      return E.daysAt(st, key, d.iso)[d.wd-1] === 1;
+    });
+  },
+
+  /* 訂便當的人：夜自習在籍且便當不是「不訂」的，加上便當名單的額外訂餐者。
+     月中退出夜自習的人，這個月仍留在名單（錢已經繳了），下個月自動消失。 */
+  roster(st, ym){
+    const out = [], seen = {};
+    (st.students||[]).forEach(function(s){
       const lunch = String(s.lunch||'').trim();
       const talked = (st.meals||[]).some(function(m){ return m.key === s.key; });
+      const off = s.active === false;
       if(!talked && (!lunch || lunch === '不訂')) return;
+      if(off && !(ym && E.meal.hadPlan(st, s.key, ym))) return;
+      if(seen[s.key]) return;
+      seen[s.key] = 1;
       out.push({ key:s.key, cls:Number(s.cls)||0, seat:s.seat||'', name:s.name||'',
-        lunch:lunch || '葷', group:'夜自習', note:s.note || '' });
+        lunch:lunch || '葷', group:'夜自習', note:s.note || '', active:!off });
     });
     (st.mealMembers||[]).forEach(function(s){
+      if(seen[s.key]) return;
+      seen[s.key] = 1;
       out.push({ key:s.key, cls:Number(s.cls)||0, seat:s.seat||'', name:s.name||'',
-        lunch:String(s.lunch||'').trim() || '葷', group:'數學班', note:s.note || '' });
+        lunch:String(s.lunch||'').trim() || '葷', group:'數學班', note:s.note || '', active:true });
     });
     return out.sort(function(a,b){
       return (a.cls - b.cls) || String(a.seat).localeCompare(String(b.seat)) || a.key.localeCompare(b.key);
     });
   },
-  byKey(st, key){
-    return E.meal.roster(st).find(function(m){ return m.key === key; }) || null;
+  byKey(st, key, ym){
+    return E.meal.roster(st, ym).find(function(m){ return m.key === key; }) || null;
   },
 
-  /* 該生該日排定供餐（不含任何例外）：數學班固定星期一，夜自習跟每週參加日 */
+  /* 計費基礎：當天有排、或月初曾經有排，都算。
+     月中被減掉的日子不是「不算」，而是「先預收、再退費」。 */
   planned(st, member, iso){
     if(!member) return false;
     const w = E.wd(iso);
     if(w < 1 || w > 5) return false;
     if(!E.isSchoolDay(st, iso)) return false;
     if(member.group === '數學班') return w === 1;
-    return E.daysAt(st, member.key, iso)[w-1] === 1;
+    const first = E.meal.startIso(st, member.key);
+    if(first && iso < first) return false;   /* 他還沒加入，不能算他的 */
+    if(E.daysAt(st, member.key, iso)[w-1] === 1) return true;
+    return E.meal.baseDays(st, member.key, E.meal.ym(iso))[w-1] === 1;
   },
-
+  dropped(st, member, iso){
+    if(!member || member.group === '數學班') return false;
+    const w = E.wd(iso);
+    if(w < 1 || w > 5) return false;
+    if(!E.isSchoolDay(st, iso)) return false;
+    const first = E.meal.startIso(st, member.key);
+    if(first && iso < first) return false;
+    if(E.daysAt(st, member.key, iso)[w-1] === 1) return false;
+    return E.meal.baseDays(st, member.key, E.meal.ym(iso))[w-1] === 1;
+  },
   rec(st, key, iso){
     return (st.meals||[]).find(function(m){ return m.key === key && m.date === iso; }) || null;
   },
 
-  /* 每一天的狀態：add 加訂、take 帶走（不退）、refund 退費、on 正常供餐、off 不供餐 */
+  /* 每一天的狀態：add 加訂、take 帶走（不退）、refund 退費、on 正常供餐、off 不供餐。
+     refund 會帶 why：leave 請假、drop 月中退出或改時間、manual 手動標的。 */
   day(st, member, iso){
     const r = E.meal.rec(st, member.key, iso);
     if(r && r.kind === '加訂') return { mode:'add', charge:1, manual:true, rec:r };
     if(r && r.kind === '帶走') return { mode:'take', charge:1, manual:true, rec:r };
-    if(r && r.kind === '退費') return { mode:'refund', charge:0, manual:true, rec:r, paid:r.status === '已退' };
+    if(r && r.kind === '退費') return { mode:'refund', charge:0, manual:true, rec:r,
+      paid:r.status === '已退', why:'manual' };
     if(!E.meal.planned(st, member, iso)) return { mode:'off', charge:0, manual:false };
-    if(E.onLeave(st, member.key, iso)) return { mode:'refund', charge:0, manual:false, paid:false };
+    if(E.meal.dropped(st, member, iso)) return { mode:'refund', charge:0, manual:false, paid:false, why:'drop' };
+    if(E.onLeave(st, member.key, iso)) return { mode:'refund', charge:0, manual:false, paid:false, why:'leave' };
     return { mode:'on', charge:1, manual:false };
   },
   /* 格子顯示：1、V 或空白（V＝請假但帶走，仍計費） */
@@ -1333,20 +1381,22 @@ E.meal = {
   /* 一位訂餐者在某個收費期的結算 */
   bill(st, member, ym){
     const mo = E.meal.month(st, ym), price = E.meal.price(st);
-    let planned = 0, refundN = 0, refundPaidN = 0, take = 0, add = 0;
+    let planned = 0, refundN = 0, refundPaidN = 0, take = 0, add = 0, dropN = 0;
     mo.days.forEach(function(d){
-      const r = E.meal.rec(st, member.key, d.iso);
-      const isAdd = !!(r && r.kind === '加訂');
-      if(E.meal.planned(st, member, d.iso)){
-        planned++;
-        if(isAdd) return;
-        if(r && r.kind === '帶走'){ take++; return; }
-        if(r && r.kind === '退費'){ refundN++; if(r.status === '已退') refundPaidN++; return; }
-        if(E.onLeave(st, member.key, d.iso)){ refundN++; return; }
+      const x = E.meal.day(st, member, d.iso);
+      const base = E.meal.planned(st, member, d.iso);
+      if(x.mode === 'add'){
+        if(base) planned++; else add++;
         return;
       }
-      /* 原本沒排、臨時加訂 */
-      if(isAdd) add++;
+      if(!base) return;
+      planned++;
+      if(x.mode === 'take') take++;
+      else if(x.mode === 'refund'){
+        refundN++;
+        if(x.why === 'drop') dropN++;
+        if(x.paid) refundPaidN++;
+      }
     });
     const served = planned - refundN + add;
     const pre = planned * price;
@@ -1355,8 +1405,8 @@ E.meal = {
     const extra = add * price;
     return {
       key:member.key, cls:member.cls, seat:member.seat, name:member.name,
-      group:member.group, lunch:member.lunch,
-      planned:planned, refundN:refundN, refundPaidN:refundPaidN, take:take, add:add,
+      group:member.group, lunch:member.lunch, active:member.active !== false,
+      planned:planned, refundN:refundN, refundPaidN:refundPaidN, take:take, add:add, dropN:dropN,
       served:served, price:price, pre:pre, dueRefund:dueRefund, paid:paid, extra:extra,
       net:pre - paid + extra, waitN:refundN - refundPaidN, charge:served * price
     };
@@ -1364,8 +1414,9 @@ E.meal = {
 
   /* 整班／全校合計 */
   summary(st, ym){
-    const rows = E.meal.roster(st).map(function(m){ return E.meal.bill(st, m, ym); });
-    const sum = { kids:0, mKids:0, days:0, served:0, pre:0, dueRefund:0, paid:0, extra:0, net:0, waitN:0, waitMoney:0 };
+    const rows = E.meal.roster(st, ym).map(function(m){ return E.meal.bill(st, m, ym); });
+    const sum = { kids:0, mKids:0, days:0, served:0, pre:0, dueRefund:0, paid:0, extra:0,
+      net:0, waitN:0, waitMoney:0, dropN:0 };
     rows.forEach(function(b){
       if(!b.planned && !b.add) return;
       sum.kids++;
@@ -1377,26 +1428,30 @@ E.meal = {
       sum.extra += b.extra;
       sum.net += b.net;
       sum.waitN += b.waitN;
+      sum.dropN += b.dropN;
     });
     sum.waitMoney = sum.dueRefund - sum.paid;
     sum.days = E.meal.month(st, ym).schoolDays;
     return { rows:rows, sum:sum };
   },
 
-  /* 該月還沒處理的退費（請假未標、或手動退費未標已退） */
+  /* 該月還沒處理的退費：請假、月中退出或改時間、手動標的，只要還沒退就列出來 */
   pending(st, ym){
     const mo = E.meal.month(st, ym), out = [];
-    E.meal.roster(st).forEach(function(m){
+    E.meal.roster(st, ym).forEach(function(m){
       mo.days.forEach(function(d){
-        const r = E.meal.rec(st, m.key, d.iso);
-        if(r && (r.kind === '帶走' || r.kind === '加訂')) return;
-        if(r && r.kind === '退費'){
-          if(r.status !== '已退') out.push({ member:m, iso:d.iso, id:r.id, why:r.note || '手動退費' });
-          return;
+        const x = E.meal.day(st, m, d.iso);
+        if(x.mode !== 'refund' || x.paid) return;
+        let why = '手動退費';
+        if(x.why === 'drop'){
+          why = (m.active === false) ? '月中退出夜自習' : '月中改參加時間';
+        }else if(x.why === 'leave'){
+          const lv = (st.leaves||[]).find(function(l){ return l.key === m.key && l.date === d.iso; });
+          why = (lv && lv.reason) || '請假';
+        }else if(x.rec && x.rec.note){
+          why = x.rec.note;
         }
-        if(!E.meal.planned(st, m, d.iso)) return;
-        const lv = (st.leaves||[]).find(function(l){ return l.key === m.key && l.date === d.iso; });
-        if(lv) out.push({ member:m, iso:d.iso, id:'', why:lv.reason || '請假' });
+        out.push({ member:m, iso:d.iso, id:(x.rec && x.rec.id) || '', why:why });
       });
     });
     return out.sort(function(a,b){
@@ -3091,11 +3146,22 @@ function mealYm(){
   if(!ui.mealYm) ui.mealYm = E.meal.ym(ref());
   return ui.mealYm;
 }
+/* 身份標籤：月中退出的人這個月還在名單上，標出來才不會被當成漏填 */
+function mealWho(m, full){
+  if(!m) return '';
+  if(m.group === '數學班') return full ? '數學班（每週一）' : '數學';
+  if(m.active === false) return full ? '夜自習（本月已退出）' : '已退出';
+  return '夜自習';
+}
 function mealCellText(d){
   if(d.mode === 'on') return '供餐';
   if(d.mode === 'add') return '加訂（計費）';
   if(d.mode === 'take') return '請假帶走（不退費）';
-  if(d.mode === 'refund') return d.paid ? '退費已退' : '退費待退';
+  if(d.mode === 'refund'){
+    if(d.why === 'drop') return d.paid ? '月中變動，退費已退' : '月中退出或改時間，待退費';
+    if(d.why === 'leave') return d.paid ? '請假，退費已退' : '請假，待退費';
+    return d.paid ? '退費已退' : '退費待退';
+  }
   return '不供餐';
 }
 
@@ -3137,7 +3203,7 @@ function renderMeal(){
   $('mealGridWrap').style.display = view === 'grid' ? '' : 'none';
   $('mealCards').style.display = view === 'grid' ? '' : 'none';
   $('mealBill').style.display = view === 'grid' ? 'none' : '';
-  if(view === 'grid'){ renderMealGrid(mo, pack); renderMealCards(pack); }
+  if(view === 'grid'){ renderMealGrid(mo, pack); renderMealCards(pack, mo.ym); }
   else renderMealBill(pack, mo);
   renderMealPending(ym);
 }
@@ -3146,7 +3212,7 @@ function renderMealGrid(mo, pack){
   const st = state;
   const byKey = {};
   pack.rows.forEach(function(b){ byKey[b.key] = b; });
-  const roster = E.meal.roster(st);
+  const roster = E.meal.roster(st, mo.ym);
   const has = roster.some(function(m){ return !!byKey[m.key]; });
 
   let row1 = '<thead><tr><th class="cls" rowspan="2">班級</th><th class="seat" rowspan="2">座號</th>'
@@ -3176,7 +3242,7 @@ function renderMealGrid(mo, pack){
     body += '<tr' + (band % 2 ? ' class="band"' : '') + '>'
       + '<td class="cls">' + m.cls + '</td><td class="seat">' + esc(m.seat) + '</td>'
       + '<td class="name">' + esc(m.name) + '</td>'
-      + '<td class="grp">' + (m.group === '數學班' ? '數學' : '夜自習') + '</td>';
+      + '<td class="grp" title="' + esc(mealWho(m, true)) + '">' + mealWho(m, false) + '</td>';
     mo.weeks.forEach(function(wk){
       let weekServed = 0;
       wk.slots.forEach(function(sl){
@@ -3201,15 +3267,15 @@ function renderMealGrid(mo, pack){
   $('mealGrid').innerHTML = row1 + row2 + body;
 }
 
-function renderMealCards(pack){
+function renderMealCards(pack, ym){
   const byKey = {};
   pack.rows.forEach(function(b){ byKey[b.key] = b; });
-  const rows = E.meal.roster(state).filter(function(m){ return byKey[m.key]; });
+  const rows = E.meal.roster(state, ym).filter(function(m){ return byKey[m.key]; });
   $('mealCards').innerHTML = rows.length ? rows.map(function(m){
     const b = byKey[m.key];
     return '<div class="card">'
       + '<div class="card-h"><span class="card-who">' + m.cls + '-' + esc(m.seat) + '　' + esc(m.name) + '</span></div>'
-      + '<div class="card-reason">' + (m.group === '數學班' ? '數學班（每週一）' : '夜自習') + '｜便當 ' + esc(m.lunch) + '</div>'
+      + '<div class="card-reason">' + mealWho(m, true) + '｜便當 ' + esc(m.lunch) + '</div>'
       + '<div class="card-nums"><span>實供 <b>' + b.served + '</b></span>'
       +   '<span>退費 <b>' + b.refundN + '</b></span>'
       +   '<span>金額 <b>' + money(b.charge) + '</b></span></div>'
@@ -3227,7 +3293,7 @@ function renderMealBill(pack){
     + '<th>預收</th><th>應退</th><th>已退</th><th>實收</th><th>待退</th></tr></thead><tbody>'
     + (pack.rows.length ? pack.rows.filter(function(b){ return b.planned || b.add; }).map(function(b){
         return '<tr><td>' + b.cls + '</td><td>' + esc(b.seat) + '</td><td>' + esc(b.name) + '</td>'
-          + '<td>' + (b.group === '數學班' ? '數學' : '夜自習') + '</td><td>' + esc(b.lunch) + '</td>'
+          + '<td>' + mealWho({ group:b.group, active:b.active }, false) + '</td><td>' + esc(b.lunch) + '</td>'
           + '<td>' + b.planned + '</td><td>' + b.refundN + '</td><td>' + b.take + '</td><td>' + b.served + '</td>'
           + '<td>' + money(b.pre) + '</td><td>' + money(b.dueRefund) + '</td>'
           + '<td>' + money(b.paid) + '</td><td>' + money(b.charge) + '</td>'
@@ -3261,7 +3327,7 @@ function renderMealPending(ym){
 
 /* 點格子：1 → V → 空白 → 回到自動判定 */
 function cycleMealCell(key, iso){
-  const member = E.meal.byKey(state, key);
+  const member = E.meal.byKey(state, key, E.meal.ym(iso));
   if(!member) return;
   const d = E.meal.day(state, member, iso);
   const cur = d.charge ? (d.mode === 'take' ? 'V' : '1') : '';
@@ -3304,11 +3370,12 @@ function mealPayAll(ym){
 }
 
 function openMealDetail(key){
-  const m = E.meal.byKey(state, key);
+  const ym = mealYm();
+  const m = E.meal.byKey(state, key, ym);
   if(!m) return;
-  const ym = mealYm(), mo = E.meal.month(state, ym), b = E.meal.bill(state, m, ym);
+  const mo = E.meal.month(state, ym), b = E.meal.bill(state, m, ym);
   const body = '<div class="hint" style="margin:0 0 8px">' + m.cls + '-' + esc(m.seat) + '　' + esc(m.name)
-    + '　' + (m.group === '數學班' ? '數學班（每週一）' : '夜自習') + '　便當 ' + esc(m.lunch) + '</div>'
+    + '　' + mealWho(m, true) + '　便當 ' + esc(m.lunch) + '</div>'
     + '<p class="hint">實供 ' + b.served + ' 份、金額 ' + money(b.charge) + ' 元、待退 ' + b.waitN + ' 筆。'
     + '點狀態可以切換 1、V、空白。</p>'
     + '<div class="tools" style="flex-wrap:wrap;gap:6px">'
@@ -3316,8 +3383,9 @@ function openMealDetail(key){
         .map(function(d){
           const x = E.meal.day(state, m, d.iso);
           const mk = E.meal.mark(state, m, d.iso);
-          const cls = x.mode === 'take' ? 'seal' : (x.mode === 'refund' ? '' : '');
-          return '<button class="btn tiny ' + cls + '" data-mealcell="' + m.key + '|' + d.iso + '">'
+          const cls = x.mode === 'take' ? 'seal' : '';
+          return '<button class="btn tiny ' + cls + '" data-mealcell="' + m.key + '|' + d.iso + '"'
+            + ' title="' + mealCellText(x) + '">'
             + (E.parse(d.iso).getMonth()+1) + '/' + d.day + '　' + (mk || '—') + '</button>';
         }).join('')
     + '</div>';
@@ -3646,7 +3714,7 @@ document.addEventListener('click', function(e){
   const takeBtn = t.closest('[data-mealtake]');
   if(takeBtn){
     const p = takeBtn.dataset.mealtake.split('|');
-    const mem = E.meal.byKey(state, p[0]);
+    const mem = E.meal.byKey(state, p[0], E.meal.ym(p[1]));
     if(!mem) return;
     state.meals = (state.meals||[]).filter(function(m){ return !(m.key === p[0] && m.date === p[1]); });
     state.meals.push({ id:newId('m'), date:p[1], key:p[0], kind:'帶走', status:'', paidAt:'', note:'請假帶走' });
@@ -4405,6 +4473,15 @@ async function cleanXlsxParts(buf){
   }catch(err){ return buf; }
 }
 
+/* 刪完欄位後，範本留下的空白欄（連同欄寬）一起收乾淨，看起來才是真的刪掉 */
+function trimEmptyCols(ws){
+  let last = 1;
+  ws.eachRow({ includeEmpty:false }, function(row){
+    row.eachCell({ includeEmpty:false }, function(cell, col){ if(col > last) last = col; });
+  });
+  if(ws.columnCount > last) ws.spliceColumns(last + 1, ws.columnCount - last);
+}
+
 async function exportXlsx(){
   try{
     /* ExcelJS 與 PizZip 第一次用到才下載，開頁時不必先等這兩支大檔 */
@@ -4427,8 +4504,8 @@ async function exportXlsx(){
     const oldSheet = wb.getWorksheet(SHEET);
     if(oldSheet) wb.removeWorksheet(oldSheet.id);
     const wsP = wb.addWorksheet(SHEET, { views:[{state:'frozen',ySplit:2}] });
-    const head = ['序號','班級','座號','姓名','一','二','三','四','五','天數','電話','便當','備註'];
-    [6,8,7,12,6,6,6,6,6,7,15,8,28].forEach(function(w,i){ wsP.getColumn(i+1).width = w; });
+    const head = ['序號','班級','座號','姓名','一','二','三','四','五','天數','電話'];
+    [6,8,7,12,6,6,6,6,6,7,15].forEach(function(w,i){ wsP.getColumn(i+1).width = w; });
     /* 名單用「基準日當天生效」的參加設定，和總表、點名頁同一套算法 */
     const rows = E.active(state).map(function(s){
       return { key:s.key, cls:s.cls, seat:s.seat, name:s.name, days:E.daysAt(state, s.key, iso) };
@@ -4459,12 +4536,12 @@ async function exportXlsx(){
       const row = i+first;
       const days = r.days.reduce(function(a,b){ return a+b; },0);
       const vals = [i+1, r.cls, r.seat, r.name].concat(r.days)
-        .concat([null, s.phone||'', s.lunch||'', s.note||'']);
+        .concat([null, s.phone || '']);
       vals.forEach(function(v,ci){
         const c = wsP.getCell(row, ci+1);
         c.value = v;
         c.font = { name:'標楷體', size:11 };
-        c.alignment = { horizontal:(ci===3||ci===10||ci===12)?'left':'center', vertical:'middle' };
+        c.alignment = { horizontal:(ci===3||ci===10)?'left':'center', vertical:'middle' };
         c.border = borderAll();
         if(banded) c.fill = bandFill;
       });
@@ -4502,6 +4579,8 @@ async function exportXlsx(){
     const dayTotals = [0,0,0,0,0];
     mat.rows.forEach(function(r){ for(let i=0;i<5;i++) dayTotals[i] += r.per[i]; });
     if(wsT){
+      /* 不參加人數、缺交、缺交號碼三欄用不到，直接從範本刪掉（含標題與合計公式） */
+      if(wsT.getCell(1,9).value) wsT.spliceColumns(9, 3);
       mat.rows.forEach(function(r){
         for(let row=2; row<=12; row++){
           if(Number(wsT.getCell(row,1).value)===Number(r.cls)){
@@ -4516,14 +4595,14 @@ async function exportXlsx(){
               ? { formula:'COUNTIFS('+Q+'$B$'+first+':$B$'+last+',$A'+row+','+Q+'$J$'+first+':$J$'+last+',">0")',
                   result:r.joined }
               : r.joined;
-            wsT.getCell(row,9).value = { formula:'B'+row+'-H'+row, result:r.notJoined };
+            /* 參加人數之後的欄位已刪除，不再寫入 */
             break;
           }
         }
       });
 
       /* 合計列：保留範本的 SUM 公式，補上算好的結果，不重算的檢視器也看得到數字 */
-      const totals = [mat.total, dayTotals[0], dayTotals[1], dayTotals[2], dayTotals[3], dayTotals[4], mat.joined, mat.notJoined];
+      const totals = [mat.total, dayTotals[0], dayTotals[1], dayTotals[2], dayTotals[3], dayTotals[4], mat.joined];
       for(let row=2; row<=wsT.rowCount; row++){
         const a = wsT.getCell(row,1).value;
         if(typeof a === 'string' && a.indexOf('總計')===0){
@@ -4539,6 +4618,9 @@ async function exportXlsx(){
       }
     }
 
+    /* 名單只留到電話欄、總表只留到參加人數欄 */
+    trimEmptyCols(wsP);
+    if(wsT) trimEmptyCols(wsT);
     wb.calcProperties = { fullCalcOnLoad:true };
     const raw = await wb.xlsx.writeBuffer();
     const out = await cleanXlsxParts(raw);
@@ -4562,7 +4644,7 @@ const MEAL_FILL = {
 
 function openMealExport(){
   const ym = mealYm();
-  const roster = E.meal.roster(state);
+  const roster = E.meal.roster(state, ym);
   const clsList = [];
   roster.forEach(function(m){ if(m.cls && clsList.indexOf(m.cls) < 0) clsList.push(m.cls); });
   clsList.sort(function(a,b){ return a - b; });
@@ -4606,7 +4688,7 @@ async function exportMealXlsx(ym, classes, withTotal){
     const ExcelJS = window.ExcelJS;
     const st = state, mo = E.meal.month(st, ym);
     const price = E.meal.price(st);
-    const roster = E.meal.roster(st);
+  const roster = E.meal.roster(st, ym);
     const school = String(E.opt(st,'school')||'').trim();
     const term = String(E.opt(st,'term')||'').trim();
     const weeks = mo.weeks.length;
