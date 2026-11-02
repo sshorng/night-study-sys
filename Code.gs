@@ -40,6 +40,8 @@ const SHEET_DEF = {
   mealMembers: { name: '便當名單', cols: ['key', '班級', '座號', '姓名', '便當', '開始日', '備註'] },
   /* 便當調整：整體加收、整體退費、折抵下期都記在這裡 */
   mealAdjusts: { name: '便當調整', cols: ['id', '期別', '對象', '日期', '名單', '金額', '事由', '結算', '建立時間'] },
+  /* 便當繳費：每人每期一筆，有紀錄就是已繳，沒有就是未繳 */
+  mealPays: { name: '便當繳費', cols: ['id', '期別', 'key', '狀態', '繳費日', '備註'] },
   config: { name: '設定', cols: ['項目', '值'] },
 };
 /* ------------------------------------------------------------------ */
@@ -49,7 +51,7 @@ const SHEET_DEF = {
 /* loadAll 的整包回應存在 Apps Script 快取（分片，單鍵上限約 100 KB）。
    每次寫入會把「資料世代」往前推，舊世代的快取不再被引用，因此不會讀到舊資料。 */
 const CACHE_PREFIX = 'ns_data';
-const CACHE_SCHEMA = 'v2';
+const CACHE_SCHEMA = 'v3';
 /* 快取存活 90 秒：老師可能直接在試算表改資料，所以不能放太久；
    程式自己存檔會把「世代」往前推，快取立刻失效，不必等逾時 */
 const CACHE_TTL_SEC = 90;
@@ -62,7 +64,7 @@ const PARTS_TO_SHEET = {
   students: 'students', enrollments: 'enrollments', calendar: 'calendar', leaves: 'leaves',
   violations: 'violations', checkins: 'checkins', seats: 'seats', seatPair: 'seats',
   duty: 'duty', dutyNotes: 'dutyNotes', meals: 'meals', mealMembers: 'mealMembers',
-  mealAdjusts: 'mealAdjusts',
+  mealAdjusts: 'mealAdjusts', mealPays: 'mealPays',
   meta: 'config', opts: 'config', config: 'config', conflicts: 'config',
 };
 
@@ -135,7 +137,7 @@ function doGet(e) {
   return json_({
     ok: true,
     service: '夜自習管理系統後端',
-    version: '1.5.0',
+    version: '1.6.0',
     sheets: Object.keys(SHEET_DEF).map(function (k) { return SHEET_DEF[k].name; }),
     sheet: sheetInfo_(),
     templates: templates,
@@ -357,7 +359,7 @@ function sameRows_(a, b) {
 /* 每張表用哪一欄當主鍵；沒有主鍵的表（設定）就整表比對後重寫 */
 const ROW_KEY_COLS = {
   students: 0, enrollments: 0, calendar: 0, leaves: 0, violations: 0,
-  seats: 0, duty: 0, dutyNotes: 0, meals: 0, mealMembers: 0, mealAdjusts: 0,
+  seats: 0, duty: 0, dutyNotes: 0, meals: 0, mealMembers: 0, mealAdjusts: 0, mealPays: 0,
 };
 
 function rowKeyOf_(key, row) {
@@ -562,6 +564,14 @@ function loadState_() {
     };
   });
 
+  /* 便當繳費：每人每期一筆，有紀錄就是已繳 */
+  const mealPays = readRows_('mealPays').map(function (r) {
+    return {
+      id: String(r[0] || ''), ym: String(r[1] || ''), key: String(r[2] || ''),
+      status: String(r[3] || '已繳'), paidAt: dateStr_(r[4]), note: String(r[5] || ''),
+    };
+  });
+
   return {
     meta: safeJson_(cfg.meta, { school: '', term: '' }),
     opts: opts,
@@ -579,6 +589,7 @@ function loadState_() {
     meals: meals,
     mealMembers: mealMembers,
     mealAdjusts: mealAdjusts,
+    mealPays: mealPays,
     conflicts: safeJson_(cfg.conflicts, []),
   };
 }
@@ -677,6 +688,12 @@ function saveState_(req) {
         a.settle || 'cash', a.createdAt || ''];
     });
     if (writeRows_('mealAdjusts', rows)) wrote.push('mealAdjusts');
+  }
+  if (ready('mealPays', ['mealPays'])) {
+    const rows = (st.mealPays || []).map(function (p) {
+      return [p.id, p.ym || '', p.key || '', p.status || '已繳', p.paidAt || '', p.note || ''];
+    });
+    if (writeRows_('mealPays', rows)) wrote.push('mealPays');
   }
   /* 設定工作表：保留不認識的列（例如 password），只改這次有送來的項目 */
   if (wantSheet('config')) {

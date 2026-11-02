@@ -678,6 +678,41 @@ table.mealgrid tfoot td.sum.wait{color:var(--seal)}
   .meal-notice .row .why{grid-area:why;white-space:normal}
   .meal-notice .row .btns{grid-area:act;flex-direction:column}
 }
+/* ---------- 便當費已繳 ---------- */
+table.mealgrid th.pay,table.mealgrid td.pay{min-width:58px}
+table.mealgrid td.pay{padding:0 3px}
+table.mealgrid td.pay label{display:flex;align-items:center;justify-content:center;gap:4px;
+  min-height:26px;cursor:pointer}
+table.mealgrid td.pay input{width:15px;height:15px;margin:0;accent-color:var(--ok);cursor:pointer}
+table.mealgrid td.pay i{font-style:normal;font-family:var(--mono);font-size:10px;color:var(--ink-3)}
+table.mealgrid td.pay.paid{background:var(--g-done)}
+table.mealgrid td.pay .payna{color:#B4A68B}
+table.mealgrid thead tr:first-child th.pay{border-bottom:0;vertical-align:bottom}
+table.mealgrid thead tr:nth-child(2) th.pay{border-top:0}
+.paybar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 12px}
+.paybar .lbl{font-size:12px;color:var(--ink-3);letter-spacing:.08em}
+.paybar .btn{min-height:34px;font-size:12.5px}
+.paybar .btn.undo{border-color:var(--seal);color:var(--seal);background:var(--seal-soft)}
+.meal-notice.unpaid{border-color:#D8C79C}
+.meal-notice.unpaid .mn-h{background:#F5EDD8}
+.meal-notice.unpaid .mn-h b{color:#6B4E16}
+.meal-notice.unpaid .mn-money{color:#7A5A1E}
+.meal-notice.unpaid .row{grid-template-columns:176px 104px minmax(70px,1fr) auto}
+.meal-notice .row .amount{font-family:var(--mono);font-size:12.5px;text-align:right;white-space:nowrap}
+.card-pay{display:flex;align-items:center;justify-content:space-between;gap:8px;
+  margin-top:6px;padding-top:6px;border-top:1px solid var(--rule-soft);font-size:12.5px}
+.card-pay .chk-inline{min-height:30px;font-size:12.5px}
+.card-pay input{width:16px;height:16px;accent-color:var(--ok)}
+@media (max-width:720px){
+  .paybar{flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px}
+  .paybar .btn{white-space:nowrap}
+  .meal-notice.unpaid .row{grid-template-columns:minmax(0,1fr) auto;
+    grid-template-areas:"who act" "amount act" "why act";row-gap:2px;padding:8px 12px;align-items:start}
+  .meal-notice.unpaid .row .who{grid-area:who}
+  .meal-notice.unpaid .row .amount{grid-area:amount;text-align:left}
+  .meal-notice.unpaid .row .why{grid-area:why;white-space:normal}
+  .meal-notice.unpaid .row .btns{grid-area:act;flex-direction:column}
+}
 @media (max-width:860px){
   #mealGridWrap{display:none}
   #mealCards{display:grid}
@@ -767,6 +802,7 @@ table.mealgrid tfoot td.sum.wait{color:var(--seal)}
     </section>
     <section class="page" id="page-meal">
       <div class="tools" id="mealTools"></div>
+      <div class="paybar" id="mealPayBar"></div>
       <div id="mealNotice"></div>
       <div class="meal-sum" id="mealSum"></div>
       <div class="tablewrap" id="mealGridWrap"><table class="data mealgrid" id="mealGrid"></table></div>
@@ -905,7 +941,7 @@ const LIB = {
    1. CONFIG
    ===================================================================== */
 const CONFIG = {
-  VERSION: '2.31.2',
+  VERSION: '2.32.0',
   GAS_URL: 'https://script.google.com/macros/s/AKfycbxBk3fJaCrPfyojhPVgT6xNE110x3ENSGquQLVWLBz8jdNH2FgX6QMNBQKr1lHLZ8ePtw/exec',
   PASSWORD: '',
   ROLE_KEY: 'nightstudy.role',
@@ -981,7 +1017,7 @@ let state = {
   config:{ refDate:'', totals:{} },
   students:[], enrollments:[], calendar:[], leaves:[], violations:[], checkins:[],
   seats:{}, seatPair:{}, duty:[], conflicts:[],
-  meals:[], mealMembers:[], mealAdjusts:[]
+  meals:[], mealMembers:[], mealAdjusts:[], mealPays:[]
 };
 let dirty = false;
 /* 目前身分：admin（管理員，全功能）或 teacher（輪值教師，受限） */
@@ -1000,7 +1036,7 @@ let ui = { tab:'today', sel:null, vioSel:new Set(), weekRef:'', cls:'all',
 
 /* 存檔時只送有變動的項目：改一位學生不必把整份資料再傳一次 */
 const SYNC_PARTS = ['students','enrollments','calendar','leaves','violations','checkins',
-  'seats','seatPair','duty','dutyNotes','meals','mealMembers','mealAdjusts','meta','opts','config','conflicts'];
+  'seats','seatPair','duty','dutyNotes','meals','mealMembers','mealAdjusts','mealPays','meta','opts','config','conflicts'];
 /* 同一張工作表的項目要一起送，避免只送一半把表寫壞 */
 const SYNC_GROUPS = [['seats','seatPair'], ['meta','opts','config','conflicts']];
 /* 網址加 ?perf=1 時，每次雲端往返的耗時會印在 console，方便量測 */
@@ -1610,6 +1646,24 @@ E.meal = {
       net:pre - paid + extra + adjust + carry, waitN:refundN - refundPaidN,
       charge:served * price + adjust + carry
     };
+  },
+
+  /* 便當費已繳：每人每期最多一筆，沒有紀錄就是未繳 */
+  pay(st, key, ym){
+    return (st.mealPays||[]).find(function(p){ return p.key === key && p.ym === ym; }) || null;
+  },
+  /* 這期還沒繳、而且真的需要繳錢的人；月中加入另標記，不納入整班一鍵 */
+  unpaid(st, ym){
+    const per = E.meal.period(st, ym), out = [];
+    E.meal.roster(st, ym).forEach(function(m){
+      const b = E.meal.bill(st, m, ym);
+      if(b.charge <= 0) return;
+      if(E.meal.pay(st, m.key, ym)) return;
+      const first = m.group === '數學班' ? String(m.from||'') : E.meal.startIso(st, m.key);
+      out.push({ member:m, bill:b, amount:b.charge,
+        midJoin:!!(first && per.from && first > per.from), first:first });
+    });
+    return out;
   },
 
 
@@ -3432,9 +3486,10 @@ function mealCellText(d){
   if(d.mode === 'add') return '加訂（計費）';
   if(d.mode === 'take') return '請假帶走（不退費）';
   if(d.mode === 'refund'){
-    if(d.why === 'drop') return d.paid ? '月中變動，退費已退' : '月中退出或改時間，待退費';
-    if(d.why === 'leave') return d.paid ? '請假，退費已退' : '請假，待退費';
-    return d.paid ? '退費已退' : '退費待退';
+    const at = d.paid && d.rec && d.rec.paidAt ? '（' + perText(d.rec.paidAt) + ' 退）' : '';
+    if(d.why === 'drop') return d.paid ? '月中變動，退費已退' + at : '月中退出或改時間，待退費';
+    if(d.why === 'leave') return d.paid ? '請假，退費已退' + at : '請假，待退費';
+    return d.paid ? '退費已退' + at : '退費待退';
   }
   return '不供餐';
 }
@@ -3470,22 +3525,43 @@ function renderMeal(){
     +   (per.custom ? '（已調整）' : '') + '</button>';
 
   const s = pack.sum;
+  const unpaid = E.meal.unpaid(st, ym);
+  const unpaidMoney = unpaid.reduce(function(n,u){ return n + u.amount; }, 0);
   $('mealSum').innerHTML = ''
     + '<div class="m"><b>' + s.served + '</b><i>供餐份數</i></div>'
     + '<div class="m"><b>' + money(s.pre) + '</b><i>預收金額</i></div>'
     + '<div class="m' + (s.waitN ? ' warn' : '') + '"><b>' + s.waitN + '</b><i>待退筆數</i></div>'
     + '<div class="m' + (s.waitMoney ? ' warn' : '') + '"><b>' + money(s.waitMoney) + '</b><i>未退金額</i></div>'
+    + '<div class="m' + (unpaid.length ? ' warn' : '') + '"><b>' + unpaid.length + '</b><i>未繳人數</i></div>'
+    + '<div class="m' + (unpaidMoney ? ' warn' : '') + '"><b>' + money(unpaidMoney) + '</b><i>未繳金額</i></div>'
     + '<div class="m"><b>' + s.mKids + '</b><i>數學班人數</i></div>'
     + '<div class="m"><b>' + mo.schoolDays + '</b><i>上課日</i></div>'
     + '<div class="m' + ((s.adjust || s.carry) ? ' warn' : '') + '"><b>'
     +   money((s.adjust || 0) + (s.carry || 0)) + '</b><i>調整／折抵</i></div>';
 
+  renderMealPayBar(pack, ym);
   $('mealGridWrap').style.display = view === 'grid' ? '' : 'none';
   $('mealCards').style.display = view === 'grid' ? '' : 'none';
   $('mealBill').style.display = view === 'grid' ? 'none' : '';
   if(view === 'grid'){ renderMealGrid(mo, pack); renderMealCards(pack, mo.ym); }
   else renderMealBill(pack, mo);
   renderMealPending(ym);
+}
+
+/* 整班收費：一鍵把該班這期需要繳費的人標成已繳，五秒內可復原 */
+function renderMealPayBar(pack, ym){
+  const classes = [];
+  pack.rows.forEach(function(b){ if(classes.indexOf(b.cls) < 0) classes.push(b.cls); });
+  classes.sort(function(a,b){ return a-b; });
+  if(!classes.length){ $('mealPayBar').innerHTML = ''; return; }
+  const undo = ui.payUndo && ui.payUndo.ym === ym && Date.now() <= ui.payUndo.until ? ui.payUndo : null;
+  $('mealPayBar').innerHTML = '<span class="lbl">整班收費</span>'
+    + classes.map(function(cls){
+        const on = undo && undo.cls === cls;
+        return '<button class="btn tiny' + (on ? ' undo' : '') + '" data-mealpayclass="' + cls + '"'
+          + ' title="' + (on ? '五秒內再按一次可復原' : '把 ' + cls + ' 班這期應繳的人標成已繳') + '">'
+          + (on ? cls + ' 復原' : cls + ' 全班已繳') + '</button>';
+      }).join('');
 }
 
 function renderMealGrid(mo, pack){
@@ -3497,8 +3573,8 @@ function renderMealGrid(mo, pack){
 
   /* 兩列表頭都用完整格數，不用 rowspan：Chrome 的 sticky 加 rowspan 會讓欄位對不齊 */
   let row1 = '<thead><tr><th class="cls">班級</th><th class="seat">座號</th>'
-    + '<th class="name">姓名</th><th class="grp">身份</th>';
-  let row2 = '<tr><th class="cls"></th><th class="seat"></th><th class="name"></th><th class="grp"></th>';
+    + '<th class="name">姓名</th><th class="grp">身份</th><th class="pay">繳費</th>';
+  let row2 = '<tr><th class="cls"></th><th class="seat"></th><th class="name"></th><th class="grp"></th><th class="pay"></th>';
   mo.weeks.forEach(function(wk){
     wk.slots.forEach(function(sl){
       row1 += sl ? '<th class="' + (sl.holiday ? 'hl' : 'd') + '" title="' + sl.iso + '">'
@@ -3514,7 +3590,7 @@ function renderMealGrid(mo, pack){
 
   let body = '<tbody>';
   if(!has){
-    body += '<tr><td colspan="' + (4 + mo.weeks.length * 6 + 2) + '" class="hint" style="text-align:left;padding:8px">'
+    body += '<tr><td colspan="' + (5 + mo.weeks.length * 6 + 2) + '" class="hint" style="text-align:left;padding:8px">'
       + '這個月還沒有人訂便當。請到「學生清單」把便當欄設成訂，或按「訂餐名單」新增數學班等額外訂餐者。</td></tr>';
   }
   let band = -1, lastCls = null;
@@ -3522,10 +3598,19 @@ function renderMealGrid(mo, pack){
     const b = byKey[m.key];
     if(!b) return;
     if(m.cls !== lastCls){ band++; lastCls = m.cls; }
+    const pay = E.meal.pay(st, m.key, mo.ym);
     body += '<tr' + (band % 2 ? ' class="band"' : '') + '>'
       + '<td class="cls">' + m.cls + '</td><td class="seat">' + esc(m.seat) + '</td>'
       + '<td class="name">' + esc(m.name) + '</td>'
-      + '<td class="grp" title="' + esc(mealWho(m, true)) + '">' + mealWho(m, false) + '</td>';
+      + '<td class="grp" title="' + esc(mealWho(m, true)) + '">' + mealWho(m, false) + '</td>'
+      + '<td class="pay' + (pay ? ' paid' : '') + '" title="'
+      +   (b.charge > 0 ? (pay ? '已繳 ' + pay.paidAt : '未繳，應繳 ' + money(b.charge) + ' 元') : '這期沒有應繳金額') + '">'
+      + (b.charge > 0
+          ? '<label><input type="checkbox" data-mealpay="' + m.key + '|' + mo.ym + '"'
+            + (pay ? ' checked' : '') + ' aria-label="' + esc(m.name) + ' 便當費已繳">'
+            + (pay ? '<i>' + perText(pay.paidAt) + '</i>' : '') + '</label>'
+          : '<span class="payna">—</span>')
+      + '</td>';
     mo.weeks.forEach(function(wk){
       let weekServed = 0;
       wk.slots.forEach(function(sl){
@@ -3549,7 +3634,7 @@ function renderMealGrid(mo, pack){
   });
   body += '</tbody>';
   /* 最後一列：每天的數量合計，跟表頭一樣固定 */
-  let foot = '<tfoot><tr><th colspan="4" style="text-align:left;padding:0 8px">每日合計</th>';
+  let foot = '<tfoot><tr><th colspan="5" style="text-align:left;padding:0 8px">每日合計</th>';
   mo.weeks.forEach(function(wk){
     let weekSum = 0;
     wk.slots.forEach(function(sl){
@@ -3575,12 +3660,23 @@ function renderMealCards(pack, ym){
   const rows = E.meal.roster(state, ym).filter(function(m){ return byKey[m.key]; });
   $('mealCards').innerHTML = rows.length ? rows.map(function(m){
     const b = byKey[m.key];
+    const pay = E.meal.pay(state, m.key, ym);
     return '<div class="card">'
       + '<div class="card-h"><span class="card-who">' + m.cls + '-' + esc(m.seat) + '　' + esc(m.name) + '</span></div>'
       + '<div class="card-reason">' + mealWho(m, true) + '</div>'
       + '<div class="card-nums"><span>實供 <b>' + b.served + '</b></span>'
       +   '<span>退費 <b>' + b.refundN + '</b></span>'
       +   '<span>金額 <b>' + money(b.charge) + '</b></span></div>'
+      + '<div class="card-pay">'
+      +   (b.charge > 0
+          ? (pay ? '<span>便當費已繳 <b>' + perText(pay.paidAt) + '</b></span>'
+                 : '<span style="color:var(--seal)">便當費未繳 ' + money(b.charge) + ' 元</span>')
+          : '<span>這期沒有應繳金額</span>')
+      +   (b.charge > 0
+          ? '<label class="chk-inline"><input type="checkbox" data-mealpay="' + m.key + '|' + ym + '"'
+            + (pay ? ' checked' : '') + '> 已繳</label>'
+          : '')
+      + '</div>'
       + '<div class="card-foot">'
       +   (b.waitN ? '<span style="color:var(--seal)">待退 ' + b.waitN + ' 筆</span>' : '<span>沒有待退</span>')
       +   '<span class="card-btns"><button class="btn tiny" data-mealdetail="' + m.key + '">逐日明細</button></span>'
@@ -3588,15 +3684,23 @@ function renderMealCards(pack, ym){
   }).join('') : '<p class="hint">這個月還沒有人訂便當</p>';
 }
 
-function renderMealBill(pack){
+function renderMealBill(pack, mo){
+  const ym = mo.ym;
   $('mealBill').innerHTML = '<div class="tablewrap"><table class="data">'
-    + '<thead><tr><th>班級</th><th>座號</th><th>姓名</th><th>身份</th>'
+    + '<thead><tr><th>班級</th><th>座號</th><th>姓名</th><th>身份</th><th>繳費</th>'
     + '<th>排定</th><th>退費</th><th>帶走</th><th>實供</th>'
     + '<th>預收</th><th>應退</th><th>已退</th><th>調整</th><th>折抵</th>'
     + '<th>實收</th><th>待退</th></tr></thead><tbody>'
     + (pack.rows.length ? pack.rows.filter(function(b){ return b.planned || b.add; }).map(function(b){
+        const pay = E.meal.pay(state, b.key, ym);
         return '<tr><td>' + b.cls + '</td><td>' + esc(b.seat) + '</td><td>' + esc(b.name) + '</td>'
           + '<td>' + mealWho({ group:b.group, active:b.active }, false) + '</td>'
+          + '<td>' + (b.charge > 0
+            ? '<label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer">'
+              + '<input type="checkbox" data-mealpay="' + b.key + '|' + ym + '"'
+              + (pay ? ' checked' : '') + ' style="width:15px;height:15px;margin:0;accent-color:var(--ok)">'
+              + (pay ? perText(pay.paidAt) : '未繳') + '</label>'
+            : '—') + '</td>'
           + '<td>' + b.planned + '</td><td>' + b.refundN + '</td><td>' + b.take + '</td><td>' + b.served + '</td>'
           + '<td>' + money(b.pre) + '</td><td>' + money(b.dueRefund) + '</td>'
           + '<td>' + money(b.paid) + '</td>'
@@ -3604,8 +3708,8 @@ function renderMealBill(pack){
           + '<td>' + (b.carry ? money(b.carry) : '—') + '</td>'
           + '<td>' + money(b.charge) + '</td>'
           + '<td>' + (b.waitN ? '<b style="color:var(--seal)">' + b.waitN + '</b>' : '—') + '</td></tr>';
-      }).join('') : '<tr><td colspan="15" class="hint">這個月沒有訂便當的紀錄</td></tr>')
-    + '</tbody><tfoot><tr><th colspan="4">全月合計</th>'
+      }).join('') : '<tr><td colspan="16" class="hint">這個月沒有訂便當的紀錄</td></tr>')
+    + '</tbody><tfoot><tr><th colspan="5">全月合計</th>'
     + '<th>' + pack.sum.served + '</th><th>' + pack.sum.waitN + '</th><th>—</th><th>' + pack.sum.served + '</th>'
     + '<th>' + money(pack.sum.pre) + '</th><th>' + money(pack.sum.dueRefund) + '</th>'
     + '<th>' + money(pack.sum.paid) + '</th>'
@@ -3637,9 +3741,11 @@ function mealAdjustsHtml(ym){
 }
 
 function renderMealPending(ym){
+  const unpaid = E.meal.unpaid(state, ym);
   const list = E.meal.pending(state, ym);
   const price = E.meal.price(state);
-  /* 預設收合；開合狀態存在這台裝置，下次進來照上次的樣子 */
+  /* 未繳預設展開；退費預設收合。開合狀態都存在這台裝置，下次進來照上次的樣子 */
+  const uopen = ui.mealUnpaidOpen !== false;
   const open = ui.mealNoticeOpen === true;
   /* 勾選狀態放 ui，重畫或點帶走都不會掉；已經不在清單裡的勾選自動清掉 */
   ui.pendPick = ui.pendPick || {};
@@ -3647,9 +3753,42 @@ function renderMealPending(ym){
   list.forEach(function(p){ alive[p.member.key + '|' + p.iso] = 1; });
   Object.keys(ui.pendPick).forEach(function(k){ if(!alive[k]) delete ui.pendPick[k]; });
   const picked = Object.keys(ui.pendPick).length;
-  /* 待處理退費放在統計表上方，做成可以收合的通知框，方便隨時追 */
-  $('mealNotice').innerHTML = list.length
-    ? '<div class="meal-notice">'
+
+  let html = '';
+  /* 未繳便當費：只列例外，放在最上面 */
+  if(unpaid.length){
+    html += '<div class="meal-notice unpaid">'
+      + '<div class="mn-h">'
+      +   '<b>未繳便當費 ' + unpaid.length + ' 人</b>'
+      +   '<span class="mn-money">共 ' + money(unpaid.reduce(function(n,u){ return n + u.amount; }, 0)) + ' 元</span>'
+      +   '<span class="spacer"></span>'
+      +   '<button class="btn tiny" data-mealunpaidtoggle="toggle">' + (uopen ? '收起' : '展開') + '</button>'
+      + '</div>'
+      + (uopen
+          ? '<div class="mn-b">'
+            + '<div class="row mn-head"><span>學生</span><span style="text-align:right">應繳</span>'
+            +   '<span>身份</span><span style="text-align:right">處理</span></div>'
+            + unpaid.map(function(u){
+              const m = u.member;
+              const why = u.midJoin
+                ? '月中加入' + (u.first ? ' ' + perText(u.first) : '')
+                : mealWho(m, false);
+              return '<div class="row">'
+                + '<span class="who"><i>' + m.cls + '-' + esc(m.seat) + '</i>' + esc(m.name) + '</span>'
+                + '<span class="amount">' + money(u.amount) + ' 元</span>'
+                + '<span class="why" title="' + esc(why) + '">' + esc(why) + '</span>'
+                + '<span class="btns">'
+                +   '<button class="btn tiny seal" data-mealunpaid="' + m.key + '|' + ym + '">已繳</button>'
+                + '</span></div>';
+            }).join('')
+            + '</div>'
+          : '')
+      + '</div>';
+  }
+
+  /* 待處理退費：排在未繳下面 */
+  if(list.length){
+    html += '<div class="meal-notice">'
       + '<div class="mn-h">'
       +   '<b>待處理退費 ' + list.length + ' 筆</b>'
       +   '<span class="mn-money">共 ' + money(list.length * price) + ' 元</span>'
@@ -3684,8 +3823,10 @@ function renderMealPending(ym){
             }).join('')
             + '</div>'
           : '')
-      + '</div>'
-    : '';
+      + '</div>';
+  }
+
+  $('mealNotice').innerHTML = html;
   $('mealPending').innerHTML = mealAdjustsHtml(ym);
 }
 
@@ -3718,6 +3859,50 @@ function mealSetPaid(key, iso, paid){
   r.status = paid ? '已退' : '待退';
   r.paidAt = paid ? E.today() : '';
   return true;
+}
+
+/* 便當費已繳：勾了就記今天，取消就整筆移除；同一人同一期只留一筆 */
+function mealSetPay(key, ym, paid){
+  state.mealPays = (state.mealPays||[]).filter(function(p){ return !(p.key === key && p.ym === ym); });
+  if(paid){
+    state.mealPays.push({ id:newId('p'), ym:ym, key:key, status:'已繳', paidAt:E.today(), note:'' });
+  }
+}
+
+/* 整班一鍵：只勾這期真的需要繳、不是月中加入、還沒繳的人 */
+function mealPayClass(cls, ym){
+  const list = E.meal.unpaid(state, ym).filter(function(u){
+    return u.member.cls === Number(cls) && !u.midJoin;
+  });
+  if(!list.length){
+    toast('這一班沒有需要標記的人，月中加入的請個別勾');
+    return;
+  }
+  state.mealPays = state.mealPays || [];
+  const ids = [];
+  list.forEach(function(u){
+    const rec = { id:newId('p'), ym:ym, key:u.member.key, status:'已繳', paidAt:E.today(), note:'' };
+    state.mealPays.push(rec);
+    ids.push(rec.id);
+  });
+  ui.payUndo = { cls:Number(cls), ym:ym, ids:ids, until:Date.now() + 5000 };
+  commit();
+  toast('已標記 ' + cls + ' 班 ' + ids.length + ' 人已繳，五秒內再按一次可復原', 5000);
+  setTimeout(function(){
+    if(ui.payUndo && Date.now() >= ui.payUndo.until){
+      ui.payUndo = null;
+      if(ui.tab === 'meal') renderMeal();
+    }
+  }, 5100);
+}
+
+function mealPayUndo(){
+  const u = ui.payUndo;
+  if(!u || Date.now() > u.until) return;
+  state.mealPays = (state.mealPays||[]).filter(function(p){ return u.ids.indexOf(p.id) < 0; });
+  ui.payUndo = null;
+  commit();
+  toast('已復原 ' + u.cls + ' 班的標記');
 }
 
 function mealPayAll(ym){
@@ -3772,10 +3957,25 @@ function openMealDetail(key){
   const m = E.meal.byKey(state, key, ym);
   if(!m) return;
   const mo = E.meal.month(state, ym), b = E.meal.bill(state, m, ym);
+  const pay = E.meal.pay(state, m.key, ym);
+  const refunds = mo.days.map(function(d){
+    return { d:d, x:E.meal.day(state, m, d.iso) };
+  }).filter(function(o){ return o.x.mode === 'refund' && o.x.paid; });
+  const payText = b.charge > 0
+    ? (pay ? '已繳 ' + perText(pay.paidAt) : '未繳，應繳 ' + money(b.charge) + ' 元')
+    : '這期沒有應繳金額';
+  const refundText = refunds.length
+    ? '退費已退：' + refunds.map(function(o){
+        const at = o.x.rec && o.x.rec.paidAt ? perText(o.x.rec.paidAt) : '日期未記';
+        return perText(o.d.iso) + '（' + at + ' 退）';
+      }).join('、')
+    : '';
   const body = '<div class="hint" style="margin:0 0 8px">' + m.cls + '-' + esc(m.seat) + '　' + esc(m.name)
     + '　' + mealWho(m, true) + '</div>'
     + '<p class="hint">實供 ' + b.served + ' 份、金額 ' + money(b.charge) + ' 元、待退 ' + b.waitN + ' 筆。'
-    + '點狀態可以切換 1、V、空白。</p>'
+    + '便當費：' + payText + '。</p>'
+    + (refundText ? '<p class="hint">' + refundText + '</p>' : '')
+    + '<p class="hint">點狀態可以切換 1、V、空白。</p>'
     + '<div class="tools" style="flex-wrap:wrap;gap:6px">'
     + mo.days.filter(function(d){ return !d.holiday && E.meal.planned(state, m, d.iso); })
         .map(function(d){
@@ -4234,6 +4434,14 @@ document.addEventListener('change', e=>{
     if(v){ v.paper = e.target.checked; commit(); toast(e.target.checked ? '已標記紙本繳回' : '已取消紙本繳回'); }
     return;
   }
+  const mealPay = e.target.dataset ? e.target.dataset.mealpay : '';
+  if(mealPay){
+    const p = mealPay.split('|');
+    mealSetPay(p[0], p[1], e.target.checked);
+    commit();
+    toast(e.target.checked ? '已標記便當費已繳（' + perText(E.today()) + '）' : '已取消便當費已繳');
+    return;
+  }
   if(e.target.id==='vioAll'){
     document.querySelectorAll('[data-vio]').forEach(c=>{
       c.checked = e.target.checked;
@@ -4284,6 +4492,31 @@ document.addEventListener('click', function(e){
   }
   if(t.id === 'btnMealPayAll'){ mealPayAll(mealYm()); return; }
   if(t.id === 'btnMealPayPick'){ mealPayPick(mealYm()); return; }
+  const pcls = t.closest('[data-mealpayclass]');
+  if(pcls){
+    const cls = Number(pcls.dataset.mealpayclass);
+    if(ui.payUndo && ui.payUndo.cls === cls && ui.payUndo.ym === mealYm() && Date.now() <= ui.payUndo.until){
+      mealPayUndo();
+    } else {
+      mealPayClass(cls, mealYm());
+    }
+    return;
+  }
+  const untg = t.closest('[data-mealunpaidtoggle]');
+  if(untg){
+    ui.mealUnpaidOpen = !(ui.mealUnpaidOpen !== false);
+    try{ localStorage.setItem('nightstudy.mealunpaid', ui.mealUnpaidOpen ? '1' : '0'); }catch(err){}
+    renderMealPending(mealYm());
+    return;
+  }
+  const upay = t.closest('[data-mealunpaid]');
+  if(upay){
+    const p = upay.dataset.mealunpaid.split('|');
+    mealSetPay(p[0], p[1], true);
+    commit();
+    toast('已標記便當費已繳（' + perText(E.today()) + '）');
+    return;
+  }
   const ntg = t.closest('[data-mealnotice]');
   if(ntg){
     ui.mealNoticeOpen = !(ui.mealNoticeOpen === true);
@@ -4320,7 +4553,7 @@ document.addEventListener('click', function(e){
   const paidBtn = t.closest('[data-mealpaid]');
   if(paidBtn){
     const p = paidBtn.dataset.mealpaid.split('|');
-    if(mealSetPaid(p[0], p[1], true)){ commit(); toast('已標記退費 ' + E.meal.price(state) + ' 元'); }
+    if(mealSetPaid(p[0], p[1], true)){ commit(); toast('已標記退費 ' + E.meal.price(state) + ' 元（' + perText(E.today()) + '）'); }
     else toast('這一天是帶走或加訂，不需要退費');
     return;
   }
@@ -5810,12 +6043,17 @@ function normalize(){
   /* 待處理退費通知框的開合狀態：記在這台裝置，下次開頁照上次的樣子 */
   try{ ui.mealNoticeOpen = localStorage.getItem('nightstudy.mealnotice') === '1'; }
   catch(err){ ui.mealNoticeOpen = false; }
+  /* 未繳便當費通知框：第一次預設展開，之後照上次的樣子 */
+  try{
+    const uv = localStorage.getItem('nightstudy.mealunpaid');
+    ui.mealUnpaidOpen = uv === null ? true : uv === '1';
+  }catch(err){ ui.mealUnpaidOpen = true; }
   state.meta.school = state.opts.school || '';
   state.meta.term = state.opts.term || '';
   state.config = state.config || {};
   if(!state.config.refDate) state.config.refDate = E.today();
   state.config.totals = state.config.totals || {};
-  ['enrollments','calendar','leaves','violations','checkins','duty','dutyNotes','meals','mealMembers','mealAdjusts','conflicts'].forEach(function(k){ state[k]=state[k]||[]; });
+  ['enrollments','calendar','leaves','violations','checkins','duty','dutyNotes','meals','mealMembers','mealAdjusts','mealPays','conflicts'].forEach(function(k){ state[k]=state[k]||[]; });
   /* 便當選項改成只分訂、不訂：舊設定裡的葷、素自動換掉 */
   if(/葷|素/.test(String(state.opts.lunchOptions||''))) state.opts.lunchOptions = '訂、不訂';
   state.seats = state.seats || {};
@@ -5859,7 +6097,8 @@ function emptyState(){
     opts:{},
     config:{ refDate:E.today(), totals:{} },
     students:[], enrollments:[], calendar:[], leaves:[], violations:[],
-    checkins:[], seats:{}, seatPair:{}, duty:[], dutyNotes:[], conflicts:[]
+    checkins:[], seats:{}, seatPair:{}, duty:[], dutyNotes:[], conflicts:[],
+    meals:[], mealMembers:[], mealAdjusts:[], mealPays:[]
   };
 }
 /* 從雲端讀名冊的唯一入口：開頁、「重新載入」、失敗後自動重試都走這裡 */
