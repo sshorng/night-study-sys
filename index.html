@@ -234,6 +234,7 @@ input[type=checkbox]{accent-color:var(--seal)}
 .dv-wd{font-family:var(--serif);font-size:15px;letter-spacing:.14em;color:var(--ink)}
 .dv-dt{font-family:var(--mono);font-size:12px;color:var(--ink-3)}
 .dv-teach{font-family:var(--serif);font-size:17px;letter-spacing:.06em}
+.dv-teach[data-dutyedit]{cursor:pointer;border-bottom:1px dashed currentColor}
 .dv-nums{display:flex;flex-wrap:wrap;gap:2px 12px;font-size:12px;color:var(--ink-2)}
 .dv-nums b{font-family:var(--mono);font-size:13px;color:var(--ink)}
 .dv-act{margin-left:auto;display:flex;gap:8px}
@@ -941,7 +942,7 @@ const LIB = {
    1. CONFIG
    ===================================================================== */
 const CONFIG = {
-  VERSION: '2.32.0',
+  VERSION: '2.34.0',
   GAS_URL: 'https://script.google.com/macros/s/AKfycbxBk3fJaCrPfyojhPVgT6xNE110x3ENSGquQLVWLBz8jdNH2FgX6QMNBQKr1lHLZ8ePtw/exec',
   PASSWORD: '',
   ROLE_KEY: 'nightstudy.role',
@@ -958,7 +959,7 @@ const CONFIG = {
   WEEKDAY: ['日','一','二','三','四','五','六'],
   SEAT_GROUPS: ['一A','一C','二A','二C','三A','三C','四A','四C','五A','五C','六A','六C','七A','七C'],
   STORE_KEY: 'nightstudy.state.v2',
-  TPL_NAMES: { seat:'座位表-範本.docx', violation:'違規單-範本.docx', roster:'名單範本.xlsx' },
+  TPL_NAMES: { seat:'座位表-範本.docx', violation:'違規單-範本.docx', roster:'名單範本.xlsx', duty:'輪值表範本.xlsx' },
   SEAT_SLOTS: [{"i":1,"band":1,"col":1,"row":0,"span":1},{"i":2,"band":1,"col":1,"row":1,"span":1},{"i":3,"band":1,"col":2,"row":0,"span":2},{"i":4,"band":1,"col":3,"row":0,"span":2},{"i":5,"band":1,"col":4,"row":0,"span":1},{"i":6,"band":1,"col":4,"row":1,"span":1},{"i":7,"band":1,"col":5,"row":0,"span":2},{"i":8,"band":1,"col":6,"row":0,"span":2},{"i":9,"band":1,"col":7,"row":0,"span":1},{"i":10,"band":1,"col":7,"row":1,"span":1},{"i":11,"band":1,"col":8,"row":0,"span":2},{"i":12,"band":1,"col":9,"row":0,"span":2},{"i":13,"band":1,"col":10,"row":0,"span":2},{"i":14,"band":1,"col":11,"row":0,"span":1},{"i":15,"band":1,"col":11,"row":1,"span":1},{"i":16,"band":1,"col":12,"row":0,"span":2},{"i":17,"band":1,"col":13,"row":0,"span":2},{"i":18,"band":1,"col":14,"row":0,"span":2},{"i":19,"band":2,"col":1,"row":0,"span":2},{"i":20,"band":2,"col":2,"row":0,"span":2},{"i":21,"band":2,"col":3,"row":0,"span":1},{"i":22,"band":2,"col":3,"row":1,"span":1},{"i":23,"band":2,"col":4,"row":0,"span":2},{"i":24,"band":2,"col":5,"row":0,"span":2},{"i":25,"band":2,"col":6,"row":0,"span":2},{"i":26,"band":2,"col":7,"row":0,"span":2},{"i":27,"band":2,"col":8,"row":0,"span":1},{"i":28,"band":2,"col":8,"row":1,"span":1},{"i":29,"band":2,"col":9,"row":0,"span":2},{"i":30,"band":2,"col":10,"row":0,"span":2},{"i":31,"band":2,"col":11,"row":0,"span":2},{"i":32,"band":2,"col":12,"row":0,"span":2},{"i":33,"band":2,"col":13,"row":0,"span":2},{"i":34,"band":2,"col":14,"row":0,"span":2},{"i":35,"band":3,"col":1,"row":0,"span":2},{"i":36,"band":3,"col":2,"row":0,"span":2},{"i":37,"band":3,"col":3,"row":0,"span":2},{"i":38,"band":3,"col":4,"row":0,"span":1},{"i":39,"band":3,"col":4,"row":1,"span":1},{"i":40,"band":3,"col":5,"row":0,"span":2},{"i":41,"band":3,"col":6,"row":0,"span":2},{"i":42,"band":3,"col":7,"row":0,"span":1},{"i":43,"band":3,"col":7,"row":1,"span":1},{"i":44,"band":3,"col":8,"row":0,"span":2},{"i":45,"band":3,"col":9,"row":0,"span":2},{"i":46,"band":3,"col":10,"row":0,"span":1},{"i":47,"band":3,"col":10,"row":1,"span":1},{"i":48,"band":3,"col":11,"row":0,"span":2},{"i":49,"band":3,"col":12,"row":0,"span":2},{"i":50,"band":3,"col":13,"row":0,"span":2},{"i":51,"band":3,"col":14,"row":0,"span":2}]
 };
 const TPL = { seat:null, violation:null, roster:null };
@@ -1002,7 +1003,11 @@ const OPTS = [
   { key:'nsStart',      label:'夜自習起日',       def:'',      type:'date',
     hint:'便當只算這一天之後；留空表示不限' },
   { key:'nsEnd',        label:'夜自習訖日',       def:'',      type:'date',
-    hint:'便當只算到這一天；留空表示不限' }
+    hint:'便當只算到這一天；留空表示不限' },
+  { key:'dutyTimeStart', label:'輪值開始時間',    def:'17:40', type:'text',
+    hint:'例：17:40；用在輪值表工作表名與說明文字' },
+  { key:'dutyTimeEnd',   label:'輪值結束時間',    def:'21:00', type:'text',
+    hint:'例：21:00；用在輪值表工作表名與說明文字' }
 ];
 
 /* 這三個參數是「常用清單」，設定頁會即時預覽會切成幾個按鈕 */
@@ -1932,7 +1937,7 @@ const API = {
   },
   /* 開頁後在背景先把三個範本讀進記憶體，第一次匯出就不用等 */
   async warmTemplates(){
-    for(const n of ['seat','violation','roster']){
+    for(const n of ['seat','violation','roster','duty']){
       if(TPL[n]) continue;
       try{
         const res = await fetch('templates/'+encodeURIComponent(CONFIG.TPL_NAMES[n]), { cache:'no-store' });
@@ -3379,7 +3384,7 @@ function dayCard(r){
     +   '<span class="dv-wd">星期'+r.wd+'</span>'
     +   '<span class="dv-dt">'+r.date+'</span>'
     +   (isToday ? '<span class="pill seal">今天</span>' : '')
-    +   '<span class="dv-teach">'+(off ? (r.label||'不上課') : (r.teacher||'未排'))+'</span>'
+    +   '<span class="dv-teach"'+(isTeacher()||off ? '' : ' data-dutyedit="'+r.date+'" title="修改輪值（可手打或選人）"')+'>'+(!off && r.teacher ? esc(r.teacher) : (!off && r.label ? esc(r.label) : (off ? (r.label||'不上課') : '未排')))+'</span>'
     +   '<div class="dv-nums">'+nums+'</div>'
     +   '<div class="dv-act">'
     +   (isToday || isTeacher() ? '' : '<button class="btn small" data-editday="'+r.date+'">'+(editing ? '完成' : '編輯這天')+'</button>')
@@ -3392,6 +3397,122 @@ function dayCard(r){
     +   (editing ? '<div><button class="btn small" data-addnote="'+r.date+'">新增一筆記事</button></div>' : '')
     + '</div></div>';
 }
+/* ---------- 輪值人員修改（admin）與學期行事曆／放假日 ---------- */
+function dutyTeachers(){
+  const set = new Set();
+  (state.duty||[]).forEach(function(d){
+    const t = String(d.teacher||'').trim();
+    if(t) set.add(t);
+  });
+  return [...set];
+}
+function openDutyEdit(date){
+  const cur = (state.duty||[]).find(function(d){ return d.date===date; }) || {};
+  const all = dutyTeachers();
+  const opts = ['<option value="">（未排）</option>'
+    + all.map(function(t){
+        return '<option value="'+esc(t)+'"'+(t===cur.teacher?' selected':'')+'>'+esc(t)+'</option>';
+      }).join('')].join('');
+  const body = '<div class="hint"><b>'+date+'</b>（'+CONFIG.WEEKDAY[E.wd(date)]+'）　目前：'
+    + esc(cur.teacher || E.calLabel(state, date) || '未排') + '</div>'
+    + '<div class="field"><label>從既有輪值人員挑</label><select id="dePick">'+opts+'</select></div>'
+    + '<div class="field"><label>或手打姓名</label><input id="deName" value="'+esc(cur.teacher||'')+'" placeholder="直接輸入可以加新人"></div>'
+    + '<div class="tools"><button type="button" class="btn small" id="deHoliday">這天放假（清掉輪值並寫入行事曆）</button></div>';
+  const m = modal('修改輪值人員', body,
+    '<button class="btn" data-close>取消</button><button class="btn primary" id="deSave">儲存</button>');
+  const sync = function(v){ m.querySelector('#deName').value = v; };
+  m.querySelector('#dePick').addEventListener('change', function(){ sync(this.value); });
+  m.querySelector('#deHoliday').addEventListener('click', function(){
+    sync('');
+    calSet(date, '放假', E.calLabel(state, date));
+    /* 放假那天不能留輪值紀錄，不然匯出時人名會蓋過放假標籤 */
+    state.duty = (state.duty||[]).filter(function(d){ return d.date!==date; });
+    closeModal(); commit();
+    toast('已把 '+date+' 設為放假，輪值清空', 3200);
+  });
+  m.querySelector('[data-close]').addEventListener('click', closeModal);
+  m.querySelector('#deSave').addEventListener('click', function(){
+    const name = m.querySelector('#deName').value.trim();
+    const before = cur.teacher || '';
+    let rec = (state.duty||[]).find(function(d){ return d.date===date; });
+    if(!rec) rec = { date:date, teacher:'', note:'' };
+    rec.teacher = name;
+    /* 原本放假被改成有人：把當天的放假注記拿掉，避免一邊放假一邊排人 */
+    if(name && before==='' ){
+      const c = (state.calendar||[]).find(function(x){ return x.date===date; });
+      if(c && (c.status==='放假')) c.status='上課';
+    }
+    state.duty = (state.duty||[]).filter(function(d){ return d.date!==date; });
+    if(name) state.duty.push({ date:date, teacher:name, note:(cur.note||'') });
+    state.duty.sort(function(a,b){ return a.date<b.date?-1:1; });
+    closeModal(); commit();
+    toast('已把 '+date+' 的輪值改為「'+(name||'未排')+'」，寫入異動', 3200);
+  });
+}
+/* 行事曆單筆寫入：有就更新，沒有就加 */
+function calSet(date, status, label){
+  let c = (state.calendar||[]).find(function(x){ return x.date===date; });
+  if(!c){ c = { date:date, status:'上課', label:'' }; state.calendar.push(c); }
+  c.status = status; c.label = label || '';
+}
+function openCalendarEdit(){
+  const list = (state.calendar||[])
+    .filter(function(c){ return c.status!=='上課' || (c.label||'').trim(); })
+    .sort(function(a,b){ return a.date<b.date?-1:1; });
+  const STATUSES = ['上課','放假','段考','活動'];
+  const rowHtml = function(c, i){
+    return '<div class="calrow" data-cali="'+i+'">'
+      + '<input type="date" data-cdate value="'+esc((c&&c.date)||ref())+'">'
+      + '<select data-cst>'+STATUSES.map(function(s){
+          return '<option'+(s===(c&&c.status||'放假')?' selected':'')+'>'+s+'</option>';
+        }).join('')+'</select>'
+      + '<input data-clabel value="'+esc((c&&c.label)||'')+'" placeholder="原因／說明，例如：中秋放假">'
+      + '<button type="button" class="btn tiny" data-caldel>刪</button>'
+      + '</div>';
+  };
+  const body = '<p class="hint">放假與活動的日子會在輪值表上以橘／綠呈現，段考為青色；上課以外的日子不計輪值與應到。</p>'
+    + '<div id="calRows">'
+    + (list.length ? list.map(rowHtml).join('') : '<div class="hint">目前沒有任何放假或行程</div>')
+    + '</div>'
+    + '<p><button type="button" class="btn small" id="calAdd">＋ 新增一筆</button></p>';
+  const m = modal('放假日／行程設定', body,
+    '<button class="btn" data-close>取消</button><button class="btn primary" id="calSave">儲存行事曆</button>');
+  m.querySelector('#calAdd').addEventListener('click', function(){
+    const newRow = '<div class="calrow" data-cali="new">'
+      + '<input type="date" data-cdate value="'+ref()+'">'
+      + '<select data-cst>'+'<option selected>放假</option>'+STATUSES.filter(s=>s!=='放假').map(s=>'<option>'+s+'</option>').join('')+'</select>'
+      + '<input data-clabel value="" placeholder="原因／說明">'
+      + '<button type="button" class="btn tiny" data-caldel>刪</button>'
+      + '</div>';
+    m.querySelector('#calRows').insertAdjacentHTML('beforeend', newRow);
+  });
+  m.querySelector('#calRows').addEventListener('click', function(ev){
+    if(ev.target.dataset.caldel !== undefined || ev.target.closest('[data-caldel]')){
+      ev.target.closest('.calrow').remove();
+    }
+  });
+  m.querySelector('[data-close]').addEventListener('click', closeModal);
+  m.querySelector('#calSave').addEventListener('click', function(){
+    const rows = [...m.querySelectorAll('.calrow')].map(function(row){
+      return { date:row.querySelector('[data-cdate]').value,
+               status:row.querySelector('[data-cst]').value,
+               label:row.querySelector('[data-clabel]').value.trim() };
+    }).filter(function(r){ return r.date; });
+    /* 彈窗裡被刪列或改日期的舊注記直接消失；沒寫注記的純上課紀錄一律保留 */
+    state.calendar = state.calendar.filter(function(c){
+      if(c.status==='上課' && !(c.label||'').trim()) return true;  /* 沒注記的上課紀錄自動保留 */
+      return false;
+    });
+    rows.forEach(function(r){
+      let c = (state.calendar||[]).find(function(x){ return x.date===r.date; });
+      if(!c){ c = { date:r.date, status:'上課', label:'' }; state.calendar.push(c); }
+      c.status = r.status; c.label = r.label;
+    });
+    closeModal(); commit();
+    toast('行事曆已更新（共 '+rows.length+' 筆注記）', 3200);
+  });
+}
+
 function renderDuty(){
   const iso = ui.weekRef || ref();
   applyNoteDraftOnce();
@@ -3402,8 +3523,11 @@ function renderDuty(){
   $('dutyTools').innerHTML = '<button class="btn" id="weekPrev">上一週</button>'
     + '<button class="btn" id="weekNow">本週</button>'
     + '<button class="btn" id="weekNext">下一週</button>'
+    + (isTeacher() ? '' :
+        '<button class="btn" id="btnDutyCal">行程／放假日</button>'
+      + '<button class="btn seal" id="btnDutyXlsx">匯出輪值表 Excel</button>')
     + '<span class="hint">'+mon.date+' 至 '+sun.date+'　本週記事 '+total+' 筆；今天固定排在最上面可直接編輯，'
-    + '其他日子按「編輯這天」才能改；輸入 90 開頭加座號會帶出學生。</span>';
+    + '其他日子按「編輯這天」才能改；輸入 90 開頭加座號會帶出學生'+(isTeacher() ? '' : '；點輪值名字可改人')+'。</span>';
   const order = rows.slice().sort(function(a, b){
     if(a.date === today && b.date !== today) return -1;
     if(b.date === today && a.date !== today) return 1;
@@ -4335,6 +4459,11 @@ document.addEventListener('click', e=>{
   }
   if(e.target.id==='btnAllIn'){ allIn(); return; }
   if(e.target.id==='btnAllClear'){ clearCheckin(); return; }
+  /* 輪值改人／行程／匯出要在 [data-day] 之前攔，不然會被子卡的 data-day 吃掉 */
+  const dedit = e.target.closest('[data-dutyedit]');
+  if(dedit){ openDutyEdit(dedit.dataset.dutyedit); return; }
+  if(e.target.id==='btnDutyCal'){ openCalendarEdit(); return; }
+  if(e.target.id==='btnDutyXlsx'){ exportDutyXlsx(); return; }
   const mk = e.target.closest('[data-day]');
   if(mk){ openEnroll(mk.dataset.key, Number(mk.dataset.day)); return; }
   const ck = e.target.closest('[data-ck]');
@@ -5559,6 +5688,151 @@ async function exportXlsx(){
     download(new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}), (E.opt(state,'exportPrefix')||'夜自習')+'_名單_'+stamp()+'.xlsx');
     toast('已下載 Excel');
   }catch(err){ toast('匯出失敗：'+err.message, 5000); }
+}
+
+/* ---------- 輪值表 Excel：套用範本原版面與套色 ---------- */
+const DUTY_FILL_COLORS = { '上課':'FFFF00', '放假':'FF9900', '段考':'00FFFF', '活動':'00FF00' };
+
+function dutyDayInfo(iso){
+  const c = (state.calendar||[]).find(function(x){ return x.date===iso; });
+  const status = c ? (c.status || '上課') : '上課';
+  return { status: status, label: (c && c.label) || '' };
+}
+
+async function exportDutyXlsx(){
+  try{
+    await LIB.need(['exceljs','pizzip']);
+    const s0 = String(E.opt(state,'nsStart')||'').trim();
+    const e0 = String(E.opt(state,'nsEnd')||'').trim();
+    if(!s0 || !e0) throw new Error('請先在「設定與檢查」填妥夜自習起日與訖日，匯出才有範圍');
+    const tpl = await API.template('duty');
+    /* 待調時間與工作表名 */
+    const tIn = String(E.opt(state,'dutyTimeStart')||'17:40').trim()||'17:40';
+    const tOut = String(E.opt(state,'dutyTimeEnd')||'21:00').trim()||'21:00';
+    const hhmm = function(t){
+      const m = String(t).match(/^(\d{1,2})[:：]?(\d{2})$/);
+      return m ? ((m[1].length<2?'0':'')+m[1]) + m[2] : String(t).replace(/[:：]/g,'');
+    };
+    const ExcelJS = window.ExcelJS;
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(tpl);
+    const ws = wb.getWorksheet(1);
+    if(!ws) throw new Error('範本缺少工作表');
+
+    /* 顯示範圍：nsStart 所在週的週一，到 nsEnd 所在週的週五 */
+    const span = [];
+    const sMon = E.weekOf(s0), eFri = E.weekOf(e0);
+    let cur = E.parse(sMon[0]);
+    const last = E.parse(eFri[4]);
+    while(true){
+      const iso = E.iso(cur);
+      if(!/^(\d{4}-)\d\d-\d\d$/.test(iso)) break;
+      const w = E.wd(iso);
+      if(w>=1 && w<=5) span.push([iso, w]);
+      const nx = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate()+1);
+      if(E.iso(nx) > E.iso(last)) break;
+      cur = nx;
+    }
+    const weeks = [];
+    for(let i=0;i<span.length;i+=5) weeks.push(span.slice(i,i+5));
+
+    /* 底部四則注意事項原樣搬移：範本固定在 A32:F35，週塊數不同時要先平移。
+       先拆掉範本既有合併，不然週塊數等於或大於 15 時會跟週塊打架（ExcelJS 對已合併範圍再合併會丟錯） */
+    ['A32:F32','A33:F33','A34:F34','A35:F35'].forEach(function(rng){
+      try{ ws.unMergeCells(rng); }catch(err){ /* 範本沒有這一段就算了 */ }
+    });
+    const M1 = 2 + weeks.length*2;   /* 注意事項第一列 */
+    const notes = [];
+    for(let i=0;i<4;i++){
+      const rr = 32 + i;
+      notes.push({ v: ws.getCell(rr,1).value, h: ws.getRow(rr).height,
+                   st: JSON.parse(JSON.stringify(ws.getCell(rr,1).style)) });
+      for(let c=1;c<=6;c++){ ws.getCell(rr,c).value = null; }
+    }
+    /* 取一組週塊樣式當參考（row2 日期列、row3 輪值列） */
+    const dStyle = {}, pStyle = {};
+    for(let c=1;c<=6;c++){
+      dStyle[c] = ws.getCell(2,c).style;
+      pStyle[c] = ws.getCell(3,c).style;
+    }
+    /* 週塊數比範本內建 15 組少時，後段殘留的空格列（含套色）整列清乾淨（含舊注意事項列到 35） */
+    for(let r=M1; r<=35; r++){
+      for(let c=1;c<=6;c++){
+        const cell = ws.getCell(r,c);
+        cell.value = null;
+        cell.style = {};
+      }
+    }
+
+    let nDays = 0;
+    weeks.forEach(function(wk, wi){
+      const dr = 2 + wi*2, pr = dr + 1;
+      ws.getCell(dr,1).value = '日期';
+      ws.getCell(pr,1).value = '輪值人員';
+      /* ExcelJS 載入範本後，同 styleId 的儲存格共用同一份樣式物件：直接逐格改 fill 會互踩，
+         整個表會被洗成最後寫入的那個顏色。每格都要深複製樣式再改寫，才會脫離共用。 */
+      const beyond = !!numberOfPairBeyond(wi);
+      if(beyond){
+        ws.getCell(dr,1).style = JSON.parse(JSON.stringify(dStyle[1]));
+        ws.getCell(pr,1).style = JSON.parse(JSON.stringify(pStyle[1]));
+      }
+      wk.forEach(function(item, k){
+        const col = k+2, iso = item[0];
+        const info = dutyDayInfo(iso);
+        const dc = ws.getCell(dr, col), pc = ws.getCell(pr, col);
+        /* 日期列：套色＝上課黃、放假橘、段考青、活動綠 */
+        const dst = JSON.parse(JSON.stringify(beyond ? dStyle[col] : dc.style));
+        dst.fill = { type:'pattern', pattern:'solid', fgColor:{ argb:'FF'+(DUTY_FILL_COLORS[info.status]||'FFFF00') } };
+        dst.numFmt = 'm"月"d"日"';
+        dc.style = dst;
+        /* ExcelJS 把 Date 物件用 UTC 換算序數，台灣時區會慢八小時、畫面上早一天。
+           直接寫 Excel 序數（與 1899-12-30 的 UTC 天數差）才是時區安全的做法 */
+        dc.value = Math.round((Date.UTC(Number(iso.slice(0,4)), Number(iso.slice(5,7))-1, Number(iso.slice(8,10))) - Date.UTC(1899,11,30)) / 86400000);
+        /* 輪值人員列：一律灰底；內容人名優先，非上課日放原因標籤 */
+        const pst = JSON.parse(JSON.stringify(beyond ? pStyle[col] : pc.style));
+        pst.fill = { type:'pattern', pattern:'solid', fgColor:{ argb:'FFC8C8C8' } };
+        pc.style = pst;
+        const rec = (state.duty||[]).find(function(d){ return d.date===iso; });
+        const t = String((rec && rec.teacher) || '').trim();
+        pc.value = t ? t : (info.status!=='上課' ? info.label : '');
+        if(info.status==='上課') nDays++;
+      });
+    });
+    /* 注意事項寫回（時間依設定代入），樣式照搬原位並在新位置重新合併 */
+    notes.forEach(function(n, i){
+      const rr = M1 + i;
+      let text = n.v;
+      if(i===0 && typeof text === 'string'){
+        text = text.replace(/17:40/g, tIn).replace(/21:00/g, tOut);
+      }
+      const cell = ws.getCell(rr,1);
+      if(n.st) cell.style = n.st;
+      cell.value = text;
+      if(n.h) ws.getRow(rr).height = n.h;
+      try{ ws.mergeCells(rr,1,rr,6); }catch(err){ /* 已合併就不重來 */ }
+    });
+
+    /* 標題：學期＋學校＋天數（參考範本原文：「115-1建成國中夜自習留守輪值表62天」） */
+    const term = (E.opt(state,'term')||state.meta.term||'').trim();
+    const school = (E.opt(state,'school')||state.meta.school||'').trim();
+    const cells = weeks.reduce(function(x,w){ return x+w.length; }, 0);
+    if(nDays || cells){
+      ws.getCell(1,1).value = (term+school+'夜自習留守輪值表'+nDays+'天\n（每人填寫2~3天）').trim();
+    }
+    ws.name = '夜自習輪值（'+hhmm(tIn)+'-'+hhmm(tOut)+'）';
+
+    wb.calcProperties = { fullCalcOnLoad:true };
+    const raw = await wb.xlsx.writeBuffer();
+    const out = await cleanXlsxParts(raw);
+    download(new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),
+      (E.opt(state,'exportPrefix')||'夜自習')+'_輪值表_'+stamp()+'.xlsx');
+    toast('已下載輪值表 Excel（'+weeks.length+' 週、'+nDays+' 個夜自習日）');
+  }catch(err){ toast('匯出輪值表失敗：'+err.message, 5000); }
+}
+/* 是否超出範本內建 15 週塊（範本 row2~31 是內建列，超出才需要補樣式） */
+function numberOfPairBeyond(wi){
+  /* 該週塊的日期列行號，是否在 32 之上 */
+  return (2 + wi*2) > 31 ? (2 + wi*2) : 0;
 }
 
 /* ---------- 便當收費表（複刻紙本預繳單：每班一張工作表加全校總表） ---------- */
