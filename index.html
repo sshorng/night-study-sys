@@ -5524,9 +5524,44 @@ async function cleanXlsxParts(buf){
       const f = zip.file(name);
       if(!f) return;
       const xml = f.asText();
-      const cleaned = xml
+      let cleaned = xml
         .replace(/<conditionalFormatting\b[^>]*\/>/g, function(){ hits++; return ''; })
-        .replace(/<conditionalFormatting\b[^>]*>\s*<\/conditionalFormatting>/g, function(){ hits++; return ''; });
+        .replace(/<conditionalFormatting\b[^>]*>\s*<\/conditionalFormatting>/g, function(){ hits++; return ''; })
+        /* ExcelJS 會把沒設定的 DPI 寫成 4294967295 溢位值，Excel 一律判修復，直接拔屬性 */
+        .replace(/(\s)+(horizontalDpi|verticalDpi)="\d+"/g, function(){ hits++; return ''; });
+      /* ExcelJS 寫死把 pageSetUpPr 排在 outlinePr 前面，違反 schema 順序，Excel 會判修復；
+         依 CT_SheetPr 正序重組：tabColor、outlinePr、pageSetUpPr */
+      cleaned = cleaned.replace(/<sheetPr(\s[^>]*)?>([\s\S]*?)<\/sheetPr>/, function(m, attrs, inner){
+        const pick = function(tag){
+          const mm = inner.match(new RegExp('<' + tag + '\\b[^>]*/>'));
+          return mm ? mm[0] : '';
+        };
+        const parts = pick('tabColor') + pick('outlinePr') + pick('pageSetUpPr');
+        if(parts === inner) return m;
+        hits++;
+        return '<sheetPr' + (attrs || '') + '>' + parts + '</sheetPr>';
+      });
+      /* 內容列之後若是範本殘渣的自閉空列，整列拔掉並把 dimension 收縮到實際範圍 */
+      let maxRow = 0;
+      cleaned.replace(/<c r="[A-Z]+(\d+)"/g, function(m, r){ if(+r > maxRow) maxRow = +r; return m; });
+      if(maxRow > 0){
+        cleaned.replace(/<mergeCell ref="[^"]*"/g, function(m){
+          m.replace(/(\d+)/g, function(n){ if(+n > maxRow) maxRow = +n; return n; });
+          return m;
+        });
+      }
+      if(maxRow > 0){
+        cleaned = cleaned
+          .replace(/<row r="(\d+)"[^>]*\/>/g, function(m, r){ return +r > maxRow ? (hits++, '') : m; })
+          .replace(/<row r="(\d+)"[^>]*>\s*<\/row>/g, function(m, r){ return +r > maxRow ? (hits++, '') : m; })
+          .replace(/<dimension ref="([^"]*)"/, function(m, ref){
+            const fixed = ref.split(':').map(function(p){
+              const c = p.match(/^([A-Z]+)(\d+)$/);
+              return c ? c[1] + Math.min(parseInt(c[2], 10), maxRow) : p;
+            }).join(':');
+            return '<dimension ref="' + fixed + '"';
+          });
+      }
       if(cleaned !== xml) zip.file(name, cleaned);
     });
     if(!hits) return buf;
