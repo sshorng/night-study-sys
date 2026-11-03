@@ -2546,34 +2546,52 @@ function dropSeatOf(key){
 function setActive(key, on){
   const s = E.byKey(state,key); if(!s) return;
   if(!on){ openExit(key); return; }
-  const date = ref();
-  const before = E.daysAt(state,key,date).slice();
-  s.active = true;
-  ui.pick.delete(key);
-  if(!before.some(Boolean) && s.days.some(Boolean)){
-    state.enrollments.push({ id:newId('e'), key:key, date:date, days:s.days.slice(), from:before,
-      reason:'加入夜自習', kind:'join', createdAt:new Date().toISOString() });
+  openJoin([key]);
+}
+
+/* 新增參加：原因固定寫「新增參加」，生效日可指定 */
+function openJoin(keys){
+  keys = (keys && keys.length) ? keys : [...ui.pick];
+  keys = keys.filter(function(k){
+    const s = E.byKey(state,k);
+    return s && s.active===false;
+  });
+  if(!keys.length) return;
+  if(keys.length===1){
+    const s = E.byKey(state,keys[0]);
+    var who = '<div class="hint">'+s.cls+'-'+s.seat+'　'+esc(s.name)+'　目前：不參加</div>';
+  }else{
+    var who = '<div class="hint">一次新增 '+keys.length+' 人，各人目前：不參加</div>';
   }
-  commit();
-  toast('已將 '+s.name+' 設為參加，記得設定參加日', 3600);
+  const body = who
+    + '<div class="field"><label>生效日</label><input type="date" id="jDate" value="'+ref()+'"></div>';
+  const m = modal('新增參加', body, '<button class="btn" data-close>取消</button><button class="btn primary" id="jSave">確定新增參加</button>');
+  m.querySelector('[data-close]').addEventListener('click', closeModal);
+  m.querySelector('#jSave').addEventListener('click', function(){
+    const date = m.querySelector('#jDate').value || ref();
+    let n = 0, noDay = 0;
+    keys.forEach(function(k){
+      const s = E.byKey(state,k); if(!s || s.active!==false) return;
+      const before = E.daysAt(state,k,date).slice();
+      s.active = true;
+      ui.pick.delete(k);
+      if(!before.some(Boolean) && s.days.some(Boolean)){
+        state.enrollments.push({ id:newId('e'), key:k, date:date, days:s.days.slice(), from:before,
+          reason:'新增參加', kind:'join', createdAt:new Date().toISOString() });
+      }
+      if(!s.days.some(Boolean)) noDay++;
+      n++;
+    });
+    closeModal(); commit();
+    if(noDay) toast('已新增參加 '+n+' 人（'+date+' 起生效），'+noDay+' 人尚未設參加日', 3600);
+    else toast('已新增參加 '+n+' 人，'+date+' 起生效，寫入異動日誌', 3200);
+  });
 }
 
 function batchActive(on){
   const keys = [...ui.pick]; if(!keys.length) return;
   if(!on){ openExitBatch(keys); return; }
-  const date = ref();
-  keys.forEach(function(k){
-    const s = E.byKey(state,k); if(!s) return;
-    const before = E.daysAt(state,k,date).slice();
-    s.active = true;
-    if(!before.some(Boolean) && s.days.some(Boolean)){
-      state.enrollments.push({ id:newId('e'), key:k, date:date, days:s.days.slice(), from:before,
-        reason:'加入夜自習', kind:'join', createdAt:new Date().toISOString() });
-    }
-  });
-  ui.pick.clear();
-  commit();
-  toast('已設為參加 '+keys.length+' 人', 3000);
+  openJoin(keys);
 }
 
 /* 退出夜自習：一定要填原因，並寫入異動日誌 */
