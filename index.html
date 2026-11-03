@@ -942,7 +942,7 @@ const LIB = {
    1. CONFIG
    ===================================================================== */
 const CONFIG = {
-  VERSION: '2.34.0',
+  VERSION: '2.34.1',
   GAS_URL: 'https://script.google.com/macros/s/AKfycbxBk3fJaCrPfyojhPVgT6xNE110x3ENSGquQLVWLBz8jdNH2FgX6QMNBQKr1lHLZ8ePtw/exec',
   PASSWORD: '',
   ROLE_KEY: 'nightstudy.role',
@@ -1004,11 +1004,32 @@ const OPTS = [
     hint:'便當只算這一天之後；留空表示不限' },
   { key:'nsEnd',        label:'夜自習訖日',       def:'',      type:'date',
     hint:'便當只算到這一天；留空表示不限' },
-  { key:'dutyTimeStart', label:'輪值開始時間',    def:'17:40', type:'text',
+  { key:'dutyTimeStart', label:'輪值開始時間',    def:'17:40', type:'text', norm:'time',
     hint:'例：17:40；用在輪值表工作表名與說明文字' },
-  { key:'dutyTimeEnd',   label:'輪值結束時間',    def:'21:00', type:'text',
+  { key:'dutyTimeEnd',   label:'輪值結束時間',    def:'21:00', type:'text', norm:'time',
     hint:'例：21:00；用在輪值表工作表名與說明文字' }
 ];
+
+/* 時間參數正規化：試算表會把「17:40」自動轉成時間序列值，回讀可能變日期字串
+   （例如 1899-12-30，或夾在日期時間裡的 T17:40）。這裡一律從字串找出 HH:MM，
+   找不出來（純日期、亂碼、空白字串）就退回程式預設值，絕不讓 1899-12-30 流出去 */
+function normTimeVal(v, def){
+  const s = String(v == null ? '' : v).trim();
+  const m = s.match(/(\d{1,2})[:：](\d{2})/);
+  if(!m) return def;
+  return (m[1].length < 2 ? '0' : '') + m[1] + ':' + m[2];
+}
+
+/* 期別（YYYY-MM）正規化：試算表會把「2026-10」自動轉成日期，回讀可能變一長串英文，
+   已繳／調整紀錄就對不上期別（畫面變回未繳）。從日期或字串裡收回 YYYY-MM */
+function normYmVal(v){
+  const s = String(v == null ? '' : v).trim();
+  const m = s.match(/^(\d{4})[-／年](\d{1,2})/);
+  if(m) return m[1] + '-' + ('0'+m[2]).slice(-2);
+  const d = new Date(s);
+  if(!isNaN(d.getTime()) && d.getFullYear() >= 2000) return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+  return s;
+}
 
 /* 這三個參數是「常用清單」，設定頁會即時預覽會切成幾個按鈕 */
 const LIST_OPT_KEYS = ['vioReasons','leaveReasons','lunchOptions'];
@@ -1062,6 +1083,7 @@ const E = {
       const empty = v===undefined || v===null || String(v).trim()==='';
       let val = empty ? d.def : String(v).trim();
       if(empty && (d.key==='school' || d.key==='term') && meta[d.key]) val = String(meta[d.key]).trim();
+      if(d.norm === 'time') val = normTimeVal(val, d.def);
       out[d.key] = val;
     });
     return out;
@@ -6381,6 +6403,11 @@ function normalize(){
   if(!state.config.refDate) state.config.refDate = E.today();
   state.config.totals = state.config.totals || {};
   ['enrollments','calendar','leaves','violations','checkins','duty','dutyNotes','meals','mealMembers','mealAdjusts','mealPays','conflicts'].forEach(function(k){ state[k]=state[k]||[]; });
+  /* 期別欄救回：試算表自動轉日期後回讀的髒字串（2026-10 變成日期或一長串英文），
+     不修的話已繳／調整紀錄對不上期別，標記過的人又變回未繳 */
+  ['mealPays','mealAdjusts'].forEach(function(k){
+    (state[k]||[]).forEach(function(r){ if(r && r.ym) r.ym = normYmVal(r.ym); });
+  });
   /* 便當選項改成只分訂、不訂：舊設定裡的葷、素自動換掉 */
   if(/葷|素/.test(String(state.opts.lunchOptions||''))) state.opts.lunchOptions = '訂、不訂';
   state.seats = state.seats || {};

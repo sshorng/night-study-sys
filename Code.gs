@@ -557,17 +557,18 @@ function loadState_() {
   /* 便當調整：整體加收、整體退費、折抵下期 */
   const mealAdjusts = readRows_('mealAdjusts').map(function (r) {
     return {
-      id: String(r[0] || ''), ym: String(r[1] || ''), scope: String(r[2] || 'all'),
+      id: String(r[0] || ''), ym: ymStr_(r[1]), scope: String(r[2] || 'all'),
       day: dateStr_(r[3]), keys: String(r[4] || '').split(',').filter(Boolean),
       amount: Number(r[5] || 0), note: String(r[6] || ''),
       settle: String(r[7] || 'cash'), createdAt: String(r[8] || ''),
     };
   });
 
-  /* 便當繳費：每人每期一筆，有紀錄就是已繳 */
+  /* 便當繳費：每人每期一筆，有紀錄就是已繳；期別一律經 ymStr_ 正規化
+    （試算表會把「2026-10」轉成日期，回讀要收回 YYYY-MM，不然已繳會變回未繳） */
   const mealPays = readRows_('mealPays').map(function (r) {
     return {
-      id: String(r[0] || ''), ym: String(r[1] || ''), key: String(r[2] || ''),
+      id: String(r[0] || ''), ym: ymStr_(r[1]), key: String(r[2] || ''),
       status: String(r[3] || '已繳'), paidAt: dateStr_(r[4]), note: String(r[5] || ''),
     };
   });
@@ -849,6 +850,19 @@ function timeStr_(v) {
   const s = String(v || '').trim();
   const m = s.match(/^(\d{1,2}):(\d{2})/);
   if (m) return ('0' + m[1]).slice(-2) + ':' + m[2];
+  return s;
+}
+
+/* 期別（YYYY-MM）的正規化：試算表會把「2026-10」自動轉成日期 2026/10/01，
+   回讀變成 Date 物件（String() 會變成整串英文），已繳／調整紀錄就對不上期別。
+   這裡一律收回 YYYY-MM：日期取年月，字串取前段。 */
+function ymStr_(v) {
+  if (v instanceof Date) {
+    return Utilities.formatDate(v, Session.getScriptTimeZone(), 'yyyy-MM-dd').slice(0, 7);
+  }
+  const s = String(v || '').trim();
+  const m = s.match(/^(\d{4})[-/](\d{1,2})/);
+  if (m) return m[1] + '-' + ('0' + m[2]).slice(-2);
   return s;
 }
 
